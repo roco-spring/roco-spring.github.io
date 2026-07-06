@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Evaluation — RoCo-Spring</title>
+    <meta name="description"
+        content="RbS-Score metric, leaderboards, baselines, and submission instructions for RoCo-Spring.">
+    <link rel="stylesheet" href="assets/style.css">
+    <script src="assets/site-layout.js" defer></script>
+</head>
+
+<body>
+    <canvas id="flow-canvas" aria-hidden="true"></canvas>
+
+    <header id="site-header"></header>
+
+    <main>
+        <section class="page-header section">
+            <div class="eyebrow">Evaluation</div>
+            <h1>Metrics, Leaderboards &amp; Submissions</h1>
+            <p class="page-intro">
+                Methods are ranked by the RbS-Score, which balances clean Spring performance and
+                corrupted RobustSpring performance with equal weight.
+            </p>
+        </section>
+
+        <section class="section">
+            <div class="section-heading">
+                <div class="eyebrow">Metric</div>
+                <h2>RbS-Score</h2>
+            </div>
+
+            <div class="metric-card content-card">
+                <p>
+                    Each quantitative task is ranked by a normalized balanced robustness score.
+                    <strong>Lower is better.</strong> The score gives equal weight to clean Spring
+                    performance and corrupted RobustSpring performance.
+                </p>
+
+                <div class="formula" aria-label="RbS Score formula">
+                    RbS-Score<sub>t</sub>(m) =
+                    0.5 · E<sub>S</sub><sup>t</sup>(m) / B<sub>S</sub><sup>t</sup>
+                    +
+                    0.5 · E<sub>R</sub><sup>t</sup>(m) / B<sub>R</sub><sup>t</sup>
+                </div>
+
+                <ul>
+                    <li><strong>E<sub>S</sub><sup>t</sup>(m):</strong> method error on Spring for task <em>t</em></li>
+                    <li><strong>E<sub>R</sub><sup>t</sup>(m):</strong> average method error on RobustSpring for task
+                        <em>t</em>
+                    </li>
+                    <li><strong>B<sub>S</sub><sup>t</sup>, B<sub>R</sub><sup>t</sup>:</strong> fixed baseline
+                        normalization constants</li>
+                </ul>
+
+                <h3>Tie-breaking</h3>
+                <ol>
+                    <li>Lower normalized RobustSpring term</li>
+                    <li>Lower normalized Spring term</li>
+                </ol>
+            </div>
+        </section>
+
+        <section class="section" id="leaderboards">
+            <div class="section-heading">
+                <div class="eyebrow">Leaderboards</div>
+                <h2>Public rankings</h2>
+            </div>
+
+            <div class="card-grid five">
+                <span class="leaderboard-card disabled" aria-disabled="true">
+                    <strong>Optical Flow Leaderboard</strong>
+                    <span class="coming-soon">Coming soon</span>
+                </span>
+
+                <span class="leaderboard-card disabled" aria-disabled="true">
+                    <strong>Stereo Matching Leaderboard</strong>
+                    <span class="coming-soon">Coming soon</span>
+                </span>
+
+                <span class="leaderboard-card disabled" aria-disabled="true">
+                    <strong>Scene Flow Leaderboard</strong>
+                    <span class="coming-soon">Coming soon</span>
+                </span>
+
+                <span class="leaderboard-card disabled" aria-disabled="true">
+                    <strong>Cross-Task Leaderboard</strong>
+                    <span class="coming-soon">Coming soon</span>
+                </span>
+
+                <span class="leaderboard-card disabled" aria-disabled="true">
+                    <strong>Exploration Track</strong>
+                    <span class="coming-soon">Coming soon</span>
+                </span>
+            </div>
+        </section>
+
+        <section class="section">
+            <div class="section-heading">
+                <div class="eyebrow">Submissions</div>
+                <h2>Submission workflow</h2>
+            </div>
+
+            <ol class="steps content-card">
+                <li>Generate predictions for the selected task</li>
+                <li>Package archive in the required format</li>
+                <li>Validate archive locally using the starting kit</li>
+                <li>Submit to the benchmark server using your unique team ID</li>
+                <li>Check leaderboard for results</li>
+            </ol>
+        </section>
+
+        <section class="section" id="reproducibility">
+            <div class="section-heading">
+                <div class="eyebrow">Workshop Paper</div>
+                <h2>Paper requirements</h2>
+            </div>
+
+            <div class="content-card">
+                <p>
+                    Each quantitative or exploration entry must submit a 4–6 page single-blind
+                    workshop paper. The paper should describe the method, implementation details,
+                    training and pretraining data, compute budget, results, ablations, and
+                    limitations.
+                </p>
+                <p>
+                    Papers will be reviewed by the organizers and additional external reviewers with expertise in
+                    optical flow, stereo, scene flow, robustness, and benchmark design. Acceptance will depend on
+                    technical soundness, clarity, reproducibility, and relevance to robust dense correspondence, not
+                    only on leaderboard rank.
+                    All accepted papers will be forwarded for the official PMLR volume of NeurIPS workshop proceedings.
+                </p>
+
+                <h3>Reproducibility package</h3>
+                <p>
+                    With the camera-ready deadline, each entry must submit a reproducibility package
+                    together with the paper. Award eligibility requires an accepted workshop paper
+                    and a complete package that meets the requirements below.
+                </p>
+                <ul class="feature-list">
+                    <li>
+                        <strong>Dataset declaration.</strong> List every dataset used for training,
+                        pretraining, fine-tuning, and validation (not only Spring and RobustSpring).
+                    </li>
+                    <li>
+                        <strong>Training scripts.</strong> Provide runnable scripts or commands that
+                        reproduce training end to end.
+                    </li>
+                    <li>
+                        <strong>Evaluation scripts.</strong> Provide runnable scripts that reproduce
+                        the metrics and results reported in the paper on the declared data splits.
+                    </li>
+                    <li>
+                        <strong>Resource requirements.</strong> Document hardware and runtime needs
+                        for both training and evaluation, including GPU type, GPU count, peak memory,
+                        and wall-clock time.
+                    </li>
+                    <li>
+                        <strong>README.</strong> Include a detailed, concise setup guide that explains
+                        how to install dependencies and rerun training and evaluation. Pin the
+                        environment either with a <code>pyproject.toml</code> following the
+                        <a href="https://packaging.python.org/en/latest/guides/writing-pyproject-toml/" target="_blank"
+                            rel="noopener noreferrer">Python packaging guide</a>,
+                        or with explicit conda instructions that list every library and version
+                        required to recreate the environment.
+                    </li>
+                </ul>
+            </div>
+        </section>
+    </main>
+
+    <footer id="site-footer"></footer>
+
+    <script src="assets/flow.js"></script>
+</body>
+
+</html>

@@ -1,0 +1,250 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Participate — RoCo-Spring</title>
+    <meta name="description"
+        content="How to register, download the starting kit, and submit to the RoCo-Spring challenge.">
+    <link rel="stylesheet" href="assets/style.css">
+    <script src="assets/site-layout.js" defer></script>
+</head>
+
+<body>
+    <canvas id="flow-canvas" aria-hidden="true"></canvas>
+
+    <header id="site-header"></header>
+
+    <main>
+        <section class="page-header section">
+            <div class="eyebrow">Participate</div>
+            <h1>Getting Started</h1>
+            <p class="page-intro">
+                Participants register a team, receive a unique team ID, download the data and starting kit,
+                generate their model predictions, and submit to the <a href="https://spring-benchmark.org/"
+                    target="_blank" rel="noopener noreferrer">benchmark</a>.
+            </p>
+        </section>
+
+        <section class="section" id="registration">
+            <div class="section-heading">
+                <div class="eyebrow">Workflow</div>
+                <h2>Step-by-step participation</h2>
+            </div>
+
+            <ol class="step-list content-card">
+                <li class="step-card">
+                    <div class="step-number" aria-hidden="true">1</div>
+                    <div class="step-body">
+                        <h3>Register team</h3>
+                        <p>
+                            Sign up your team on the competition platform to receive updates and access
+                            submission instructions.
+                            <span class="coming-soon">Coming soon</span>
+                        </p>
+                    </div>
+                </li>
+                <li class="step-card">
+                    <div class="step-number" aria-hidden="true">2</div>
+                    <div class="step-body">
+                        <h3>Receive unique team ID</h3>
+                        <p>
+                            After registration, each team is issued a unique identifier that must be used
+                            for all submissions and leaderboard entries.
+                        </p>
+                    </div>
+                </li>
+                <li class="step-card">
+                    <div class="step-number" aria-hidden="true">3</div>
+                    <div class="step-body">
+                        <h3>Download data</h3>
+                        <p>
+                            Download the <a
+                                href="https://darus.uni-stuttgart.de/dataset.xhtml?persistentId=doi:10.18419/darus-3376"
+                                target="_blank" rel="noopener noreferrer">Spring</a> and <a
+                                href="https://darus.uni-stuttgart.de/dataset.xhtml?persistentId=doi:10.18419/DARUS-5047"
+                                target="_blank" rel="noopener noreferrer">RobustSpring</a> training splits needed for
+                            model
+                            development, local validation, and practice runs.
+                        </p>
+                    </div>
+                </li>
+                <li class="step-card">
+                    <div class="step-number" aria-hidden="true">4</div>
+                    <div class="step-body">
+                        <h3>Install starting kit</h3>
+                        <p>
+                            Set up the PTLFlow-based starting kit with training and inference scripts,
+                            data loaders, and example configurations.
+                        </p>
+                    </div>
+                </li>
+                <li class="step-card">
+                    <div class="step-number" aria-hidden="true">5</div>
+                    <div class="step-body">
+                        <h3>Run baseline</h3>
+                        <p>
+                            Run the provided baseline configurations to verify your environment, data paths,
+                            and end-to-end inference pipeline.
+                        </p>
+                    </div>
+                </li>
+                <li class="step-card">
+                    <div class="step-number" aria-hidden="true">6</div>
+                    <div class="step-body">
+                        <h3>Generate predictions</h3>
+                        <p>
+                            Produce model outputs for your chosen task(s) and export them in the
+                            required prediction format.
+                        </p>
+                    </div>
+                </li>
+                <li class="step-card">
+                    <div class="step-number" aria-hidden="true">7</div>
+                    <div class="step-body">
+                        <h3>Validate archive locally</h3>
+                        <p>
+                            Package your predictions into a submission archive and run local validation to
+                            catch formatting or naming issues before uploading.
+                        </p>
+                    </div>
+                </li>
+                <li class="step-card">
+                    <div class="step-number" aria-hidden="true">8</div>
+                    <div class="step-body">
+                        <h3>Submit to benchmark server</h3>
+                        <p>
+                            Upload your validated archive to the <a href="https://spring-benchmark.org/" target="_blank"
+                                rel="noopener noreferrer">benchmark</a> to receive scores on the
+                            development leaderboard.
+                        </p>
+                    </div>
+                </li>
+                <li class="step-card">
+                    <div class="step-number" aria-hidden="true">9</div>
+                    <div class="step-body">
+                        <h3>Submit workshop paper and reproducibility package</h3>
+                        <p>
+                            Prepare and submit a 4–6 page workshop paper describing your method and
+                            experiments. With the camera-ready deadline, include a reproducibility
+                            package with dataset declarations, training and evaluation scripts,
+                            resource requirements, and a pinned environment setup. See
+                            <a href="evaluation.html#reproducibility">evaluation requirements</a>
+                            for details.
+                        </p>
+                    </div>
+                </li>
+            </ol>
+        </section>
+
+        <section class="section">
+            <div class="section-heading">
+                <div class="eyebrow">Starting Kit</div>
+                <h2>PTLFlow-based tools and scripts</h2>
+            </div>
+
+            <div class="content-card">
+                <p>
+                    GitHub repository:
+                    <span class="coming-soon">Coming soon</span>
+                </p>
+
+                <!-- <ul class="feature-list">
+                    <li>PTLFlow-based training and inference scripts</li>
+                    <li>Spring and RobustSpring data loaders</li>
+                    <li>Standard configs</li>
+                    <li>Prediction export scripts</li>
+                    <li>Submission packaging scripts</li>
+                    <li>Local archive validation</li>
+                    <li>Example submissions</li>
+                </ul> -->
+            </div>
+        </section>
+
+        <!-- <section class="section">
+            <div class="section-heading">
+                <div class="eyebrow">Tutorials</div>
+                <h2>Tutorial notebooks</h2>
+            </div>
+
+            <div class="card-grid four">
+                <article class="tutorial-card">
+                    <h3>Data Download</h3>
+                    <p>Instructions for accessing Spring and RobustSpring data.</p>
+                    <span class="coming-soon">Coming soon</span>
+                </article>
+
+                <article class="tutorial-card">
+                    <h3>Baseline Execution</h3>
+                    <p>Run provided baselines and verify your setup.</p>
+                    <span class="coming-soon">Coming soon</span>
+                </article>
+
+                <article class="tutorial-card">
+                    <h3>Local Validation</h3>
+                    <p>Validate prediction archives before submission.</p>
+                    <span class="coming-soon">Coming soon</span>
+                </article>
+
+                <article class="tutorial-card">
+                    <h3>Benchmark Submission</h3>
+                    <p>Package and upload predictions to the server.</p>
+                    <span class="coming-soon">Coming soon</span>
+                </article>
+            </div>
+
+            <div class="card-grid one spaced-top">
+                <article class="tutorial-card">
+                    <h3>Metric Interpretation</h3>
+                    <p>Understand RbS-Score and leaderboard rankings.</p>
+                    <span class="coming-soon">Coming soon</span>
+                </article>
+            </div>
+        </section> -->
+
+        <!-- <section class="section">
+            <div class="section-heading">
+                <div class="eyebrow">Practice</div>
+                <h2>Practice submissions</h2>
+            </div>
+
+            <div class="content-card">
+                <p>
+                    Practice submissions will be released with the starting kit. Use them to
+                    verify your pipeline before the development leaderboard opens.
+                </p>
+            </div>
+        </section> -->
+
+        <section class="section">
+            <div class="section-heading">
+                <div class="eyebrow">Support</div>
+                <h2>Getting help</h2>
+            </div>
+
+            <div class="contact-card content-card">
+                <p>
+                    GitHub issues:
+                    <span class="coming-soon">Coming soon</span>
+                </p>
+
+                <p>
+                    Discussion forum:
+                    <span class="coming-soon">Coming soon</span>
+                </p>
+
+                <p>
+                    Email:
+                    <a href="mailto:roco-spring-org@googlegroups.com">roco-spring-org@googlegroups.com</a>
+                </p>
+            </div>
+        </section>
+    </main>
+
+    <footer id="site-footer"></footer>
+
+    <script src="assets/flow.js"></script>
+</body>
+
+</html>

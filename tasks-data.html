@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Tasks &amp; Data — RoCo-Spring</title>
+    <meta name="description"
+        content="Task definitions, application scenarios, and Spring / RobustSpring datasets for RoCo-Spring.">
+    <link rel="stylesheet" href="assets/style.css">
+    <script src="assets/site-layout.js" defer></script>
+</head>
+
+<body>
+    <canvas id="flow-canvas" aria-hidden="true"></canvas>
+
+    <header id="site-header"></header>
+
+    <main>
+        <section class="page-header section">
+            <div class="eyebrow">Tasks &amp; Data</div>
+            <h1>What to solve and what data to use</h1>
+            <p class="page-intro">
+                RoCo-Spring covers three quantitative correspondence tasks and one exploration
+                track. They are evaluated on paired clean Spring and corrupted RobustSpring data.
+            </p>
+        </section>
+
+        <section class="section">
+            <div class="section-heading">
+                <div class="eyebrow">Tracks</div>
+                <h2>RoCo-Spring tasks</h2>
+            </div>
+
+            <div class="tracks-panel">
+                <div class="tracks-intro">
+                    <p>
+                        RoCo-Spring includes three quantitative dense correspondence tracks and
+                        one exploration track. The quantitative tracks evaluate methods on optical
+                        flow, stereo matching, and scene flow using paired clean and corrupted
+                        benchmark data. The exploration track rewards careful analysis of robustness
+                        behavior, failure modes, and evaluation methodology.
+                    </p>
+                </div>
+
+                <div class="tracks-subsection">
+                    <h3>Quantitative tracks</h3>
+
+                    <div class="card-grid three">
+                        <article class="track-card">
+                            <h4>Optical Flow</h4>
+                            <p>
+                                Estimate a dense 2D displacement field between consecutive frames,
+                                assigning each visible pixel a motion vector.
+                            </p>
+                        </article>
+
+                        <article class="track-card">
+                            <h4>Stereo Matching</h4>
+                            <p>
+                                Estimate a dense disparity map from a rectified stereo image pair,
+                                assigning each pixel the horizontal offset to its corresponding point.
+                            </p>
+                        </article>
+
+                        <article class="track-card">
+                            <h4>Scene Flow</h4>
+                            <p>
+                                Estimate dense 3D motion from stereo image sequences, combining
+                                per-pixel geometry and temporal motion into a single correspondence task.
+                            </p>
+                        </article>
+                    </div>
+                </div>
+                <br>
+                <h3>Qualitative track</h3>
+                <div class="tracks-subsection exploration-subsection">
+                    <h3>Exploration track</h3>
+                    <p>
+                        The exploration track is for rigorous studies that help explain robustness
+                        in dense correspondence. Submissions may analyze why current methods fail
+                        under corruptions, which design choices improve robustness, how different
+                        corruptions affect different model families, or whether robustness gains
+                        transfer across optical flow, stereo matching, and scene flow.
+                    </p>
+                    <p>
+                        Strong exploration submissions should pose a clear scientific question,
+                        use a careful experimental protocol, provide reproducible evidence, and
+                        offer insights that are useful for future robust dense correspondence research.
+                    </p>
+                </div>
+            </div>
+        </section>
+
+        <section class="section">
+            <div class="section-heading">
+                <div class="eyebrow">Datasets</div>
+                <h2>Spring and RobustSpring</h2>
+            </div>
+
+            <div class="content-card">
+                <p>
+                    We use two datasets for RoCo-Spring: <em>Spring</em> provides clean high-resolution
+                    stereo video and dense ground truth for all three correspondence tasks;
+                    <em>RobustSpring</em> applies realistic corruptions to the same data for robustness
+                    evaluation. You can find links to the papers, benchmark, and datasets below.
+                </p>
+                <p>
+                    RobustSpring applies corruptions to the same scenes, cameras, and labels as
+                    Spring. This paired clean / corrupted design measures robustness without
+                    changing scene content, camera setup, annotation protocol, or benchmark
+                    procedure. Performance drops can therefore be attributed to corruption sensitivity
+                    rather than unrelated dataset differences.
+                </p>
+
+                <div class="two-column spaced-top">
+                    <article class="info-card dataset-card">
+                        <h3>Spring</h3>
+                        <button type="button" class="dataset-preview" data-lightbox-src="img/spring.png"
+                            data-lightbox-alt="Spring dataset overview">
+                            <img src="img/spring.png" alt="Spring dataset overview" loading="lazy">
+                        </button>
+                        <p>
+                            Spring provides high-resolution stereo video with left and right images at
+                            1920x1080 px, together with dense scene-flow ground truth at 4x
+                            super-resolution. It includes bidirectional disparities for stereo and depth,
+                            disparity changes for scene flow, and forward/backward optical flow for both
+                            left and right views. This makes Spring a unified high-detail benchmark for
+                            optical flow, stereo matching, and scene flow.
+                        </p>
+                        <div class="dataset-card-actions">
+                            <a class="button secondary compact"
+                                href="https://openaccess.thecvf.com/content/CVPR2023/papers/Mehl_Spring_A_High-Resolution_High-Detail_Dataset_and_Benchmark_for_Scene_Flow_CVPR_2023_paper.pdf"
+                                target="_blank" rel="noopener noreferrer">Paper</a>
+                            <a class="button secondary compact" href="https://spring-benchmark.org/" target="_blank"
+                                rel="noopener noreferrer">Benchmark</a>
+                            <a class="button secondary compact"
+                                href="https://darus.uni-stuttgart.de/dataset.xhtml?persistentId=doi:10.18419/darus-3376"
+                                target="_blank" rel="noopener noreferrer">Dataset</a>
+                        </div>
+                    </article>
+
+                    <article class="info-card dataset-card">
+                        <h3>RobustSpring</h3>
+                        <button type="button" class="dataset-preview" data-lightbox-src="img/robustspring.png"
+                            data-lightbox-alt="RobustSpring corruption benchmark overview">
+                            <img src="img/robustspring.png" alt="RobustSpring corruption benchmark overview"
+                                loading="lazy">
+                        </button>
+                        <p>
+                            RobustSpring extends Spring into a robustness benchmark with 20 realistic
+                            image corruptions, including blur, color changes, noise, quality degradations,
+                            and weather effects. The corruptions are applied to stereo video data and are
+                            integrated consistently over time, across stereo views, and with depth where
+                            applicable, enabling controlled robustness evaluation for optical flow, stereo,
+                            and scene flow.
+                        </p>
+                        <div class="dataset-card-actions">
+                            <a class="button secondary compact" href="https://openreview.net/pdf?id=RebPBMrMmk"
+                                target="_blank" rel="noopener noreferrer">Paper</a>
+                            <a class="button secondary compact" href="https://spring-benchmark.org/" target="_blank"
+                                rel="noopener noreferrer">Benchmark</a>
+                            <a class="button secondary compact"
+                                href="https://darus.uni-stuttgart.de/dataset.xhtml?persistentId=doi:10.18419/DARUS-5047"
+                                target="_blank" rel="noopener noreferrer">Dataset</a>
+                        </div>
+                    </article>
+                </div>
+            </div>
+
+            <div class="notice content-card">
+                <h3>Dataset terms</h3>
+                <p>Participants must respect dataset licenses, benchmark terms, the
+                    <a href="https://neurips.cc/public/CodeOfConduct" target="_blank" rel="noopener noreferrer">NeurIPS
+                        Code
+                        of Conduct</a>,
+                    and the
+                    <a href="https://neurips.cc/public/EthicsGuidelines" target="_blank"
+                        rel="noopener noreferrer">NeurIPS
+                        Code of Ethics</a>.
+                </p>
+            </div>
+        </section>
+    </main>
+
+    <footer id="site-footer"></footer>
+
+    <dialog class="image-lightbox" id="image-lightbox" aria-label="Expanded image preview">
+        <button type="button" class="image-lightbox-close" aria-label="Close preview">×</button>
+        <img src="" alt="">
+    </dialog>
+
+    <script src="assets/flow.js"></script>
+    <script src="assets/lightbox.js"></script>
+    <script src="assets/timeline.js"></script>
+</body>
+
+</html>

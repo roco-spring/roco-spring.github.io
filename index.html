@@ -6,122 +6,476 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>RoCo-Spring: The Robust Correspondence Challenge</title>
     <meta name="description"
-        content="RoCo-Spring is a NeurIPS 2026 challenge on robustness in optical flow, stereo matching, and scene flow.">
-    <style>
-        body {
-            margin: 0;
-            font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-            line-height: 1.6;
-            color: #172033;
-            background: #f7f8fb;
-        }
-
-        main {
-            max-width: 880px;
-            margin: 0 auto;
-            padding: 72px 24px;
-        }
-
-        .card {
-            background: white;
-            border-radius: 24px;
-            padding: 48px;
-            box-shadow: 0 16px 48px rgba(23, 32, 51, 0.08);
-        }
-
-        .eyebrow {
-            font-size: 0.9rem;
-            font-weight: 700;
-            letter-spacing: 0.08em;
-            text-transform: uppercase;
-            color: #4c63ff;
-            margin-bottom: 16px;
-        }
-
-        h1 {
-            font-size: clamp(2rem, 5vw, 4rem);
-            line-height: 1.05;
-            margin: 0 0 20px;
-        }
-
-        .subtitle {
-            font-size: 1.25rem;
-            color: #4d5870;
-            margin-bottom: 32px;
-        }
-
-        .notice {
-            display: inline-block;
-            padding: 10px 16px;
-            border-radius: 999px;
-            background: #eef1ff;
-            color: #3142c6;
-            font-weight: 700;
-            margin-bottom: 32px;
-        }
-
-        h2 {
-            margin-top: 36px;
-            font-size: 1.25rem;
-        }
-
-        ul {
-            padding-left: 1.25rem;
-        }
-
-        footer {
-            margin-top: 48px;
-            color: #69728a;
-            font-size: 0.95rem;
-        }
-    </style>
+        content="RoCo-Spring is a NeurIPS 2026 challenge on robust dense correspondence under realistic distribution shifts.">
+    <link rel="stylesheet" href="assets/style.css">
+    <script src="assets/site-layout.js" defer></script>
 </head>
 
 <body>
+    <canvas id="flow-canvas" aria-hidden="true"></canvas>
+
+    <header id="site-header"></header>
+
     <main>
-        <section class="card">
-            <div class="eyebrow">NeurIPS 2026 Challenge</div>
+        <section class="hero section">
+            <div class="hero-card">
+                <div class="eyebrow">Overview</div>
 
-            <h1>RoCo-Spring: The Robust Correspondence Challenge</h1>
+                <h1>RoCo-Spring: The Robust Correspondence Challenge</h1>
 
-            <p class="subtitle">
-                A challenge on robust dense correspondence under realistic distribution shifts,
-                covering optical flow, stereo matching, and scene flow.
-            </p>
+                <p class="hero-subtitle">
+                    A NeurIPS 2026 Challenge on robust dense correspondence under realistic distribution shifts,
+                    covering optical flow, stereo matching, and scene flow.
+                </p>
 
-            <div class="notice">More information coming soon.</div>
+                <div class="hero-body">
+                    <p>
+                        Dense correspondence has made remarkable progress on standard benchmarks. Although modern
+                        optical flow, stereo matching, and scene flow methods achieve strong performance under ideal
+                        conditions, their accuracy can degrade substantially under real-world visual shifts.
+                    </p>
 
-            <h2>Overview</h2>
-            <p>
-                RoCo-Spring targets the gap between clean benchmark accuracy and robustness
-                under realistic corruptions such as camera noise, adverse weather, blur,
-                compression, and illumination changes.
-            </p>
+                    <p>
+                        Robustness under realistic corruptions remains a challenge for the deployment of these methods
+                        in autonomous driving, robotics, and other safety-critical settings. RoCo-Spring jointly
+                        evaluates clean accuracy and corrupted robustness, targeting methods that remain accurate under
+                        camera noise, adverse weather conditions, blur, compression, and changes in illumination.
+                    </p>
+                </div>
 
-            <h2>Tracks</h2>
-            <ul>
-                <li>Optical flow</li>
-                <li>Stereo matching</li>
-                <li>Scene flow</li>
-                <li>Exploration track on robustness analysis</li>
-            </ul>
+                <div class="hero-actions">
+                    <a class="button primary" href="participate.html">Participate</a>
+                    <a class="button secondary" href="evaluation.html">Evaluation</a>
+                </div>
 
-            <h2>Keywords</h2>
-            <p>
-                Robustness, optical flow, stereo matching, scene flow, distribution shift.
-            </p>
+                <div class="status-grid" aria-label="Challenge status">
+                    <a class="status-card" href="tasks-data.html#tracks">
+                        <strong>Tracks</strong>
+                        <span>Optical Flow · Stereo · Scene Flow · Exploration</span>
+                    </a>
+                    <a class="status-card" href="participate.html#registration">
+                        <strong>Registration</strong>
+                        <span>Coming soon</span>
+                    </a>
+                    <a class="status-card" href="evaluation.html#leaderboards">
+                        <strong>Leaderboards</strong>
+                        <span>Coming soon</span>
+                    </a>
+                </div>
+            </div>
+        </section>
 
-            <h2>Coming soon</h2>
-            <p>
-                We will add details on the timeline, rules, starting kit, baselines,
-                submission format, leaderboards, and organizer contacts.
-            </p>
+        <section class="section">
+            <div class="section-heading">
+                <div class="eyebrow">Datasets</div>
+                <h2>Spring and RobustSpring</h2>
+            </div>
 
-            <footer>
-                RoCo-Spring: The Robust Correspondence Challenge.
-            </footer>
+            <div class="two-column content-card">
+                <article class="info-card dataset-card">
+                    <h3>Spring</h3>
+                    <button type="button" class="dataset-preview" data-lightbox-src="img/spring.png"
+                        data-lightbox-alt="Spring dataset overview">
+                        <img src="img/spring.png" alt="Spring dataset overview" loading="lazy">
+                    </button>
+                    <p>
+                        Spring provides high-resolution stereo video with left and right images at
+                        1920x1080 px, together with dense scene-flow ground truth at 4x
+                        super-resolution. It includes bidirectional disparities for stereo and depth,
+                        disparity changes for scene flow, and forward/backward optical flow for both
+                        left and right views. This makes Spring a unified high-detail benchmark for
+                        optical flow, stereo matching, and scene flow.
+                    </p>
+                    <div class="dataset-card-actions">
+                        <a class="button secondary compact"
+                            href="https://openaccess.thecvf.com/content/CVPR2023/papers/Mehl_Spring_A_High-Resolution_High-Detail_Dataset_and_Benchmark_for_Scene_Flow_CVPR_2023_paper.pdf"
+                            target="_blank" rel="noopener noreferrer">Paper</a>
+                        <a class="button secondary compact" href="https://spring-benchmark.org/" target="_blank"
+                            rel="noopener noreferrer">Benchmark</a>
+                        <a class="button secondary compact"
+                            href="https://darus.uni-stuttgart.de/dataset.xhtml?persistentId=doi:10.18419/darus-3376"
+                            target="_blank" rel="noopener noreferrer">Dataset</a>
+                    </div>
+                </article>
+
+                <article class="info-card dataset-card">
+                    <h3>RobustSpring</h3>
+                    <button type="button" class="dataset-preview" data-lightbox-src="img/robustspring.png"
+                        data-lightbox-alt="RobustSpring corruption benchmark overview">
+                        <img src="img/robustspring.png" alt="RobustSpring corruption benchmark overview" loading="lazy">
+                    </button>
+                    <p>
+                        RobustSpring extends Spring into a robustness benchmark with 20 realistic
+                        image corruptions, including blur, color changes, noise, quality degradations,
+                        and weather effects. The corruptions are applied to stereo video data and are
+                        integrated consistently over time, across stereo views, and with depth where
+                        applicable, enabling controlled robustness evaluation for optical flow, stereo,
+                        and scene flow.
+                    </p>
+                    <div class="dataset-card-actions">
+                        <a class="button secondary compact" href="https://openreview.net/pdf?id=RebPBMrMmk"
+                            target="_blank" rel="noopener noreferrer">Paper</a>
+                        <a class="button secondary compact" href="https://spring-benchmark.org/" target="_blank"
+                            rel="noopener noreferrer">Benchmark</a>
+                        <a class="button secondary compact"
+                            href="https://darus.uni-stuttgart.de/dataset.xhtml?persistentId=doi:10.18419/DARUS-5047"
+                            target="_blank" rel="noopener noreferrer">Dataset</a>
+                    </div>
+                </article>
+            </div>
+        </section>
+
+        <section class="section">
+            <div class="section-heading">
+                <div class="eyebrow">Tracks</div>
+                <h2>Four challenge tracks</h2>
+            </div>
+
+            <div class="card-grid four">
+                <article class="track-card">
+                    <h3>Optical Flow</h3>
+                    <p>
+                        Estimate a dense 2D displacement field between consecutive frames,
+                        assigning each visible pixel a horizontal and vertical motion vector.
+                    </p>
+                </article>
+
+                <article class="track-card">
+                    <h3>Stereo Matching</h3>
+                    <p>
+                        Estimate a dense disparity map from a rectified stereo image pair,
+                        assigning each pixel the horizontal offset to its corresponding point.
+                    </p>
+                </article>
+
+                <article class="track-card">
+                    <h3>Scene Flow</h3>
+                    <p>
+                        Estimate dense 3D motion from stereo image sequences, combining
+                        per-pixel geometry and temporal motion into a single correspondence task.
+                    </p>
+                </article>
+
+                <article class="track-card track-card--exploration">
+                    <h3>Exploration Track</h3>
+                    <p>
+                        Submit a rigorous analysis of robustness in dense correspondence,
+                        focusing on failure modes, method behavior, metrics, or evaluation design.
+                    </p>
+                </article>
+            </div>
+        </section>
+
+        <section class="section">
+            <div class="section-heading">
+                <div class="eyebrow">Timeline</div>
+                <h2>Competition schedule</h2>
+            </div>
+
+            <div class="table-wrapper content-card">
+                <table class="timeline-table">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Milestone</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr data-deadline="2026-07-02">
+                            <td>July 2, 2026</td>
+                            <td>Website launch</td>
+                        </tr>
+                        <tr data-deadline="2026-07-13">
+                            <td>July 13, 2026</td>
+                            <td>Development leaderboard opens for all quantitative tasks</td>
+                        </tr>
+                        <tr data-deadline="2026-09-15">
+                            <td>September 15, 2026</td>
+                            <td>4–6 page workshop paper submission deadline</td>
+                        </tr>
+                        <tr data-deadline="2026-09-29">
+                            <td>September 29, 2026</td>
+                            <td>Workshop paper author notification</td>
+                        </tr>
+                        <tr data-deadline="2026-09-30">
+                            <td>September 30, 2026</td>
+                            <td>Final quantitative submission deadline</td>
+                        </tr>
+                        <tr data-deadline="2026-10-07">
+                            <td>October 7, 2026</td>
+                            <td>Camera-ready paper, code, and reproducibility package deadline</td>
+                        </tr>
+                        <tr data-deadline="2026-10-15">
+                            <td>October 15, 2026</td>
+                            <td>Final evaluation, reproducibility checks, and award shortlisting</td>
+                        </tr>
+                        <tr data-deadline="2026-10-31">
+                            <td>October 31, 2026</td>
+                            <td>Winners notified and workshop program finalized</td>
+                        </tr>
+                        <tr data-deadline="2026-12-11">
+                            <td>December 11 or 12, 2026</td>
+                            <td>In-person NeurIPS Competition Track workshop</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <p class="tentative-note">All dates are tentative and subject to change.</p>
+        </section>
+
+        <section class="section">
+            <div class="section-heading">
+                <div class="eyebrow">Workshop</div>
+                <h2>Confirmed keynote speakers</h2>
+            </div>
+
+            <div class="card-grid two">
+                <article class="info-card keynote-card">
+                    <h3>Jia Deng</h3>
+                    <p class="keynote-affiliation">
+                        Princeton University · Princeton Vision &amp; Learning Lab
+                    </p>
+                    <p>
+                        Jia Deng is Professor of Computer Science at Princeton University and
+                        Director of the Princeton Vision &amp; Learning Lab. He brings a uniquely
+                        relevant perspective to RoCo-Spring: his work spans benchmark-driven computer
+                        vision, large-scale datasets such as ImageNet<a class="citation-ref"
+                            href="#ref-deng2009imagenet" aria-label="Reference 1">[1]</a>, and
+                        influential dense correspondence architectures across multiple tasks,
+                        including RAFT for optical flow<a class="citation-ref" href="#ref-teed2020raft"
+                            aria-label="Reference 2">[2]</a>, RAFT-Stereo for stereo matching<a class="citation-ref"
+                            href="#ref-lipson2021raft-stereo" aria-label="Reference 3">[3]</a>, and SEA-RAFT for
+                        efficient and accurate
+                        optical flow<a class="citation-ref" href="#ref-wang2024searaft"
+                            aria-label="Reference 4">[4]</a>. His keynote will connect the evolution
+                        of correspondence methods and benchmark design with the central question of
+                        the challenge: how to turn clean benchmark progress into robust optical flow,
+                        stereo, and scene flow methods that remain reliable under realistic visual
+                        shifts.
+                    </p>
+                </article>
+
+                <article class="info-card keynote-card">
+                    <h3>Fatih Porikli</h3>
+                    <p class="keynote-affiliation">Qualcomm AI Research</p>
+                    <p>
+                        Fatih Porikli is an IEEE Fellow and Vice President of Technology at Qualcomm
+                        AI Research. His expertise connects robust visual perception, video
+                        understanding, low-level vision, and real-world deployment. His prior work
+                        includes scene-flow estimation under degraded video conditions, including
+                        simultaneous stereo video deblurring and scene flow estimation<a class="citation-ref"
+                            href="#ref-pan2017stereodeblur" aria-label="Reference 5">[5]</a>, joint stereo video
+                        deblurring, scene
+                        flow estimation, and moving-object segmentation<a class="citation-ref"
+                            href="#ref-pan2020jointstereo" aria-label="Reference 6">[6]</a>, and
+                        adversarial robustness for vision systems<a class="citation-ref"
+                            href="#ref-naseer2020selfsupervised" aria-label="Reference 7">[7]</a>.
+                        His talk will provide an industry-facing and deployment-oriented perspective
+                        on robust dense correspondence.
+                    </p>
+                </article>
+            </div>
+
+            <div class="keynote-references content-card">
+                <h3>References</h3>
+                <ol>
+                    <li id="ref-deng2009imagenet">
+                        Deng, J., Dong, W., Socher, R., Li, L.-J., Li, K., &amp; Fei-Fei, L. (2009).
+                        ImageNet: A Large-Scale Hierarchical Image Database. <em>Proc. IEEE Conference
+                            on Computer Vision and Pattern Recognition (CVPR)</em>, 248–255.
+                    </li>
+                    <li id="ref-teed2020raft">
+                        Teed, Z., &amp; Deng, J. (2020). RAFT: Recurrent All-Pairs Field Transforms
+                        for Optical Flow. <em>Proc. European Conference on Computer Vision (ECCV)</em>,
+                        402–419.
+                    </li>
+                    <li id="ref-lipson2021raft-stereo">
+                        Lipson, L., Teed, Z., &amp; Deng, J. (2021). RAFT-Stereo: Multilevel Recurrent
+                        Field Transforms for Stereo Matching. <em>Proc. International Conference on 3D
+                            Vision (3DV)</em>, 218–227.
+                    </li>
+                    <li id="ref-wang2024searaft">
+                        Wang, Y., Lipson, L., &amp; Deng, J. (2024). SEA-RAFT: Simple, Efficient,
+                        Accurate RAFT for Optical Flow. <em>Proc. European Conference on Computer Vision
+                            (ECCV)</em>, 36–54.
+                    </li>
+                    <li id="ref-pan2017stereodeblur">
+                        Pan, L., Dai, Y., Liu, M., &amp; Porikli, F. (2017). Simultaneous Stereo Video
+                        Deblurring and Scene Flow Estimation. <em>Proc. IEEE Conference on Computer
+                            Vision and Pattern Recognition (CVPR)</em>, 6987–6996.
+                    </li>
+                    <li id="ref-pan2020jointstereo">
+                        Pan, L., Dai, Y., Liu, M., Porikli, F., &amp; Pan, Q. (2020). Joint Stereo Video
+                        Deblurring, Scene Flow Estimation and Moving Object Segmentation.
+                        <em>IEEE Transactions on Image Processing (TIP)</em>, 29, 1748–1761.
+                    </li>
+                    <li id="ref-naseer2020selfsupervised">
+                        Naseer, M., Khan, S., Hayat, M., Khan, F. S., &amp; Porikli, F. (2020). A
+                        Self-Supervised Approach for Adversarial Robustness. <em>Proc. IEEE/CVF
+                            Conference on Computer Vision and Pattern Recognition (CVPR)</em>, 262–271.
+                    </li>
+                </ol>
+            </div>
+        </section>
+
+        <section class="section">
+            <div class="section-heading">
+                <div class="eyebrow">Schedule</div>
+                <h2>Tentative workshop schedule</h2>
+            </div>
+
+            <div class="table-wrapper content-card">
+                <table class="schedule-table">
+                    <thead>
+                        <tr>
+                            <th>Time</th>
+                            <th>Session</th>
+                            <th>Format</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>08:15–08:25</td>
+                            <td>Opening and challenge overview</td>
+                            <td>Organizers</td>
+                        </tr>
+                        <tr>
+                            <td>08:25–09:10</td>
+                            <td>Keynote: Jia Deng</td>
+                            <td>35 min talk + 10 min discussion</td>
+                        </tr>
+                        <tr>
+                            <td>09:10–09:55</td>
+                            <td>Keynote: Fatih Porikli</td>
+                            <td>35 min talk + 10 min discussion</td>
+                        </tr>
+                        <tr>
+                            <td>09:55–10:35</td>
+                            <td>Optical flow track talks</td>
+                            <td>2 talks, 15+5 min each</td>
+                        </tr>
+                        <tr>
+                            <td>10:35–11:05</td>
+                            <td>Coffee break</td>
+                            <td>30 min</td>
+                        </tr>
+                        <tr>
+                            <td>11:05–11:45</td>
+                            <td>Stereo matching track talks</td>
+                            <td>2 talks, 15+5 min each</td>
+                        </tr>
+                        <tr>
+                            <td>11:45–12:25</td>
+                            <td>Scene flow track talks</td>
+                            <td>2 talks, 15+5 min each</td>
+                        </tr>
+                        <tr>
+                            <td>12:25–13:25</td>
+                            <td>Lunch</td>
+                            <td>60 min</td>
+                        </tr>
+                        <tr>
+                            <td>13:00–15:00</td>
+                            <td>Poster session</td>
+                            <td>2 hours, overlaps with lunch</td>
+                        </tr>
+                        <tr>
+                            <td>15:00–15:30</td>
+                            <td>Coffee break</td>
+                            <td>30 min</td>
+                        </tr>
+                        <tr>
+                            <td>15:30–16:10</td>
+                            <td>Exploration track talks</td>
+                            <td>2 talks, 15+5 min each</td>
+                        </tr>
+                        <tr>
+                            <td>16:10–16:50</td>
+                            <td>Panel and audience forum</td>
+                            <td>Organizers, speakers, teams</td>
+                        </tr>
+                        <tr>
+                            <td>16:50–17:00</td>
+                            <td>Awards and closing remarks</td>
+                            <td>Organizers</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <p class="tentative-note">Tentative one-day workshop schedule, 8:15 to 17:00.</p>
+        </section>
+
+        <section class="section">
+            <div class="section-heading">
+                <div class="eyebrow">Organizers</div>
+                <h2>Organizing team</h2>
+            </div>
+
+            <div class="organizer-grid content-card">
+                <div>
+                    <img class="organizer-photo" src="img/agnihotri.jpg" alt="Shashank Agnihotri">
+                    <div><strong>Shashank Agnihotri</strong><span>University of Mannheim</span></div>
+                </div>
+                <div>
+                    <img class="organizer-photo" src="img/oei.jpg" alt="Victor Oei">
+                    <div><strong>Victor Oei</strong><span>University of Stuttgart</span></div>
+                </div>
+                <div>
+                    <img class="organizer-photo" src="img/schmalfuss.jpg" alt="Jenny Schmalfuss">
+                    <div><strong>Jenny Schmalfuss</strong><span>NVIDIA</span></div>
+                </div>
+                <div>
+                    <img class="organizer-photo" src="img/bauer.jpg" alt="Katrin Bauer">
+                    <div><strong>Katrin Bauer</strong><span>University of Stuttgart</span></div>
+                </div>
+                <div>
+                    <img class="organizer-photo" src="img/morimitsu.jpg" alt="Henrique Morimitsu">
+                    <div><strong>Henrique Morimitsu</strong><span>University of Science and Technology Beijing</span>
+                    </div>
+                </div>
+                <div>
+                    <img class="organizer-photo" src="img/bruhn.jpg" alt="Andrés Bruhn">
+                    <div><strong>Andrés Bruhn</strong><span>University of Stuttgart</span></div>
+                </div>
+                <div>
+                    <img class="organizer-photo" src="img/keuper.jpg" alt="Margret Keuper">
+                    <div><strong>Margret Keuper</strong><span>University of Mannheim and MPI-INF</span></div>
+                </div>
+            </div>
+        </section>
+
+        <section class="section">
+            <div class="section-heading">
+                <div class="eyebrow">Contact</div>
+                <h2>Get in touch</h2>
+            </div>
+
+            <div class="contact-card content-card">
+                <p>
+                    Challenge email:
+                    <a href="mailto:roco-spring-org@googlegroups.com">roco-spring-org@googlegroups.com</a>
+                </p>
+
+                <p>
+                    GitHub repository:
+                    <span class="coming-soon">Coming soon</span>
+                </p>
+            </div>
         </section>
     </main>
+
+    <footer id="site-footer"></footer>
+
+    <dialog class="image-lightbox" id="image-lightbox" aria-label="Expanded image preview">
+        <button type="button" class="image-lightbox-close" aria-label="Close preview">×</button>
+        <img src="" alt="">
+    </dialog>
+
+    <script src="assets/flow.js"></script>
+    <script src="assets/lightbox.js"></script>
+    <script src="assets/timeline.js"></script>
 </body>
 
 </html>
