@@ -34,28 +34,115 @@
 
             <div class="metric-card content-card">
                 <p>
-                    Each quantitative task is ranked by a normalized balanced robustness score.
-                    <strong>Lower is better.</strong> The score gives equal weight to clean Spring
-                    performance and corrupted RobustSpring performance.
+                    Each quantitative task is ranked using the
+                    <strong>Robustness-balanced Spring Score (RbS-Score)</strong>.
+                    The score combines a method's accuracy on the clean Spring benchmark (S)
+                    with its accuracy on the corrupted RobustSpring benchmark (R).
+                    Both components receive equal weight, and <strong>lower is better</strong>.
                 </p>
 
-                <div class="formula" aria-label="RbS Score formula">
+                <div class="formula" aria-label="RbS-Score formula">
                     RbS-Score<sub>t</sub>(m) =
-                    0.5 · E<sub>S</sub><sup>t</sup>(m) / B<sub>S</sub><sup>t</sup>
+                    0.5 ·
+                    E<sub>S</sub><sup>t</sup>(m) / B<sub>S</sub><sup>t</sup>
                     +
-                    0.5 · E<sub>R</sub><sup>t</sup>(m) / B<sub>R</sub><sup>t</sup>
+                    0.5 ·
+                    E<sub>R</sub><sup>t</sup>(m) / B<sub>R</sub><sup>t</sup>
                 </div>
 
                 <ul>
-                    <li><strong>E<sub>S</sub><sup>t</sup>(m):</strong> method error on Spring for task <em>t</em></li>
-                    <li><strong>E<sub>R</sub><sup>t</sup>(m):</strong> average method error on RobustSpring for task
-                        <em>t</em>
+                    <li>
+                        <strong>m:</strong> the evaluated method.
                     </li>
-                    <li><strong>B<sub>S</sub><sup>t</sup>, B<sub>R</sub><sup>t</sup>:</strong> fixed baseline
-                        normalization constants</li>
+                    <li>
+                        <strong>t:</strong> the quantitative task, such as optical flow,
+                        stereo, or scene flow.
+                    </li>
+                    <li>
+                        <strong>E<sub>S</sub><sup>t</sup>(m):</strong>
+                        the method's endpoint-error-style metric on the clean Spring data.
+                    </li>
+                    <li>
+                        <strong>E<sub>R</sub><sup>t</sup>(m):</strong>
+                        the same error metric evaluated on RobustSpring,
+                        averaged over all included corruption types.
+                    </li>
+                    <li>
+                        <strong>
+                            B<sub>S</sub><sup>t</sup>,
+                            B<sub>R</sub><sup>t</sup>:
+                        </strong>
+                        fixed task-specific baseline errors used to normalize the clean and
+                        corrupted results.
+                    </li>
                 </ul>
 
+                <h3>Task-specific error metrics</h3>
+
+                <p>
+                    The same task-specific error definition is used for Spring and
+                    RobustSpring. RobustSpring therefore measures prediction accuracy on
+                    corrupted inputs rather than only the change between clean and corrupted
+                    predictions.
+                </p>
+
+                <ul>
+                    <li>
+                        <strong>Optical flow:</strong>
+                        mean endpoint error (EPE).
+                    </li>
+
+                    <li>
+                        <strong>Stereo:</strong>
+                        mean absolute disparity error (Abs).
+                    </li>
+
+                    <li>
+                        <strong>Scene flow:</strong>
+                        a balanced combination of the errors for reference-frame disparity
+                        <em>d</em><sub>1</sub>, target-frame disparity
+                        <em>d</em><sub>2</sub>, and optical flow. Each component is normalized
+                        by its own baseline error before the three components are averaged:
+                        <div class="formula" aria-label="Scene-flow RbS-Score formula">
+                            RbS-Score<sub>SF</sub>(m) =
+                            0.5 ·
+                            [
+                            (
+                            Abs<sub>d1,S</sub>(m) / B<sub>d1,S</sub>
+                            +
+                            Abs<sub>d2,S</sub>(m) / B<sub>d2,S</sub>
+                            +
+                            EPE<sub>flow,S</sub>(m) / B<sub>flow,S</sub>
+                            ) / 3
+                            ]
+                            +
+                            0.5 ·
+                            [
+                            (
+                            Abs<sub>d1,R</sub>(m) / B<sub>d1,R</sub>
+                            +
+                            Abs<sub>d2,R</sub>(m) / B<sub>d2,R</sub>
+                            +
+                            EPE<sub>flow,R</sub>(m) / B<sub>flow,R</sub>
+                            ) / 3
+                            ]
+                        </div>
+                    </li>
+                </ul>
+
+                <p>
+                    A score of <strong>1.0</strong> indicates that the method matches the
+                    selected baselines on average. Scores below 1.0 indicate better normalized
+                    performance, while scores above 1.0 indicate worse normalized performance.
+                </p>
+
                 <h3>Tie-breaking</h3>
+
+                <p>
+                    If two methods obtain the same RbS-Score, ties are resolved in the
+                    following order:
+                </p>
+
                 <ol>
                     <li>Lower normalized RobustSpring term</li>
                     <li>Lower normalized Spring term</li>
