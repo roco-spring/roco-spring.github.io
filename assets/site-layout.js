@@ -25,10 +25,41 @@
             }
 
             markCurrentNavLink();
+            initMobileNav();
         })
         .catch((error) => {
             console.error(error);
         });
+
+    function initMobileNav() {
+        const header = document.querySelector(".site-header");
+        const toggle = header?.querySelector(".nav-toggle");
+        const nav = header?.querySelector(".nav");
+
+        if (!header || !toggle || !nav) {
+            return;
+        }
+
+        function setNavOpen(open) {
+            header.classList.toggle("is-nav-open", open);
+            toggle.setAttribute("aria-expanded", String(open));
+            toggle.setAttribute("aria-label", open ? "Close menu" : "Open menu");
+        }
+
+        toggle.addEventListener("click", () => {
+            setNavOpen(!header.classList.contains("is-nav-open"));
+        });
+
+        nav.querySelectorAll("a").forEach((link) => {
+            link.addEventListener("click", () => setNavOpen(false));
+        });
+
+        document.addEventListener("keydown", (event) => {
+            if (event.key === "Escape") {
+                setNavOpen(false);
+            }
+        });
+    }
 
     function markCurrentNavLink() {
         const page = location.pathname.split("/").pop() || "index.html";
