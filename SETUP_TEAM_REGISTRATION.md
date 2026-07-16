@@ -124,9 +124,11 @@ rg -l --hidden -g '!node_modules/**' -g '!.git/**' \
 
 The file-only search avoids echoing a discovered credential into terminal logs. Inspect each reported file locally after the scanner passes; do not copy a credential value into a terminal, issue, screenshot, or review message. Names such as `temporaryPassword` and the three Secret Manager identifiers are expected in implementation code. A match is acceptable only when no value is logged, persisted, returned to the browser, or committed.
 
-## One-time Google OAuth bootstrap
+## Initial Google OAuth provisioning and deliberate credential rotation
 
-The production OAuth client secret must be freshly rotated/reissued before authorization. Never reuse a secret from a prompt, previous conversation, shell history, source file, README, log, or committed/downloaded credential file. If Google creates a replacement Desktop client with a different client ID, update every public/backend client-ID constant and this document before continuing.
+Run the OAuth bootstrap only for initial secret provisioning or a deliberate credential rotation/recovery. A routine release must use `npm run secrets:verify` and the production health gates; it must not mint a new refresh token or rotate the rate-limit HMAC secret on every deployment.
+
+When bootstrap is actually required, the production OAuth client secret must be freshly rotated/reissued before authorization. Never reuse a secret from a prompt, previous conversation, shell history, source file, README, log, or committed/downloaded credential file. If Google creates a replacement Desktop client with a different client ID, update every public/backend client-ID constant and this document before continuing.
 
 Run the interactive bootstrap from a trusted local terminal:
 
@@ -153,21 +155,44 @@ The exact Secret Manager names are:
 - `GOOGLE_OAUTH_REFRESH_TOKEN`
 - `RATE_LIMIT_HMAC_SECRET`
 
-Do not run `functions:secrets:access` as a routine verification step. After rotating a secret, redeploy every function that binds it.
+Do not run `functions:secrets:access` as a routine verification step. Verify only secret-version metadata. After an intentional rotation, redeploy every function that binds the changed secret and complete the live health checks.
 
 ## Firebase deployment
 
-Build and scan first, confirm the active project, then deploy only rules, indexes, and Functions:
+Fetch the target branch, review every tracked and untracked change, and commit the exact release source before any production mutation. The deployment command refuses a dirty tree and records the full source SHA. Confirm the active project, then deploy only rules, indexes, and Functions:
 
 ```bash
+git fetch origin --prune
 npm test
 npm run build
+npm run lint
 npm run security:scan
+git status --short
+# Review and commit the intended release; the tree must now be clean.
+npm run release:source
 node scripts/firebase-safe.mjs use
 npm run deploy:production
 ```
 
-`deploy:production` runs the complete test/build/lint/security gate, re-verifies that public end-user signup and deletion are disabled, improved email privacy is enabled, and email/password login remains enabled, checks that the latest version of each required Secret Manager secret is enabled without accessing plaintext, and then deploys only Firestore rules, indexes, and Functions. Any failed read-back stops deployment.
+`deploy:production` verifies the clean committed source both before and after the local test/build/lint/security gate; re-verifies that public end-user signup and deletion are disabled, improved email privacy is enabled, and email/password login remains enabled; checks that the latest version of each required Secret Manager secret is enabled without accessing plaintext; deploys only Firestore rules, indexes, and Functions; then runs both production health gates described below. Any failed pre-deployment gate stops before deployment. A failed post-deployment smoke gate does not roll back resources that Firebase already updated: keep the release blocked, inspect safe logs and resource inventory, and roll forward with a reviewed fix.
+
+The credential-free endpoint gate can be rerun independently at any time:
+
+```bash
+npm run backend:smoke
+```
+
+For each callable, it first sends a browser-equivalent `OPTIONS` preflight from `https://roco-spring.github.io` and requires the exact origin, `POST`, and the `authorization`, `content-type`, and `x-firebase-appcheck` headers. It then sends a token-free `{data:{}}` callable request. It never sends credentials, Auth/App Check tokens, or prints a response body. A pass requires the Firebase callable protocol's HTTP `401 UNAUTHENTICATED` JSON rejection with production-origin CORS and reports `PASS ... [DEPLOYED_GUARD]`. Because `registerTeam` is otherwise public, that result is runtime evidence that its missing App Check token was rejected. For the other three authenticated callables, the result proves a deployed guard but cannot distinguish Auth rejection from App Check rejection. HTTP 404, unguarded HTTP 2xx, blocked invocation, bad CORS/protocol, redirects, and persistent timeouts/5xx/network failures all fail. Missing, transient-backend, network, and timeout failures receive at most five bounded attempts with 1/2/4/8-second delays.
+
+The live valid-App-Check gate is also safe to rerun:
+
+```bash
+npm run backend:appcheck-smoke
+```
+
+It opens the deployed registration page in Chromium, reuses that page's initialized Firebase App Check instance, and sends two non-mutating, credential-free validation probes. `registerTeam({})` and `getMyTeam({productionSmokeProbe:true})` must both reach their handlers and return `functions/invalid-argument`. This establishes that the live origin obtained an accepted App Check token and crossed CORS/infrastructure to the intended validation boundary without creating a team or reading private data. The browser probe retries at most three times to tolerate transient reCAPTCHA or propagation failures.
+
+These two gates do not prove an authenticated dashboard session, Google OAuth refresh-token health, private Drive/Sheets creation, or Gmail delivery. Those end-to-end paths require organizer-approved test data and controlled cleanup; record them as `NOT RUN (optional)` when that authorization is unavailable rather than overclaiming coverage.
 
 The public website remains on GitHub Pages. There is intentionally no Firebase Hosting configuration.
 
@@ -175,9 +200,10 @@ After deployment, verify:
 
 - Firestore rules reject authenticated and unauthenticated browser reads/writes.
 - Identity Platform read-back shows `disabledUserSignup=true`, `disabledUserDeletion=true`, `enableImprovedEmailPrivacy=true`, `signIn.email.enabled=true`, and `signIn.email.passwordRequired=true`.
-- A production callable rejects a missing/invalid App Check token and accepts a valid token from the live site.
-- All four callables are deployed in `europe-west3`.
-- The scheduled reconciliation job exists and invokes only its associated function.
+- `npm run backend:smoke` reports `PASS ... [DEPLOYED_GUARD]` for all four callables; do not treat a bare non-404 response as sufficient.
+- `npm run backend:appcheck-smoke` reports `PASS ... [VALID_APP_CHECK_TO_VALIDATION_BOUNDARY]` for both safe probes.
+- All four callables and `reconcileRegistrations` exist in `europe-west3`; record their revision/update time and confirm they correspond to the committed release source.
+- The scheduled reconciliation job exists, is enabled, targets only its associated function, and has a recent safe execution status.
 - Functions that do not require Google credentials have no Google secrets bound.
 - App Check metrics show legitimate requests before console-level enforcement is enabled.
 

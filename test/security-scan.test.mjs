@@ -35,6 +35,9 @@ test("security scanner detects a credential shape without echoing its value", as
         });
         const output = `${result.stdout}${result.stderr}`;
 
+        assert.equal(result.error, undefined, result.error?.message);
+        assert.equal(result.signal, null, `scanner terminated by ${result.signal}`);
+
         assert.equal(result.status, 1);
         assert.match(output, new RegExp(fixtureName.replaceAll(".", "\\."), "u"));
         assert.match(output, /Google OAuth client secret value/u);

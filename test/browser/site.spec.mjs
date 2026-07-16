@@ -39,7 +39,7 @@ for (const path of SITE_PAGES) {
   });
 }
 
-test("registration portal renders ten slots, validates partial members, and switches tabs", async ({ page }) => {
+test("registration portal starts with three slots, validates partial members, and switches tabs", async ({ page }) => {
   const pageErrors = [];
   page.on("pageerror", (error) => pageErrors.push(error.message));
 
@@ -47,9 +47,14 @@ test("registration portal renders ten slots, validates partial members, and swit
   expect(response?.ok()).toBe(true);
   await expect(page.locator("header.site-header .brand")).toHaveText("RoCo-Spring");
   await expect(page.locator("#public-auth")).toBeVisible({ timeout: 15_000 });
-  await expect(page.locator("#registration-members .member-slot")).toHaveCount(10);
+  await expect(page.locator("#registration-members .member-slot")).toHaveCount(3);
   await expect(page.locator("#registration-members legend").first()).toContainText("Team member 1");
-  await expect(page.locator("#registration-members legend").nth(9)).toContainText("Team member 10");
+  await expect(page.locator("#registration-members legend").nth(2)).toContainText("Team member 3");
+  for (const field of ["fullName", "email", "affiliation"]) {
+    await expect(page.locator(`#register-member-1-${field}`)).toHaveAttribute("required", "");
+    await expect(page.locator(`#register-member-2-${field}`)).not.toHaveAttribute("required", "");
+    await expect(page.locator(`#register-member-3-${field}`)).not.toHaveAttribute("required", "");
+  }
 
   await page.locator("#register-team-name").fill("Browser Validation Team");
   await page.locator("#register-primary-email").fill("member@example.org");
@@ -71,6 +76,69 @@ test("registration portal renders ten slots, validates partial members, and swit
   expect(pageErrors).toEqual([]);
 });
 
+test("team members can be added progressively to ten without losing entered values", async ({ page }) => {
+  await page.goto("/team-registration.html");
+  await expect(page.locator("#public-auth")).toBeVisible({ timeout: 15_000 });
+
+  await page.locator("#register-member-1-fullName").fill("Persistent Member");
+  await page.locator("#register-member-2-email").fill("second@example.org");
+  const secondMemberClearButton = page.locator("#registration-members .member-slot").nth(1)
+    .locator(".member-remove-button");
+  await expect(secondMemberClearButton).toBeVisible();
+
+  await page.locator('#registration-form button[type="submit"]').click();
+  await expect(page.locator("#register-team-name")).toHaveAttribute("aria-invalid", "true");
+  await secondMemberClearButton.click();
+  await expect(page.locator("#register-member-2-email")).toHaveValue("");
+  await expect(secondMemberClearButton).toBeHidden();
+  await expect(page.locator("#register-team-name")).not.toHaveAttribute("aria-invalid", "true");
+  await expect(page.locator('#registration-form [aria-invalid="true"]')).toHaveCount(0);
+  await expect(page.locator('#registration-form [data-field-error]:not(:empty)')).toHaveCount(0);
+
+  await page.locator("#register-member-2-email").fill("second@example.org");
+  await expect(secondMemberClearButton).toBeVisible();
+
+  for (let expectedCount = 4; expectedCount <= 10; expectedCount += 1) {
+    await page.locator("#add-registration-member").click();
+    await expect(page.locator("#registration-members .member-slot")).toHaveCount(expectedCount);
+    await expect(page.locator(`#register-member-${expectedCount}-fullName`)).toBeFocused();
+  }
+
+  await expect(page.locator("#add-registration-member")).toBeDisabled();
+  await expect(page.locator("#register-member-1-fullName")).toHaveValue("Persistent Member");
+  await expect(page.locator("#register-member-2-email")).toHaveValue("second@example.org");
+  await expect(page.locator("#registration-members legend").nth(9)).toContainText("Team member 10");
+  await expect(page.locator("#registration-members .member-slot").nth(1)
+    .locator(".member-remove-button")).toBeVisible();
+  await expect(page.locator("#registration-members .member-slot").nth(2)
+    .locator(".member-remove-button")).toBeHidden();
+  await expect(page.locator("#registration-members .member-slot").nth(3)
+    .locator(".member-remove-button")).toBeVisible();
+
+  await page.locator("#registration-members .member-slot").nth(1)
+    .locator(".member-remove-button").click();
+  await expect(page.locator("#registration-members .member-slot")).toHaveCount(10);
+  await expect(page.locator("#register-member-2-email")).toHaveValue("");
+  await expect(page.locator("#registration-members .member-slot").nth(1)
+    .locator(".member-remove-button")).toBeHidden();
+
+  await page.locator("#register-member-5-fullName").fill("Member That Moves Up");
+  await page.locator("#register-member-10-email").fill("last-member@example.org");
+  await page.locator("#registration-members .member-slot").nth(3)
+    .locator(".member-remove-button").click();
+
+  await expect(page.locator("#registration-members .member-slot")).toHaveCount(9);
+  await expect(page.locator("#register-member-4-fullName")).toHaveValue("Member That Moves Up");
+  await expect(page.locator("#register-member-9-email")).toHaveValue("last-member@example.org");
+  await expect(page.locator("#registration-members legend").nth(8)).toContainText("Team member 9");
+  await expect(page.locator("#add-registration-member")).toBeEnabled();
+
+  await page.locator("#add-registration-member").click();
+  await expect(page.locator("#registration-members .member-slot")).toHaveCount(10);
+  await expect(page.locator("#register-member-10-fullName")).toBeFocused();
+  await expect(page.locator("#add-registration-member")).toBeDisabled();
+});
+
 test("login query mode and keyboard tab behavior are accessible", async ({ page }) => {
   await page.goto("/team-registration.html?mode=login");
   await expect(page.locator("#public-auth")).toBeVisible({ timeout: 15_000 });
@@ -88,6 +156,10 @@ test("registration page remains within the viewport on mobile and desktop", asyn
     await page.setViewportSize(viewport);
     await page.goto("/team-registration.html");
     await expect(page.locator("#public-auth")).toBeVisible({ timeout: 15_000 });
+    for (let memberIndex = 4; memberIndex <= 10; memberIndex += 1) {
+      await page.locator("#add-registration-member").click();
+    }
+    await expect(page.locator("#registration-members .member-slot")).toHaveCount(10);
     const dimensions = await page.evaluate(() => ({
       clientWidth: document.documentElement.clientWidth,
       scrollWidth: document.documentElement.scrollWidth

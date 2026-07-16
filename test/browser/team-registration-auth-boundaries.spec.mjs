@@ -398,12 +398,39 @@ test("a rejected token refresh removes all rendered private data and password ca
 
   await expect(page.locator("#dashboard-tracks")).toBeEmpty();
   await expect(page.locator("#dashboard-members")).toBeEmpty();
+  await expect(page.locator("#edit-members .member-slot")).toHaveCount(3);
   const editMemberValues = await page.locator("#edit-members input").evaluateAll((inputs) => (
     inputs.map((input) => input.value)
   ));
-  expect(editMemberValues).toEqual(new Array(30).fill(""));
+  expect(editMemberValues).toEqual(new Array(9).fill(""));
   await expect(page.locator("body")).not.toContainText(teamA.teamName);
   await expect(page.locator("body")).not.toContainText(teamA.primaryContactEmail);
+});
+
+test("the edit form preserves every loaded member beyond the initial three rows", async ({ page }) => {
+  const team = teamFixture("Expanded", 36);
+  team.members = Array.from({ length: 5 }, (_, index) => ({
+    fullName: `Expanded Member ${index + 1}`,
+    email: `expanded-${index + 1}@private.example`,
+    affiliation: `Expanded Laboratory ${index + 1}`
+  }));
+  team.primaryContactEmail = team.members[0].email;
+
+  await openPortal(page);
+  await loadUserTeam(page, "uid-expanded", team);
+  await page.getByRole("button", { name: "Edit team details" }).click();
+
+  await expect(page.locator("#edit-members .member-slot")).toHaveCount(5);
+  for (let memberIndex = 1; memberIndex <= team.members.length; memberIndex += 1) {
+    const member = team.members[memberIndex - 1];
+    await expect(page.locator(`#edit-member-${memberIndex}-fullName`)).toHaveValue(
+      member.fullName
+    );
+    await expect(page.locator(`#edit-member-${memberIndex}-email`)).toHaveValue(member.email);
+    await expect(page.locator(`#edit-member-${memberIndex}-affiliation`)).toHaveValue(
+      member.affiliation
+    );
+  }
 });
 
 test("a delayed update from user A is ignored after user B signs in", async ({ page }) => {
@@ -587,6 +614,8 @@ test("sign-in, successful edit, and dashboard sign-out complete without browser 
 
 test("a registration retry reuses one UUID and renders the safe success result", async ({ page }) => {
   await openPortal(page);
+  await page.locator("#add-registration-member").click();
+  await expect(page.locator("#registration-members .member-slot")).toHaveCount(4);
   await page.locator("#register-team-name").fill("Idempotent Browser Team");
   await page.locator("#register-primary-email").fill("OWNER@EXAMPLE.ORG");
   await page.locator('#registration-form input[name="tracks"][value="optical-flow"]').check();
@@ -611,6 +640,11 @@ test("a registration retry reuses one UUID and renders the safe success result",
       affiliation: "Example Institute"
     }]
   });
+  expect(firstPayload.members).toEqual([{
+    fullName: "Owner Person",
+    email: "owner@example.org",
+    affiliation: "Example Institute"
+  }]);
   expect(firstPayload.idempotencyKey).toMatch(
     /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u
   );
@@ -633,6 +667,15 @@ test("a registration retry reuses one UUID and renders the safe success result",
   await expect(page.locator("#login-tab-panel")).toBeVisible();
   await expect(page.locator("#login-email")).toHaveValue("owner@example.org");
   await expect(page.locator("#login-status")).toContainText("Registration completed for RoCo-81");
+
+  await page.getByRole("tab", { name: "Register a new team" }).click();
+  await expect(page.locator("#registration-members .member-slot")).toHaveCount(3);
+  await expect(page.locator("#register-team-name")).toHaveValue("");
+  for (let memberIndex = 1; memberIndex <= 3; memberIndex += 1) {
+    for (const field of ["fullName", "email", "affiliation"]) {
+      await expect(page.locator(`#register-member-${memberIndex}-${field}`)).toHaveValue("");
+    }
+  }
 });
 
 test("password reset stays neutral and initial password completion signs out", async ({ page }) => {

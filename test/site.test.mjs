@@ -92,6 +92,8 @@ test("registration page includes the exact introduction and required controls", 
     assert.ok(html.includes("Register a team for the RoCo-Spring challenge. The person completing this registration must be one of the team members listed below. At least one competition track and one team member are required."));
     assert.match(html, /Register a new team/u);
     assert.match(html, /Sign in to an existing team/u);
+    assert.match(html, /id="add-registration-member"/u);
+    assert.match(html, /id="add-edit-member"/u);
     assert.match(html, /I confirm that the person submitting this registration is one of the team members listed below\.|I confirm that the person submitting this registration is one of the team members listed above\./u);
 });
 
@@ -136,6 +138,26 @@ test("production deployment disables public Auth signup/deletion and verifies em
     assert.match(identityConfig, /roco-spring-registration-2026/u);
     assert.match(packageConfig.scripts["deploy:production"], /identity:configure/u);
     assert.match(packageConfig.scripts["deploy:production"], /deploy:firebase/u);
+    assert.match(packageConfig.scripts["deploy:production"], /release:source/u);
+    assert.match(packageConfig.scripts["deploy:production"], /backend:smoke/u);
+    assert.match(packageConfig.scripts["deploy:production"], /backend:appcheck-smoke/u);
+});
+
+test("every production callable declares the required region, CORS allowlist, and App Check", async () => {
+    const functionsIndex = await source("functions/src/index.ts");
+    for (const name of [
+        "registerTeam",
+        "getMyTeam",
+        "updateMyTeam",
+        "completeInitialPasswordChange"
+    ]) {
+        const declaration = functionsIndex.match(
+            new RegExp(`export const ${name} = onCall\\(([\\s\\S]*?)\\n\\);`, "u")
+        )?.[1] ?? "";
+        assert.match(declaration, /region:\s*REGION/u, name);
+        assert.match(declaration, /cors:\s*callableCors/u, name);
+        assert.match(declaration, /enforceAppCheck:\s*true/u, name);
+    }
 });
 
 test("citation BibTeX appears verbatim in its required context", async () => {

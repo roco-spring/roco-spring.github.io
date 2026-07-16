@@ -27,7 +27,17 @@
 
         <section class="section registration-section" aria-labelledby="team-account-heading">
             <div class="content-card registration-portal" id="registration-portal" aria-busy="true">
-                <h2 class="portal-title" id="team-account-heading">Team registration and account</h2>
+                <div class="portal-masthead">
+                    <div class="portal-masthead-copy">
+                        <p class="portal-kicker"><span aria-hidden="true"></span> Secure team workspace</p>
+                        <h2 class="portal-title" id="team-account-heading">Team registration and account</h2>
+                        <p class="portal-subtitle">Everything your team needs to enter, update, and stay ready for
+                            RoCo-Spring.</p>
+                    </div>
+                    <div class="portal-mark" aria-hidden="true">
+                        <span></span><span></span><span></span>
+                    </div>
+                </div>
 
                 <noscript>
                     <p class="form-status" data-state="error">
@@ -53,15 +63,23 @@
 
                     <section class="auth-panel" id="register-tab-panel" role="tabpanel"
                         aria-labelledby="register-tab">
-                        <p class="registration-intro">
-                            Register a team for the RoCo-Spring challenge. The person completing this registration
-                            must be one of the team members listed below. At least one competition track and one team
-                            member are required.
-                        </p>
+                        <div class="registration-intro-card">
+                            <p class="registration-intro">
+                                Register a team for the RoCo-Spring challenge. The person completing this registration
+                                must be one of the team members listed below. At least one competition track and one team
+                                member are required.
+                            </p>
+                            <div class="registration-intro-meta" aria-label="Registration overview">
+                                <span><strong>3</strong> quick sections</span>
+                                <span><strong>10</strong> members maximum</span>
+                                <span><strong>1</strong> secure team account</span>
+                            </div>
+                        </div>
 
                         <form id="registration-form" novalidate>
                             <fieldset class="form-section">
-                                <legend>Team information</legend>
+                                <legend><span class="form-step" aria-hidden="true">01</span><span>Team
+                                        information</span></legend>
                                 <div class="form-grid two-fields">
                                     <div class="form-field">
                                         <label for="register-team-name">Team name <span class="required-marker"
@@ -89,17 +107,27 @@
 
                             <fieldset class="form-section track-options" data-field-container="tracks"
                                 aria-describedby="register-tracks-help register-tracks-error">
-                                <legend>Competition tracks <span class="required-marker" aria-hidden="true">*</span>
+                                <legend><span class="form-step" aria-hidden="true">02</span><span>Competition tracks
+                                        <span class="required-marker" aria-hidden="true">*</span></span>
                                 </legend>
                                 <p id="register-tracks-help" class="field-help">Select one or more tracks.</p>
                                 <div class="checkbox-grid">
-                                    <label><input type="checkbox" name="tracks" value="optical-flow"> Optical
-                                        Flow</label>
-                                    <label><input type="checkbox" name="tracks" value="stereo-matching"> Stereo
-                                        Matching</label>
-                                    <label><input type="checkbox" name="tracks" value="scene-flow"> Scene Flow</label>
-                                    <label><input type="checkbox" name="tracks" value="exploration"> Exploration
-                                        Track</label>
+                                    <label class="track-option"><input type="checkbox" name="tracks"
+                                            value="optical-flow"><span class="track-option-copy"><strong>Optical
+                                                Flow</strong><small>Estimate motion between image frames</small></span>
+                                        <span class="track-option-check" aria-hidden="true"></span></label>
+                                    <label class="track-option"><input type="checkbox" name="tracks"
+                                            value="stereo-matching"><span class="track-option-copy"><strong>Stereo
+                                                Matching</strong><small>Recover depth from stereo image pairs</small></span>
+                                        <span class="track-option-check" aria-hidden="true"></span></label>
+                                    <label class="track-option"><input type="checkbox" name="tracks"
+                                            value="scene-flow"><span class="track-option-copy"><strong>Scene
+                                                Flow</strong><small>Model 3D motion through time</small></span>
+                                        <span class="track-option-check" aria-hidden="true"></span></label>
+                                    <label class="track-option"><input type="checkbox" name="tracks"
+                                            value="exploration"><span class="track-option-copy"><strong>Exploration
+                                                Track</strong><small>Explore ideas beyond the core tracks</small></span>
+                                        <span class="track-option-check" aria-hidden="true"></span></label>
                                 </div>
                                 <span class="field-error" id="register-tracks-error"
                                     data-field-error="tracks"></span>
@@ -107,56 +135,88 @@
 
                             <fieldset class="form-section members-section" data-field-container="members"
                                 aria-describedby="register-members-help register-members-error">
-                                <legend>Team members</legend>
+                                <legend><span class="form-step" aria-hidden="true">03</span><span>Team
+                                        members</span></legend>
                                 <p id="register-members-help" class="field-help">
-                                    Team member 1 is required. For members 2–10, either complete all three fields or
-                                    leave the entire row blank.
+                                    Team member 1 is required. Members 2 and 3 are optional, and you can add more
+                                    teammates up to 10. Fully complete each member you use.
                                 </p>
+                                <div class="member-editor-toolbar">
+                                    <div class="member-count-copy">
+                                        <span>Member fields</span>
+                                        <strong id="registration-member-count">3 shown · 10 max</strong>
+                                    </div>
+                                    <button class="button member-add-button" id="add-registration-member"
+                                        type="button"><span aria-hidden="true">+</span> Add Team Member</button>
+                                </div>
+                                <p class="visually-hidden" id="registration-members-announcement" role="status"
+                                    aria-live="polite" aria-atomic="true"></p>
                                 <div id="registration-members" class="member-slots"></div>
                                 <span class="field-error" id="register-members-error"
                                     data-field-error="members"></span>
                             </fieldset>
 
-                            <div class="confirmation-field" data-field-container="submitterIsMember">
-                                <label>
-                                    <input id="submitter-is-member" name="submitterIsMember" type="checkbox" required
-                                        data-field="submitterIsMember"
-                                        aria-describedby="submitter-is-member-error">
-                                    <span>I confirm that the person submitting this registration is one of the team
-                                        members listed above.</span>
-                                </label>
-                                <span class="field-error" id="submitter-is-member-error"
-                                    data-field-error="submitterIsMember"></span>
-                            </div>
+                            <div class="registration-action-panel">
+                                <div class="confirmation-field" data-field-container="submitterIsMember">
+                                    <label>
+                                        <input id="submitter-is-member" name="submitterIsMember" type="checkbox"
+                                            required data-field="submitterIsMember"
+                                            aria-describedby="submitter-is-member-error">
+                                        <span>I confirm that the person submitting this registration is one of the team
+                                            members listed above.</span>
+                                    </label>
+                                    <span class="field-error" id="submitter-is-member-error"
+                                        data-field-error="submitterIsMember"></span>
+                                </div>
 
-                            <p class="form-status" id="registration-status" role="status" aria-live="polite"></p>
-                            <button class="button primary form-submit" type="submit">Register team</button>
+                                <div class="registration-submit-row">
+                                    <p class="form-status" id="registration-status" role="status"
+                                        aria-live="polite"></p>
+                                    <button class="button primary form-submit" type="submit">Register team <span
+                                            aria-hidden="true">→</span></button>
+                                </div>
+                            </div>
                         </form>
                     </section>
 
                     <section class="auth-panel" id="login-tab-panel" role="tabpanel" aria-labelledby="login-tab"
                         hidden>
-                        <div class="narrow-form-panel">
-                            <h3>Team account sign-in</h3>
-                            <p>Use the primary contact email and your current Firebase Authentication password.</p>
-                            <form id="login-form" novalidate>
-                                <div class="form-field">
-                                    <label for="login-email">Login email</label>
-                                    <input id="login-email" name="email" type="email" maxlength="254"
-                                        autocomplete="username" required>
-                                </div>
-                                <div class="form-field">
-                                    <label for="login-password">Password</label>
-                                    <input id="login-password" name="password" type="password" maxlength="128"
-                                        autocomplete="current-password" required>
-                                </div>
-                                <div class="form-actions split-actions">
-                                    <button class="button primary" type="submit">Sign in</button>
-                                    <button class="text-button" id="forgot-password-button" type="button">Forgot
-                                        password?</button>
-                                </div>
-                                <p class="form-status" id="login-status" role="status" aria-live="polite"></p>
-                            </form>
+                        <div class="auth-panel-layout">
+                            <div class="auth-panel-aside">
+                                <p class="portal-kicker"><span aria-hidden="true"></span> Welcome back</p>
+                                <h3>Your team workspace is ready</h3>
+                                <p>Sign in to review your registration, keep your roster current, and confirm your
+                                    organizer record is synchronized.</p>
+                                <ul class="auth-feature-list">
+                                    <li><span aria-hidden="true">✓</span> Review registration details</li>
+                                    <li><span aria-hidden="true">✓</span> Update tracks and members</li>
+                                    <li><span aria-hidden="true">✓</span> Check organizer record sync</li>
+                                </ul>
+                            </div>
+                            <div class="narrow-form-panel login-form-panel">
+                                <div class="login-lock" aria-hidden="true"></div>
+                                <h3>Team account sign-in</h3>
+                                <p>Use the primary contact email and your current Firebase Authentication password.</p>
+                                <form id="login-form" novalidate>
+                                    <div class="form-field">
+                                        <label for="login-email">Login email</label>
+                                        <input id="login-email" name="email" type="email" maxlength="254"
+                                            autocomplete="username" required>
+                                    </div>
+                                    <div class="form-field">
+                                        <label for="login-password">Password</label>
+                                        <input id="login-password" name="password" type="password" maxlength="128"
+                                            autocomplete="current-password" required>
+                                    </div>
+                                    <div class="form-actions split-actions">
+                                        <button class="button primary" type="submit">Sign in <span
+                                                aria-hidden="true">→</span></button>
+                                        <button class="text-button" id="forgot-password-button" type="button">Forgot
+                                            password?</button>
+                                    </div>
+                                    <p class="form-status" id="login-status" role="status" aria-live="polite"></p>
+                                </form>
+                            </div>
                         </div>
                     </section>
                 </div>
@@ -273,7 +333,8 @@
                         </div>
 
                         <fieldset class="form-section">
-                            <legend>Team information</legend>
+                            <legend><span class="form-step" aria-hidden="true">01</span><span>Team
+                                    information</span></legend>
                             <div class="form-grid two-fields">
                                 <div class="form-field">
                                     <label for="edit-team-name">Team name</label>
@@ -298,30 +359,58 @@
 
                         <fieldset class="form-section track-options" data-field-container="tracks"
                             aria-describedby="edit-tracks-error">
-                            <legend>Competition tracks</legend>
+                            <legend><span class="form-step" aria-hidden="true">02</span><span>Competition
+                                    tracks</span></legend>
                             <div class="checkbox-grid">
-                                <label><input type="checkbox" name="tracks" value="optical-flow"> Optical Flow</label>
-                                <label><input type="checkbox" name="tracks" value="stereo-matching"> Stereo
-                                    Matching</label>
-                                <label><input type="checkbox" name="tracks" value="scene-flow"> Scene Flow</label>
-                                <label><input type="checkbox" name="tracks" value="exploration"> Exploration
-                                    Track</label>
+                                <label class="track-option"><input type="checkbox" name="tracks"
+                                        value="optical-flow"><span class="track-option-copy"><strong>Optical
+                                            Flow</strong><small>Estimate motion between image frames</small></span>
+                                    <span class="track-option-check" aria-hidden="true"></span></label>
+                                <label class="track-option"><input type="checkbox" name="tracks"
+                                        value="stereo-matching"><span class="track-option-copy"><strong>Stereo
+                                            Matching</strong><small>Recover depth from stereo image pairs</small></span>
+                                    <span class="track-option-check" aria-hidden="true"></span></label>
+                                <label class="track-option"><input type="checkbox" name="tracks"
+                                        value="scene-flow"><span class="track-option-copy"><strong>Scene
+                                            Flow</strong><small>Model 3D motion through time</small></span>
+                                    <span class="track-option-check" aria-hidden="true"></span></label>
+                                <label class="track-option"><input type="checkbox" name="tracks"
+                                        value="exploration"><span class="track-option-copy"><strong>Exploration
+                                            Track</strong><small>Explore ideas beyond the core tracks</small></span>
+                                    <span class="track-option-check" aria-hidden="true"></span></label>
                             </div>
                             <span class="field-error" id="edit-tracks-error" data-field-error="tracks"></span>
                         </fieldset>
 
                         <fieldset class="form-section members-section" data-field-container="members"
                             aria-describedby="edit-members-help edit-members-error">
-                            <legend>Team members</legend>
+                            <legend><span class="form-step" aria-hidden="true">03</span><span>Team members</span>
+                            </legend>
                             <p id="edit-members-help" class="field-help">
-                                Keep the primary contact in the member list. Fully complete any member row you use.
+                                Keep the primary contact in the member list. Add up to 10 members and fully complete
+                                each member you use.
                             </p>
+                            <div class="member-editor-toolbar">
+                                <div class="member-count-copy">
+                                    <span>Member fields</span>
+                                    <strong id="edit-member-count">3 shown · 10 max</strong>
+                                </div>
+                                <button class="button member-add-button" id="add-edit-member" type="button"><span
+                                        aria-hidden="true">+</span> Add Team Member</button>
+                            </div>
+                            <p class="visually-hidden" id="edit-members-announcement" role="status"
+                                aria-live="polite" aria-atomic="true"></p>
                             <div id="edit-members" class="member-slots"></div>
                             <span class="field-error" id="edit-members-error" data-field-error="members"></span>
                         </fieldset>
 
-                        <p class="form-status" id="edit-team-status" role="status" aria-live="polite"></p>
-                        <button class="button primary form-submit" type="submit">Save team details</button>
+                        <div class="registration-action-panel edit-action-panel">
+                            <div class="registration-submit-row">
+                                <p class="form-status" id="edit-team-status" role="status" aria-live="polite"></p>
+                                <button class="button primary form-submit" type="submit">Save team details <span
+                                        aria-hidden="true">→</span></button>
+                            </div>
+                        </div>
                     </form>
 
                     <section class="account-card password-card" aria-labelledby="change-password-heading">

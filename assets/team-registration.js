@@ -32,6 +32,9 @@ const elements = {
     registrationForm: document.getElementById("registration-form"),
     registrationStatus: document.getElementById("registration-status"),
     registrationMembers: document.getElementById("registration-members"),
+    registrationMemberCount: document.getElementById("registration-member-count"),
+    addRegistrationMember: document.getElementById("add-registration-member"),
+    registrationMembersAnnouncement: document.getElementById("registration-members-announcement"),
     loginForm: document.getElementById("login-form"),
     loginEmail: document.getElementById("login-email"),
     loginPassword: document.getElementById("login-password"),
@@ -58,6 +61,9 @@ const elements = {
     editTeamForm: document.getElementById("edit-team-form"),
     editTeamStatus: document.getElementById("edit-team-status"),
     editMembers: document.getElementById("edit-members"),
+    editMemberCount: document.getElementById("edit-member-count"),
+    addEditMember: document.getElementById("add-edit-member"),
+    editMembersAnnouncement: document.getElementById("edit-members-announcement"),
     editTeamName: document.getElementById("edit-team-name"),
     editPrimaryEmail: document.getElementById("edit-primary-email"),
     cancelEditButton: document.getElementById("cancel-edit-button"),
@@ -65,89 +71,241 @@ const elements = {
     changePasswordStatus: document.getElementById("change-password-status")
 };
 
+const INITIAL_MEMBER_SLOTS = 3;
+const MAX_TEAM_MEMBERS = 10;
+const MEMBER_FIELDS = Object.freeze([
+    Object.freeze({ key: "fullName", label: "Full name", type: "text", maximum: 120, autocomplete: "name" }),
+    Object.freeze({ key: "email", label: "Contact email address", type: "email", maximum: 254, autocomplete: "email" }),
+    Object.freeze({
+        key: "affiliation",
+        label: "Affiliation",
+        type: "text",
+        maximum: 300,
+        autocomplete: "organization"
+    })
+]);
+
 let currentTeam = null;
 let registrationAttempt = null;
 let authenticationSequence = 0;
 let signedOutMessage = "";
 let signedOutMessageState = "success";
 
-initializeMemberSlots(elements.registrationMembers, "register");
-initializeMemberSlots(elements.editMembers, "edit");
+const registrationMemberEditor = {
+    container: elements.registrationMembers,
+    prefix: "register",
+    form: elements.registrationForm,
+    addButton: elements.addRegistrationMember,
+    count: elements.registrationMemberCount,
+    announcement: elements.registrationMembersAnnouncement
+};
+const editMemberEditor = {
+    container: elements.editMembers,
+    prefix: "edit",
+    form: elements.editTeamForm,
+    addButton: elements.addEditMember,
+    count: elements.editMemberCount,
+    announcement: elements.editMembersAnnouncement
+};
+const memberEditors = [registrationMemberEditor, editMemberEditor];
+
+initializeMemberEditor(registrationMemberEditor);
+initializeMemberEditor(editMemberEditor);
 initializeTabs();
 initializeEventHandlers();
 
 onAuthStateChanged(auth, handleAuthenticationState);
 window.rocoTeamRegistrationReady = true;
 
-function initializeMemberSlots(container, prefix) {
-    const fragment = document.createDocumentFragment();
-
-    for (let index = 0; index < 10; index += 1) {
-        const memberNumber = index + 1;
-        const fieldset = document.createElement("fieldset");
-        const legend = document.createElement("legend");
-        const fields = document.createElement("div");
-
-        fieldset.className = "member-slot";
-        fieldset.dataset.memberIndex = String(index);
-        legend.textContent = `Team member ${memberNumber}`;
-
-        if (index === 0) {
-            const required = document.createElement("span");
-            required.className = "required-marker";
-            required.setAttribute("aria-hidden", "true");
-            required.textContent = " *";
-            legend.append(required);
-        } else {
-            const optional = document.createElement("span");
-            optional.className = "optional-marker";
-            optional.textContent = " (optional)";
-            legend.append(optional);
-        }
-
-        fields.className = "form-grid member-fields";
-        fields.append(
-            createMemberField(prefix, index, "fullName", "Full name", "text", 120, "name", index === 0),
-            createMemberField(prefix, index, "email", "Contact email address", "email", 254, "email", index === 0),
-            createMemberField(
-                prefix,
-                index,
-                "affiliation",
-                "Affiliation",
-                "text",
-                300,
-                "organization",
-                index === 0
-            )
-        );
-
-        fieldset.append(legend, fields);
-
-        if (index > 0) {
-            const clearButton = document.createElement("button");
-            clearButton.className = "text-button clear-member-button";
-            clearButton.type = "button";
-            clearButton.textContent = `Clear team member ${memberNumber}`;
-            clearButton.addEventListener("click", () => {
-                fieldset.querySelectorAll("input").forEach((input) => {
-                    input.value = "";
-                    input.removeAttribute("aria-invalid");
-                });
-                fieldset.querySelectorAll("[data-field-error]").forEach((error) => {
-                    error.textContent = "";
-                });
-                registrationAttempt = null;
-            });
-            fieldset.append(clearButton);
-        }
-
-        fragment.append(fieldset);
-    }
-
-    container.replaceChildren(fragment);
+function initializeMemberEditor(editor) {
+    resetMemberEditor(editor);
+    editor.addButton?.addEventListener("click", () => addMemberSlot(editor));
+    editor.container.addEventListener("input", () => updateMemberEditorState(editor));
 }
 
-function createMemberField(prefix, index, key, labelText, type, maximum, autocomplete, required) {
+function resetMemberEditor(editor, members = []) {
+    const safeMembers = Array.isArray(members) ? members.slice(0, MAX_TEAM_MEMBERS) : [];
+    const slotCount = Math.max(INITIAL_MEMBER_SLOTS, safeMembers.length);
+    const fragment = document.createDocumentFragment();
+
+    for (let index = 0; index < slotCount; index += 1) {
+        fragment.append(createMemberSlot(editor, index, safeMembers[index]));
+    }
+
+    editor.container.replaceChildren(fragment);
+    renumberMemberSlots(editor);
+    updateMemberEditorState(editor);
+}
+
+function createMemberSlot(editor, index, member = {}) {
+    const fieldset = document.createElement("fieldset");
+    const legend = document.createElement("legend");
+    const number = document.createElement("span");
+    const label = document.createElement("span");
+    const requirement = document.createElement("span");
+    const fields = document.createElement("div");
+
+    fieldset.className = "member-slot";
+    number.className = "member-number";
+    label.className = "member-slot-label";
+    requirement.className = "member-requirement";
+    legend.append(number, label, requirement);
+
+    fields.className = "form-grid member-fields";
+    MEMBER_FIELDS.forEach(({ key, label: fieldLabel, type, maximum, autocomplete }) => {
+        fields.append(createMemberField(editor.prefix, index, key, fieldLabel, type, maximum, autocomplete));
+    });
+
+    fieldset.append(legend, fields);
+
+    if (index > 0) {
+        const removeButton = document.createElement("button");
+        removeButton.className = "text-button member-remove-button";
+        removeButton.type = "button";
+        removeButton.addEventListener("click", () => removeMemberSlot(editor, fieldset));
+        fieldset.append(removeButton);
+    }
+
+    setMemberSlotValues(fieldset, member);
+    return fieldset;
+}
+
+function addMemberSlot(editor) {
+    const slotCount = editor.container.querySelectorAll(".member-slot").length;
+
+    if (slotCount >= MAX_TEAM_MEMBERS) {
+        announceMemberEditor(editor, "A team may have no more than 10 members.");
+        return;
+    }
+
+    const slot = createMemberSlot(editor, slotCount);
+    editor.container.append(slot);
+    renumberMemberSlots(editor);
+    updateMemberEditorState(editor);
+    clearFieldErrors(editor.form);
+    registrationAttempt = null;
+    announceMemberEditor(editor, `Team member ${slotCount + 1} added.`);
+    slot.querySelector('[data-member-field="fullName"]')?.focus();
+}
+
+function removeMemberSlot(editor, slot) {
+    const slots = [...editor.container.querySelectorAll(".member-slot")];
+    const removedIndex = slots.indexOf(slot);
+
+    if (removedIndex < 1) return;
+
+    if (removedIndex < INITIAL_MEMBER_SLOTS) {
+        slot.querySelectorAll("input").forEach((input) => {
+            input.value = "";
+        });
+        clearFieldErrors(editor.form);
+        updateMemberEditorState(editor);
+        registrationAttempt = null;
+        announceMemberEditor(editor, `Team member ${removedIndex + 1} cleared.`);
+        slot.querySelector('[data-member-field="fullName"]')?.focus();
+        return;
+    }
+
+    if (slots.length <= INITIAL_MEMBER_SLOTS) return;
+
+    slot.remove();
+    renumberMemberSlots(editor);
+    updateMemberEditorState(editor);
+    clearFieldErrors(editor.form);
+    registrationAttempt = null;
+    announceMemberEditor(editor, `Team member ${removedIndex + 1} removed.`);
+
+    const remainingSlots = [...editor.container.querySelectorAll(".member-slot")];
+    const focusTarget = remainingSlots[Math.min(removedIndex, remainingSlots.length - 1)]
+        ?.querySelector('[data-member-field="fullName"]') ?? editor.addButton;
+    focusTarget?.focus();
+}
+
+function renumberMemberSlots(editor) {
+    const slots = [...editor.container.querySelectorAll(".member-slot")];
+
+    slots.forEach((slot, index) => {
+        const memberNumber = index + 1;
+        const isRequired = index === 0;
+        slot.dataset.memberIndex = String(index);
+        slot.querySelector(".member-number").textContent = String(memberNumber).padStart(2, "0");
+        slot.querySelector(".member-slot-label").textContent = `Team member ${memberNumber}`;
+
+        const requirement = slot.querySelector(".member-requirement");
+        requirement.className = isRequired
+            ? "member-requirement required-member"
+            : "member-requirement optional-marker";
+        requirement.textContent = isRequired ? "Required" : "Optional";
+
+        MEMBER_FIELDS.forEach(({ key, autocomplete }) => {
+            const input = slot.querySelector(`[data-member-field="${key}"]`);
+            const wrapper = input.closest(".form-field");
+            const label = wrapper.querySelector("label");
+            const error = wrapper.querySelector("[data-field-error]");
+            const inputId = `${editor.prefix}-member-${memberNumber}-${key}`;
+            const errorId = `${inputId}-error`;
+            const fieldPath = `members.${index}.${key}`;
+
+            label.htmlFor = inputId;
+            input.id = inputId;
+            input.required = isRequired;
+            input.autocomplete = `section-${editor.prefix}-member-${memberNumber} ${autocomplete}`;
+            input.dataset.field = fieldPath;
+            input.setAttribute("aria-describedby", errorId);
+            error.id = errorId;
+            error.dataset.fieldError = fieldPath;
+        });
+
+        const removeButton = slot.querySelector(".member-remove-button");
+        if (removeButton) {
+            const action = index < INITIAL_MEMBER_SLOTS ? "Clear" : "Remove";
+            removeButton.textContent = `${action} member ${memberNumber}`;
+            removeButton.setAttribute("aria-label", `${action} team member ${memberNumber}`);
+        }
+    });
+}
+
+function updateMemberEditorState(editor) {
+    const slots = [...editor.container.querySelectorAll(".member-slot")];
+    const slotCount = slots.length;
+    const atMaximum = slotCount >= MAX_TEAM_MEMBERS;
+    const formIsBusy = editor.form.getAttribute("aria-busy") === "true";
+
+    if (editor.count) {
+        editor.count.textContent = `${slotCount} shown · ${MAX_TEAM_MEMBERS} max`;
+    }
+
+    if (editor.addButton) {
+        editor.addButton.disabled = atMaximum || formIsBusy;
+        editor.addButton.textContent = atMaximum ? "Maximum 10 members added" : "+ Add Team Member";
+        editor.addButton.setAttribute(
+            "aria-label",
+            atMaximum ? "Maximum of 10 team members reached" : `Add team member ${slotCount + 1}`
+        );
+    }
+
+    slots.forEach((slot, index) => {
+        const removeButton = slot.querySelector(".member-remove-button");
+        if (!removeButton) return;
+        const starterSlotIsBlank = index < INITIAL_MEMBER_SLOTS
+            && [...slot.querySelectorAll("input")].every((input) => input.value.trim() === "");
+        removeButton.hidden = starterSlotIsBlank;
+        removeButton.disabled = formIsBusy;
+    });
+}
+
+function announceMemberEditor(editor, message) {
+    if (editor.announcement) editor.announcement.textContent = message;
+}
+
+function setMemberSlotValues(slot, member = {}) {
+    MEMBER_FIELDS.forEach(({ key }) => {
+        const input = slot.querySelector(`[data-member-field="${key}"]`);
+        input.value = typeof member?.[key] === "string" ? member[key] : "";
+    });
+}
+
+function createMemberField(prefix, index, key, labelText, type, maximum, autocomplete) {
     const wrapper = document.createElement("div");
     const label = document.createElement("label");
     const input = document.createElement("input");
@@ -163,7 +321,7 @@ function createMemberField(prefix, index, key, labelText, type, maximum, autocom
     input.id = inputId;
     input.type = type;
     input.maxLength = maximum;
-    input.required = required;
+    input.required = index === 0;
     input.autocomplete = `section-${prefix}-member-${memberNumber} ${autocomplete}`;
     input.dataset.memberField = key;
     input.dataset.field = fieldPath;
@@ -305,7 +463,7 @@ function clearPrivateState() {
     elements.initialPasswordForm.reset();
     elements.changePasswordForm.reset();
     elements.editTeamForm.reset();
-    populateMemberSlots(elements.editMembers, []);
+    resetMemberEditor(editMemberEditor);
 
     [
         elements.dashboardTeamId,
@@ -427,6 +585,7 @@ async function handleRegistration(event) {
 
         registrationAttempt = null;
         elements.registrationForm.reset();
+        resetMemberEditor(registrationMemberEditor);
         clearFieldErrors(elements.registrationForm);
         setStatus(elements.registrationStatus, "", "");
         elements.loginEmail.value = validation.data.primaryContactEmail;
@@ -692,23 +851,8 @@ function populateEditForm(team) {
         checkbox.checked = selectedTracks.has(checkbox.value);
     });
 
-    populateMemberSlots(elements.editMembers, Array.isArray(team.members) ? team.members : []);
+    resetMemberEditor(editMemberEditor, Array.isArray(team.members) ? team.members : []);
     clearFieldErrors(elements.editTeamForm);
-}
-
-function populateMemberSlots(container, members) {
-    container.querySelectorAll(".member-slot").forEach((slot, index) => {
-        const member = members[index] ?? {};
-        slot.querySelector('[data-member-field="fullName"]').value = typeof member.fullName === "string"
-            ? member.fullName
-            : "";
-        slot.querySelector('[data-member-field="email"]').value = typeof member.email === "string"
-            ? member.email
-            : "";
-        slot.querySelector('[data-member-field="affiliation"]').value = typeof member.affiliation === "string"
-            ? member.affiliation
-            : "";
-    });
 }
 
 async function handleTeamUpdate(event) {
@@ -997,6 +1141,9 @@ function setFormBusy(form, busy) {
     form.querySelectorAll("button, input").forEach((control) => {
         control.disabled = busy;
     });
+    memberEditors
+        .filter((editor) => editor.form === form)
+        .forEach((editor) => updateMemberEditorState(editor));
 }
 
 function setStatus(element, message, state) {
@@ -1119,6 +1266,9 @@ function safeErrorMessage(error, context) {
         }
         if (code === "functions/invalid-argument") {
             return "The registration was rejected because one or more fields are invalid. Review the form and try again.";
+        }
+        if (["functions/internal", "functions/not-found"].includes(code)) {
+            return "The registration service is temporarily unavailable. Try again shortly; repeating the same request will not create a duplicate team. If this continues, contact roco-spring-org@googlegroups.com.";
         }
     }
 
