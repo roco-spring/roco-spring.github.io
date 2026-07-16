@@ -1,0 +1,54 @@
+name: Verify registration system
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: registration-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            functions/package-lock.json
+
+      - name: Set up Java for Firebase emulators
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Install pinned dependencies
+        run: |
+          npm ci
+          npm --prefix functions ci
+          npx playwright install --with-deps chromium
+
+      - name: Run unit, emulator, and browser tests
+        run: npm test
+
+      - name: Build and lint Functions
+        run: |
+          npm run build
+          npm run lint
+
+      - name: Scan for credentials and unsafe password handling
+        run: npm run security:scan

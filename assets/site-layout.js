@@ -63,11 +63,12 @@
 
     function markCurrentNavLink() {
         const page = location.pathname.split("/").pop() || "index.html";
+        const activePage = page === "team-registration.html" ? "participate.html" : page;
 
         document.querySelectorAll(".site-header .nav a").forEach((link) => {
             const href = link.getAttribute("href");
 
-            if (href === page) {
+            if (href === activePage) {
                 link.setAttribute("aria-current", "page");
             }
         });

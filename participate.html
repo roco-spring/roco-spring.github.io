@@ -39,10 +39,10 @@
                     <div class="step-body">
                         <h3>Register team</h3>
                         <p>
-                            Sign up your team on the competition platform to receive updates and access
-                            submission instructions.
-                            <span class="coming-soon">Coming soon</span>
+                            Register or manage your team to receive a unique team ID, updates, and access
+                            to submission instructions.
                         </p>
+                        <a class="button primary compact" href="team-registration.html">Register or manage team</a>
                     </div>
                 </li>
                 <li class="step-card">
@@ -146,9 +146,32 @@
 
             <div class="content-card">
                 <p>
-                    GitHub repository:
-                    <span class="coming-soon">Coming soon</span>
+                    RoCo-Spring starting kit repository:
+                    <a href="https://github.com/hmorimitsu/roco-spring-devkit" target="_blank"
+                        rel="noopener noreferrer">hmorimitsu/roco-spring-devkit</a>
                 </p>
+                <p>
+                    Clone the official RoCo Spring DevKit for its PTLFlow-based tools and scripts.
+                    Challenge submission requirements and validation steps are maintained on this website.
+                </p>
+
+                <div class="citation-block">
+                    <p>If you use the PTLFlow-based starting kit or PTLFlow components in your work, please cite the
+                        following reference.</p>
+                    <div class="citation-actions">
+                        <button class="button secondary compact bibtex-copy" type="button"
+                            data-copy-target="citation-ptlflow" aria-label="Copy PTLFlow BibTeX">Copy BibTeX</button>
+                        <span class="copy-status" role="status" aria-live="polite"></span>
+                    </div>
+                    <pre><code id="citation-ptlflow">@misc{morimitsu2021ptlflow,
+  author = {Henrique Morimitsu},
+  title = {PyTorch Lightning Optical Flow},
+  year = {2021},
+  publisher = {GitHub},
+  journal = {GitHub repository},
+  howpublished = {\url{https://github.com/hmorimitsu/ptlflow}}
+}</code></pre>
+                </div>
 
                 <!-- <ul class="feature-list">
                     <li>PTLFlow-based training and inference scripts</li>
@@ -226,12 +249,14 @@
             <div class="contact-card content-card">
                 <p>
                     GitHub issues:
-                    <span class="coming-soon">Coming soon</span>
+                    <a href="https://github.com/roco-spring/roco-spring.github.io/issues" target="_blank"
+                        rel="noopener noreferrer">Report a website or challenge issue</a>
                 </p>
 
                 <p>
-                    Discussion forum:
-                    <span class="coming-soon">Coming soon</span>
+                    Questions and discussion:
+                    <a href="https://github.com/roco-spring/roco-spring.github.io/issues/new/choose" target="_blank"
+                        rel="noopener noreferrer">Start a public support thread</a>
                 </p>
 
                 <p>
@@ -245,6 +270,7 @@
     <footer id="site-footer"></footer>
 
     <script src="assets/flow.js"></script>
+    <script src="assets/citations.js"></script>
 </body>
 
 </html>

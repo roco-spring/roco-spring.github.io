@@ -23,3 +23,28 @@ python -m http.server 8080
 ```
 
 Then visit [http://localhost:8080](http://localhost:8080).
+
+## Team registration
+
+The registration page remains part of the vanilla static site. It uses Firebase Authentication, App Check, private callable Cloud Functions, and a deny-by-default Firestore data layer. The backend creates one private organizer Sheet per team and delivers first-login credentials through Gmail API; the browser never receives Google credentials or direct access to team records.
+
+See [SETUP_TEAM_REGISTRATION.md](SETUP_TEAM_REGISTRATION.md) for architecture, local emulator setup, the secure one-time OAuth procedure, deployment, and recovery instructions.
+
+Install dependencies and run the checks from the repository root:
+
+```bash
+npm ci
+npm --prefix functions ci
+npm test
+npm run build
+npm run lint
+npm run security:scan
+```
+
+After the documented OAuth preflight and Secret Manager setup, deploy the backend with:
+
+```bash
+npm run deploy:production
+```
+
+Passwords, OAuth secrets and refresh tokens, service-account credentials, App Check debug tokens, and the rate-limit HMAC secret are never stored in this public repository.

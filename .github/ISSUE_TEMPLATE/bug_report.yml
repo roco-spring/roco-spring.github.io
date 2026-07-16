@@ -1,0 +1,48 @@
+name: Website or workflow problem
+description: Report a reproducible problem with the public website or challenge workflow.
+title: "[Bug]: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please describe only non-sensitive behavior. Never paste credentials, passwords, tokens, private registration data, or complete network request bodies.
+  - type: input
+    id: page
+    attributes:
+      label: Public page URL
+      placeholder: https://roco-spring.github.io/...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior and safe reproduction steps
+    validations:
+      required: true
+  - type: dropdown
+    id: browser
+    attributes:
+      label: Browser family
+      options:
+        - Chrome or Chromium
+        - Firefox
+        - Safari
+        - Edge
+        - Other
+    validations:
+      required: true
+  - type: checkboxes
+    id: safety
+    attributes:
+      label: Safety check
+      options:
+        - label: I have not included credentials, passwords, tokens, or private team/member data.
+          required: true

@@ -1,0 +1,697 @@
+import { expect, test } from "@playwright/test";
+
+const FIREBASE_VERSION = "12.16.0";
+
+const FIREBASE_MODULES = {
+  "firebase-app.js": `
+    const harness = globalThis.__rocoFirebaseHarness;
+    export function initializeApp(config) {
+      harness.firebaseConfig = config;
+      return { config };
+    }
+  `,
+  "firebase-app-check.js": `
+    export class ReCaptchaEnterpriseProvider {
+      constructor(siteKey) {
+        this.siteKey = siteKey;
+      }
+    }
+    export function initializeAppCheck(app, options) {
+      return { app, options };
+    }
+  `,
+  "firebase-auth.js": `
+    const harness = globalThis.__rocoFirebaseHarness;
+    export const browserSessionPersistence = { type: "SESSION" };
+    export const EmailAuthProvider = {
+      credential(email, password) {
+        return { email, password };
+      }
+    };
+    export function getAuth() {
+      return harness.auth;
+    }
+    export function connectAuthEmulator() {}
+    export function setPersistence() {
+      return Promise.resolve();
+    }
+    export function onAuthStateChanged(_auth, observer) {
+      return harness.observeAuth(observer);
+    }
+    export function getIdTokenResult(user, forceRefresh) {
+      return harness.getIdTokenResult(user, forceRefresh);
+    }
+    export function signOut() {
+      return harness.signOut();
+    }
+    export function signInWithEmailAndPassword(_auth, email, password) {
+      return harness.signIn(email, password);
+    }
+    export function sendPasswordResetEmail(_auth, email) {
+      return harness.recordPasswordReset(email);
+    }
+    export function reauthenticateWithCredential(user, credential) {
+      return harness.reauthenticate(user, credential);
+    }
+    export function updatePassword(user, password) {
+      return harness.updatePassword(user, password);
+    }
+  `,
+  "firebase-functions.js": `
+    const harness = globalThis.__rocoFirebaseHarness;
+    export function getFunctions() {
+      return { region: "stub" };
+    }
+    export function connectFunctionsEmulator() {}
+    export function httpsCallable(_functions, name) {
+      return (payload) => harness.invokeCallable(name, payload);
+    }
+  `
+};
+
+function teamFixture(label, revision = 1) {
+  const slug = label.toLowerCase();
+
+  return {
+    teamId: `RoCo-${revision}`,
+    teamName: `${label} Private Team`,
+    primaryContactEmail: `${slug}@private.example`,
+    tracks: ["optical-flow"],
+    members: [{
+      fullName: `${label} Private Member`,
+      email: `${slug}@private.example`,
+      affiliation: `${label} Private Laboratory`
+    }],
+    createdAt: "2026-07-01T10:00:00.000Z",
+    updatedAt: "2026-07-02T10:00:00.000Z",
+    revision,
+    sheetSyncStatus: "synced",
+    sheetLastSyncedRevision: revision
+  };
+}
+
+async function installFirebaseHarness(page) {
+  await page.addInitScript(() => {
+    const auth = { currentUser: null };
+    const observers = new Set();
+    const tokenPolicies = new Map();
+    const callableRequests = [];
+    const passwordResets = [];
+    const passwordOperations = [];
+    let reauthenticationFailureCode = null;
+    let nextCallableId = 1;
+
+    function emitAuth(user) {
+      auth.currentUser = user;
+      for (const observer of observers) observer(user);
+    }
+
+    globalThis.__rocoFirebaseHarness = {
+      auth,
+      firebaseConfig: null,
+
+      observeAuth(observer) {
+        observers.add(observer);
+        // Firebase invokes a newly registered observer with the current state;
+        // mirror that initial asynchronous notification in the browser harness.
+        queueMicrotask(() => {
+          if (observers.has(observer)) observer(auth.currentUser);
+        });
+        return () => observers.delete(observer);
+      },
+
+      emitAuth,
+
+      setTokenSuccess(uid, claims = {}) {
+        tokenPolicies.set(uid, { kind: "success", claims });
+      },
+
+      setTokenFailure(uid, code = "auth/user-token-expired") {
+        tokenPolicies.set(uid, { kind: "failure", code });
+      },
+
+      getIdTokenResult(user, forceRefresh) {
+        if (forceRefresh !== true) {
+          return Promise.reject(new Error("Expected a forced ID-token refresh."));
+        }
+
+        const policy = tokenPolicies.get(user.uid) ?? { kind: "success", claims: {} };
+
+        if (policy.kind === "failure") {
+          const error = new Error("Stubbed ID-token refresh failure.");
+          error.code = policy.code;
+          return Promise.reject(error);
+        }
+
+        return Promise.resolve({ claims: policy.claims });
+      },
+
+      signOut() {
+        emitAuth(null);
+        return Promise.resolve();
+      },
+
+      signIn(email) {
+        const user = { uid: `signed-in:${email}`, email };
+        emitAuth(user);
+        return Promise.resolve({ user });
+      },
+
+      recordPasswordReset(email) {
+        passwordResets.push(email);
+        return Promise.resolve();
+      },
+
+      readPasswordResets() {
+        return [...passwordResets];
+      },
+
+      reauthenticate() {
+        passwordOperations.push("reauthenticate");
+        if (reauthenticationFailureCode) {
+          const error = new Error("Stubbed reauthentication failure.");
+          error.code = reauthenticationFailureCode;
+          return Promise.reject(error);
+        }
+        return Promise.resolve();
+      },
+
+      updatePassword() {
+        passwordOperations.push("updatePassword");
+        return Promise.resolve();
+      },
+
+      setReauthenticationFailure(code) {
+        reauthenticationFailureCode = code;
+      },
+
+      clearPasswordOperations() {
+        passwordOperations.length = 0;
+      },
+
+      readPasswordOperations() {
+        return [...passwordOperations];
+      },
+
+      invokeCallable(name, payload) {
+        const id = nextCallableId;
+        nextCallableId += 1;
+
+        return new Promise((resolve, reject) => {
+          callableRequests.push({
+            id,
+            name,
+            payload,
+            uid: auth.currentUser?.uid ?? null,
+            settled: false,
+            resolve,
+            reject
+          });
+        });
+      },
+
+      pendingCallCount(name, uid) {
+        return callableRequests.filter((request) => (
+          request.name === name
+          && request.uid === uid
+          && request.settled === false
+        )).length;
+      },
+
+      pendingCallPayload(name, uid) {
+        return callableRequests.find((request) => (
+          request.name === name
+          && request.uid === uid
+          && request.settled === false
+        ))?.payload ?? null;
+      },
+
+      resolveCall(name, uid, data) {
+        const request = callableRequests.find((candidate) => (
+          candidate.name === name
+          && candidate.uid === uid
+          && candidate.settled === false
+        ));
+
+        if (!request) throw new Error(`No pending ${name} request for ${uid}.`);
+        request.settled = true;
+        request.resolve({ data });
+      },
+
+      rejectCall(name, uid, code = "functions/internal") {
+        const request = callableRequests.find((candidate) => (
+          candidate.name === name
+          && candidate.uid === uid
+          && candidate.settled === false
+        ));
+
+        if (!request) throw new Error(`No pending ${name} request for ${uid}.`);
+        const error = new Error(`Stubbed ${name} failure.`);
+        error.code = code;
+        request.settled = true;
+        request.reject(error);
+      }
+    };
+  });
+
+  await page.route(`https://www.gstatic.com/firebasejs/${FIREBASE_VERSION}/**`, async (route) => {
+    const filename = new URL(route.request().url()).pathname.split("/").at(-1);
+    const body = FIREBASE_MODULES[filename];
+
+    if (!body) {
+      await route.abort("failed");
+      return;
+    }
+
+    await route.fulfill({
+      status: 200,
+      contentType: "application/javascript; charset=utf-8",
+      body
+    });
+  });
+}
+
+async function openPortal(page) {
+  await installFirebaseHarness(page);
+  await page.goto("/team-registration.html");
+  await expect.poll(() => page.evaluate(() => window.rocoTeamRegistrationReady)).toBe(true);
+  await expect.poll(() => page.evaluate(() => window.rocoTeamRegistrationSettled)).toBe(true);
+}
+
+async function configureToken(page, uid, claims = {}) {
+  await page.evaluate(({ targetUid, targetClaims }) => {
+    window.__rocoFirebaseHarness.setTokenSuccess(targetUid, targetClaims);
+  }, { targetUid: uid, targetClaims: claims });
+}
+
+async function emitUser(page, uid, email = `${uid.toLowerCase()}@login.example`) {
+  await page.evaluate(({ targetUid, targetEmail }) => {
+    window.__rocoFirebaseHarness.emitAuth({ uid: targetUid, email: targetEmail });
+  }, { targetUid: uid, targetEmail: email });
+}
+
+async function emitSignedOut(page) {
+  await page.evaluate(() => window.__rocoFirebaseHarness.emitAuth(null));
+}
+
+async function waitForCall(page, name, uid) {
+  await expect.poll(() => page.evaluate(({ callableName, targetUid }) => (
+    window.__rocoFirebaseHarness.pendingCallCount(callableName, targetUid)
+  ), { callableName: name, targetUid: uid })).toBe(1);
+}
+
+async function resolveCall(page, name, uid, data) {
+  await page.evaluate(({ callableName, targetUid, responseData }) => {
+    window.__rocoFirebaseHarness.resolveCall(callableName, targetUid, responseData);
+  }, { callableName: name, targetUid: uid, responseData: data });
+}
+
+async function loadUserTeam(page, uid, fixture) {
+  await configureToken(page, uid);
+  await emitUser(page, uid);
+  await waitForCall(page, "getMyTeam", uid);
+  await resolveCall(page, "getMyTeam", uid, { team: fixture });
+  await expect(page.locator("#dashboard-team-name")).toHaveText(fixture.teamName);
+  await expect(page.locator("#dashboard-view")).toBeVisible();
+}
+
+test("a delayed team load from user A cannot overwrite user B after an auth handoff", async ({ page }) => {
+  const errors = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  const teamA = teamFixture("Alpha", 11);
+  const teamB = teamFixture("Bravo", 22);
+
+  await openPortal(page);
+  await configureToken(page, "uid-a");
+  await configureToken(page, "uid-b");
+
+  await emitUser(page, "uid-a", "alpha@login.example");
+  await waitForCall(page, "getMyTeam", "uid-a");
+
+  await emitSignedOut(page);
+  await emitUser(page, "uid-b", "bravo@login.example");
+  await waitForCall(page, "getMyTeam", "uid-b");
+  await resolveCall(page, "getMyTeam", "uid-b", { team: teamB });
+
+  await expect(page.locator("#dashboard-team-name")).toHaveText(teamB.teamName);
+  await expect(page.locator("#dashboard-primary-email")).toHaveText(teamB.primaryContactEmail);
+
+  await resolveCall(page, "getMyTeam", "uid-a", { team: teamA });
+
+  await expect(page.locator("#dashboard-team-name")).toHaveText(teamB.teamName);
+  await expect(page.locator("#dashboard-primary-email")).toHaveText(teamB.primaryContactEmail);
+  await expect(page.locator("#dashboard-members")).toContainText("Bravo Private Member");
+  await expect(page.locator("body")).not.toContainText("Alpha Private Team");
+  await expect(page.locator("body")).not.toContainText("alpha@private.example");
+  expect(errors).toEqual([]);
+});
+
+test("a rejected token refresh removes all rendered private data and password candidates", async ({ page }) => {
+  const teamA = teamFixture("TokenFailure", 31);
+  await openPortal(page);
+  await loadUserTeam(page, "uid-a", teamA);
+
+  await page.getByRole("button", { name: "Edit team details" }).click();
+  await page.evaluate(() => {
+    document.getElementById("initial-new-password").value = "InitialSecret-123";
+    document.getElementById("initial-confirm-password").value = "InitialSecret-123";
+    document.getElementById("current-password").value = "CurrentSecret-123";
+    document.getElementById("new-password").value = "NormalSecret-123";
+    document.getElementById("confirm-new-password").value = "NormalSecret-123";
+  });
+
+  await page.evaluate(() => {
+    window.__rocoFirebaseHarness.setTokenFailure("uid-a");
+    window.__rocoFirebaseHarness.emitAuth({ uid: "uid-a", email: "alpha@login.example" });
+  });
+
+  await expect(page.locator("#public-auth")).toBeVisible();
+  await expect(page.locator("#login-status")).toContainText("secure session could not be verified");
+  await expect(page.locator("#dashboard-panel")).toBeHidden();
+  await expect(page.locator("#dashboard-view")).toBeHidden();
+  await expect(page.locator("#edit-team-form")).toBeHidden();
+
+  for (const selector of [
+    "#initial-new-password",
+    "#initial-confirm-password",
+    "#current-password",
+    "#new-password",
+    "#confirm-new-password"
+  ]) {
+    await expect(page.locator(selector)).toHaveValue("");
+  }
+
+  for (const selector of [
+    "#dashboard-team-id",
+    "#dashboard-team-name",
+    "#dashboard-primary-email",
+    "#dashboard-created-at",
+    "#dashboard-updated-at",
+    "#dashboard-revision",
+    "#dashboard-sync-status"
+  ]) {
+    await expect(page.locator(selector)).toHaveText("");
+  }
+
+  await expect(page.locator("#edit-team-name")).toHaveValue("");
+  await expect(page.locator("#edit-primary-email")).toHaveValue("");
+
+  await expect(page.locator("#dashboard-tracks")).toBeEmpty();
+  await expect(page.locator("#dashboard-members")).toBeEmpty();
+  const editMemberValues = await page.locator("#edit-members input").evaluateAll((inputs) => (
+    inputs.map((input) => input.value)
+  ));
+  expect(editMemberValues).toEqual(new Array(30).fill(""));
+  await expect(page.locator("body")).not.toContainText(teamA.teamName);
+  await expect(page.locator("body")).not.toContainText(teamA.primaryContactEmail);
+});
+
+test("a delayed update from user A is ignored after user B signs in", async ({ page }) => {
+  const teamA = teamFixture("UpdateAlpha", 41);
+  const teamB = teamFixture("UpdateBravo", 52);
+  const staleUpdate = {
+    ...teamFixture("StaleAlphaUpdate", 42),
+    teamId: teamA.teamId
+  };
+
+  await openPortal(page);
+  await loadUserTeam(page, "uid-a", teamA);
+  await configureToken(page, "uid-b");
+
+  await page.getByRole("button", { name: "Edit team details" }).click();
+  await page.locator("#edit-team-name").fill("StaleAlphaUpdate Private Team");
+  await page.getByRole("button", { name: "Save team details" }).click();
+  await waitForCall(page, "updateMyTeam", "uid-a");
+
+  const updatePayload = await page.evaluate(() => (
+    window.__rocoFirebaseHarness.pendingCallPayload("updateMyTeam", "uid-a")
+  ));
+  expect(updatePayload.expectedRevision).toBe(teamA.revision);
+  expect(updatePayload.teamName).toBe("StaleAlphaUpdate Private Team");
+
+  await emitSignedOut(page);
+  await emitUser(page, "uid-b", "bravo@login.example");
+  await waitForCall(page, "getMyTeam", "uid-b");
+  await resolveCall(page, "getMyTeam", "uid-b", { team: teamB });
+  await expect(page.locator("#dashboard-team-name")).toHaveText(teamB.teamName);
+
+  await resolveCall(page, "updateMyTeam", "uid-a", {
+    team: staleUpdate,
+    synchronizationStatus: "synced"
+  });
+
+  await expect(page.locator("#dashboard-team-name")).toHaveText(teamB.teamName);
+  await expect(page.locator("#dashboard-primary-email")).toHaveText(teamB.primaryContactEmail);
+  await expect(page.locator("#dashboard-members")).toContainText("UpdateBravo Private Member");
+  await expect(page.locator("body")).not.toContainText(staleUpdate.teamName);
+  await expect(page.locator("body")).not.toContainText(staleUpdate.primaryContactEmail);
+});
+
+test("every password field is cleared at each authentication transition", async ({ page }) => {
+  const teamB = teamFixture("PasswordBravo", 62);
+  await openPortal(page);
+
+  await emitSignedOut(page);
+  await expect(page.locator("#public-auth")).toBeVisible();
+  await page.getByRole("tab", { name: "Sign in to an existing team" }).click();
+  await page.locator("#login-password").fill("TemporaryLoginSecret-123");
+
+  await configureToken(page, "uid-a", { mustChangePassword: true });
+  await emitUser(page, "uid-a", "alpha@login.example");
+  await expect(page.locator("#initial-password-panel")).toBeVisible();
+  await expect(page.locator("#login-password")).toHaveValue("");
+
+  await page.locator("#initial-new-password").fill("InitialCandidate-123");
+  await page.locator("#initial-confirm-password").fill("InitialCandidate-123");
+
+  await configureToken(page, "uid-b");
+  await emitUser(page, "uid-b", "bravo@login.example");
+  await waitForCall(page, "getMyTeam", "uid-b");
+  await expect(page.locator("#initial-new-password")).toHaveValue("");
+  await expect(page.locator("#initial-confirm-password")).toHaveValue("");
+  await resolveCall(page, "getMyTeam", "uid-b", { team: teamB });
+
+  await page.locator("#current-password").fill("CurrentCandidate-123");
+  await page.locator("#new-password").fill("NormalCandidate-123");
+  await page.locator("#confirm-new-password").fill("NormalCandidate-123");
+
+  await configureToken(page, "uid-c", { mustChangePassword: true });
+  await emitUser(page, "uid-c", "charlie@login.example");
+  await expect(page.locator("#initial-password-panel")).toBeVisible();
+
+  for (const selector of [
+    "#login-password",
+    "#initial-new-password",
+    "#initial-confirm-password",
+    "#current-password",
+    "#new-password",
+    "#confirm-new-password"
+  ]) {
+    await expect(page.locator(selector)).toHaveValue("");
+  }
+});
+
+test("an ordinary password change reauthenticates first and never updates after failed reauthentication", async ({ page }) => {
+  const team = teamFixture("PasswordOrder", 71);
+  await openPortal(page);
+  await loadUserTeam(page, "uid-password", team);
+
+  await page.locator("#current-password").fill("CurrentCandidate-123");
+  await page.locator("#new-password").fill("ReplacementCandidate-123");
+  await page.locator("#confirm-new-password").fill("ReplacementCandidate-123");
+  await page.getByRole("button", { name: "Change password" }).click();
+
+  await expect(page.locator("#change-password-status")).toContainText("Password changed successfully");
+  expect(await page.evaluate(() => (
+    window.__rocoFirebaseHarness.readPasswordOperations()
+  ))).toEqual(["reauthenticate", "updatePassword"]);
+
+  await page.evaluate(() => {
+    window.__rocoFirebaseHarness.clearPasswordOperations();
+    window.__rocoFirebaseHarness.setReauthenticationFailure("auth/wrong-password");
+  });
+  await page.locator("#current-password").fill("IncorrectCandidate-123");
+  await page.locator("#new-password").fill("AnotherCandidate-123");
+  await page.locator("#confirm-new-password").fill("AnotherCandidate-123");
+  await page.getByRole("button", { name: "Change password" }).click();
+
+  await expect(page.locator("#change-password-status")).toContainText("current password");
+  expect(await page.evaluate(() => (
+    window.__rocoFirebaseHarness.readPasswordOperations()
+  ))).toEqual(["reauthenticate"]);
+});
+
+test("sign-in, successful edit, and dashboard sign-out complete without browser or network errors", async ({ page }) => {
+  const pageErrors = [];
+  const consoleErrors = [];
+  const failedRequests = [];
+  page.on("pageerror", (error) => pageErrors.push(error.message));
+  page.on("console", (message) => {
+    if (message.type() === "error") consoleErrors.push(message.text());
+  });
+  page.on("requestfailed", (request) => {
+    failedRequests.push(new URL(request.url()).pathname);
+  });
+
+  const email = "owner@example.org";
+  const uid = `signed-in:${email}`;
+  const original = teamFixture("HappyLogin", 81);
+  const updated = {
+    ...original,
+    teamName: "Happy Login Updated Team",
+    updatedAt: "2026-07-03T10:00:00.000Z",
+    revision: 82,
+    sheetLastSyncedRevision: 82
+  };
+
+  await openPortal(page);
+  await configureToken(page, uid);
+  await page.getByRole("tab", { name: "Sign in to an existing team" }).click();
+  await page.locator("#login-email").fill(email);
+  await page.locator("#login-password").fill("TemporaryLoginSecret-123");
+  await page.getByRole("button", { name: "Sign in" }).click();
+  await waitForCall(page, "getMyTeam", uid);
+  await resolveCall(page, "getMyTeam", uid, { team: original });
+
+  await expect(page.locator("#dashboard-view")).toBeVisible();
+  await expect(page.locator("#dashboard-team-name")).toHaveText(original.teamName);
+  await expect(page.locator("#login-password")).toHaveValue("");
+
+  await page.getByRole("button", { name: "Edit team details" }).click();
+  await page.locator("#edit-team-name").fill(updated.teamName);
+  await page.getByRole("button", { name: "Save team details" }).click();
+  await waitForCall(page, "updateMyTeam", uid);
+  expect(await page.evaluate(() => (
+    window.__rocoFirebaseHarness.pendingCallPayload("updateMyTeam", "signed-in:owner@example.org")
+  ))).toMatchObject({
+    expectedRevision: 81,
+    teamName: updated.teamName
+  });
+  await resolveCall(page, "updateMyTeam", uid, {
+    team: updated,
+    synchronizationStatus: "synced"
+  });
+
+  await expect(page.locator("#dashboard-team-name")).toHaveText(updated.teamName);
+  await expect(page.locator("#dashboard-status")).toContainText("saved");
+
+  await page.getByRole("button", { name: "Sign out" }).click();
+  await expect(page.locator("#public-auth")).toBeVisible();
+  await expect(page.locator("#login-status")).toContainText("Signed out successfully");
+  await expect(page.locator("body")).not.toContainText(updated.teamName);
+  await expect(page.locator("body")).not.toContainText(updated.primaryContactEmail);
+  expect(pageErrors).toEqual([]);
+  expect(consoleErrors).toEqual([]);
+  expect(failedRequests).toEqual([]);
+});
+
+test("a registration retry reuses one UUID and renders the safe success result", async ({ page }) => {
+  await openPortal(page);
+  await page.locator("#register-team-name").fill("Idempotent Browser Team");
+  await page.locator("#register-primary-email").fill("OWNER@EXAMPLE.ORG");
+  await page.locator('#registration-form input[name="tracks"][value="optical-flow"]').check();
+  await page.locator("#register-member-1-fullName").fill("Owner Person");
+  await page.locator("#register-member-1-email").fill("owner@example.org");
+  await page.locator("#register-member-1-affiliation").fill("Example Institute");
+  await page.locator("#submitter-is-member").check();
+  await page.getByRole("button", { name: "Register team" }).click();
+  await waitForCall(page, "registerTeam", null);
+
+  const firstPayload = await page.evaluate(() => (
+    window.__rocoFirebaseHarness.pendingCallPayload("registerTeam", null)
+  ));
+  expect(firstPayload).toMatchObject({
+    teamName: "Idempotent Browser Team",
+    primaryContactEmail: "owner@example.org",
+    tracks: ["optical-flow"],
+    registrantConfirmed: true,
+    members: [{
+      fullName: "Owner Person",
+      email: "owner@example.org",
+      affiliation: "Example Institute"
+    }]
+  });
+  expect(firstPayload.idempotencyKey).toMatch(
+    /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u
+  );
+
+  await page.evaluate(() => {
+    window.__rocoFirebaseHarness.rejectCall("registerTeam", null, "functions/unavailable");
+  });
+  await expect(page.locator("#registration-status")).not.toHaveAttribute("data-state", "loading");
+  await page.getByRole("button", { name: "Register team" }).click();
+  await waitForCall(page, "registerTeam", null);
+  const replayPayload = await page.evaluate(() => (
+    window.__rocoFirebaseHarness.pendingCallPayload("registerTeam", null)
+  ));
+  expect(replayPayload.idempotencyKey).toBe(firstPayload.idempotencyKey);
+
+  await resolveCall(page, "registerTeam", null, {
+    teamId: "RoCo-81",
+    emailStatus: "sent"
+  });
+  await expect(page.locator("#login-tab-panel")).toBeVisible();
+  await expect(page.locator("#login-email")).toHaveValue("owner@example.org");
+  await expect(page.locator("#login-status")).toContainText("Registration completed for RoCo-81");
+});
+
+test("password reset stays neutral and initial password completion signs out", async ({ page }) => {
+  await openPortal(page);
+  await page.getByRole("tab", { name: "Sign in to an existing team" }).click();
+  await page.locator("#login-email").fill("owner@example.org");
+  await page.getByRole("button", { name: "Forgot password?" }).click();
+  await expect(page.locator("#login-status")).toContainText("If an account exists");
+  expect(await page.evaluate(() => (
+    window.__rocoFirebaseHarness.readPasswordResets()
+  ))).toEqual(["owner@example.org"]);
+
+  await configureToken(page, "uid-first-login", { mustChangePassword: true });
+  await emitUser(page, "uid-first-login", "owner@example.org");
+  await expect(page.locator("#initial-password-panel")).toBeVisible();
+  await page.locator("#initial-new-password").fill("ReplacementCandidate-123");
+  await page.locator("#initial-confirm-password").fill("ReplacementCandidate-123");
+  await page.getByRole("button", { name: "Change password and sign out" }).click();
+  await waitForCall(page, "completeInitialPasswordChange", "uid-first-login");
+  expect(await page.evaluate(() => (
+    window.__rocoFirebaseHarness.pendingCallPayload(
+      "completeInitialPasswordChange",
+      "uid-first-login"
+    )
+  ))).toEqual({ newPassword: "ReplacementCandidate-123" });
+
+  await resolveCall(page, "completeInitialPasswordChange", "uid-first-login", {
+    success: true
+  });
+  await expect(page.locator("#public-auth")).toBeVisible();
+  await expect(page.locator("#login-status")).toContainText(
+    "Password changed successfully. Sign in again"
+  );
+  await expect(page.locator("#initial-new-password")).toHaveValue("");
+});
+
+test("a revision conflict reloads the latest team without overwriting it", async ({ page }) => {
+  const original = teamFixture("ConflictOriginal", 91);
+  const latest = teamFixture("ConflictLatest", 92);
+  await openPortal(page);
+  await loadUserTeam(page, "uid-conflict", original);
+  await page.getByRole("button", { name: "Edit team details" }).click();
+  await page.locator("#edit-team-name").fill("Losing Local Edit");
+  await page.getByRole("button", { name: "Save team details" }).click();
+  await waitForCall(page, "updateMyTeam", "uid-conflict");
+  await page.evaluate(() => {
+    window.__rocoFirebaseHarness.rejectCall(
+      "updateMyTeam",
+      "uid-conflict",
+      "functions/aborted"
+    );
+  });
+  await waitForCall(page, "getMyTeam", "uid-conflict");
+  await resolveCall(page, "getMyTeam", "uid-conflict", { team: latest });
+
+  await expect(page.locator("#edit-team-form")).toBeVisible();
+  await expect(page.locator("#edit-team-name")).toHaveValue(latest.teamName);
+  await expect(page.locator("#edit-team-status")).toContainText(
+    "latest revision is now loaded"
+  );
+  await expect(page.locator("body")).not.toContainText("Losing Local Edit");
+});

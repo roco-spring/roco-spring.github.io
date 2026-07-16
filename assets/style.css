@@ -1052,6 +1052,632 @@ details p {
     }
 }
 
+/* Team registration and account portal */
+.registration-page [hidden] {
+    display: none !important;
+}
+
+.registration-section {
+    padding-top: 24px;
+}
+
+.registration-portal {
+    max-width: 1080px;
+    margin: 0 auto;
+}
+
+.registration-portal .portal-title,
+.registration-portal h2 {
+    color: var(--text);
+    font-size: clamp(1.8rem, 4vw, 2.7rem);
+}
+
+.portal-title {
+    margin-bottom: 24px;
+}
+
+.portal-loading {
+    margin: 0;
+    padding: 20px;
+    border-radius: 16px;
+    background: rgba(93, 124, 255, 0.1);
+    color: #273158;
+    font-weight: 700;
+}
+
+.auth-tabs {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+    margin-bottom: 26px;
+    padding: 6px;
+    border: 1px solid var(--line);
+    border-radius: 18px;
+    background: rgba(93, 124, 255, 0.07);
+}
+
+.auth-tab {
+    min-height: 48px;
+    padding: 10px 16px;
+    border: 1px solid transparent;
+    border-radius: 13px;
+    color: var(--muted);
+    background: transparent;
+    font: inherit;
+    font-weight: 800;
+    cursor: pointer;
+}
+
+.auth-tab[aria-selected="true"] {
+    border-color: rgba(93, 124, 255, 0.24);
+    color: #2437a6;
+    background: white;
+    box-shadow: 0 8px 24px rgba(23, 32, 51, 0.08);
+}
+
+.registration-intro {
+    max-width: 850px;
+    margin-bottom: 26px;
+    color: var(--muted);
+    font-size: 1.04rem;
+}
+
+.registration-page form,
+.registration-page fieldset {
+    min-width: 0;
+}
+
+.form-section {
+    margin: 0 0 22px;
+    padding: 24px;
+    border: 1px solid var(--line);
+    border-radius: 20px;
+    background: rgba(255, 255, 255, 0.72);
+}
+
+.form-section>legend,
+.member-slot>legend {
+    padding: 0 8px;
+    color: var(--text);
+    font-weight: 850;
+}
+
+.form-grid {
+    display: grid;
+    gap: 18px;
+}
+
+.form-grid.two-fields {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.form-grid.three-fields,
+.form-grid.member-fields {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.form-field {
+    min-width: 0;
+}
+
+.form-field label {
+    display: block;
+    margin-bottom: 6px;
+    color: var(--text);
+    font-size: 0.94rem;
+    font-weight: 800;
+}
+
+.form-field input {
+    width: 100%;
+    min-height: 46px;
+    padding: 10px 12px;
+    border: 1px solid rgba(23, 32, 51, 0.24);
+    border-radius: 12px;
+    color: var(--text);
+    background: white;
+    font: inherit;
+}
+
+.form-field input[readonly] {
+    color: #4e5870;
+    background: #eef1f7;
+    cursor: not-allowed;
+}
+
+.form-field small,
+.field-help {
+    display: block;
+    margin: 7px 0 0;
+    color: var(--muted);
+    font-size: 0.88rem;
+}
+
+.form-field small a {
+    color: #2437a6;
+    font-weight: 700;
+}
+
+.required-marker {
+    color: #a32323;
+}
+
+.optional-marker {
+    color: var(--muted);
+    font-size: 0.82rem;
+    font-weight: 650;
+}
+
+.field-error {
+    color: #941f1f;
+    font-size: 0.86rem;
+    font-weight: 750;
+}
+
+.field-error:not(:empty) {
+    display: block;
+    margin-top: 6px;
+}
+
+.form-field input[aria-invalid="true"],
+.field-container-invalid {
+    border-color: #ae2929;
+    box-shadow: 0 0 0 2px rgba(174, 41, 41, 0.12);
+}
+
+.track-options .field-help {
+    margin-top: 0;
+}
+
+.checkbox-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+    margin-top: 14px;
+}
+
+.checkbox-grid label,
+.confirmation-field>label {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 12px 14px;
+    border: 1px solid var(--line);
+    border-radius: 13px;
+    color: #303b55;
+    background: white;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.checkbox-grid input,
+.confirmation-field input {
+    flex: 0 0 auto;
+    width: 1.08rem;
+    height: 1.08rem;
+    margin: 0.18rem 0 0;
+    accent-color: var(--accent);
+}
+
+.member-slots {
+    display: grid;
+    gap: 16px;
+    margin-top: 18px;
+}
+
+.member-slot {
+    margin: 0;
+    padding: 20px;
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    background: white;
+}
+
+.clear-member-button {
+    margin-top: 10px;
+}
+
+.confirmation-field {
+    margin: 0 0 20px;
+    border-radius: 13px;
+}
+
+.confirmation-field>label {
+    padding: 16px;
+}
+
+.registration-page .button {
+    border: 0;
+    font: inherit;
+    cursor: pointer;
+}
+
+.registration-page .button:disabled,
+.registration-page button:disabled,
+.registration-page input:disabled {
+    cursor: wait;
+    opacity: 0.62;
+}
+
+.form-submit {
+    min-width: 160px;
+}
+
+.form-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 14px;
+}
+
+.split-actions {
+    justify-content: space-between;
+}
+
+.text-button {
+    padding: 5px 2px;
+    border: 0;
+    color: #2437a6;
+    background: transparent;
+    font: inherit;
+    font-size: 0.92rem;
+    font-weight: 800;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    cursor: pointer;
+}
+
+.form-status {
+    min-height: 1.5em;
+    margin: 14px 0;
+    font-size: 0.94rem;
+    font-weight: 750;
+}
+
+.form-status:not(:empty) {
+    padding: 11px 13px;
+    border-left: 4px solid currentColor;
+    border-radius: 8px;
+}
+
+.form-status[data-state="success"] {
+    color: #145c38;
+    background: #e9f7ef;
+}
+
+.form-status[data-state="error"] {
+    color: #8d1e1e;
+    background: #fff0f0;
+}
+
+.form-status[data-state="warning"] {
+    color: #765312;
+    background: #fff8df;
+}
+
+.form-status[data-state="loading"] {
+    color: #273d92;
+    background: #eef1ff;
+}
+
+.narrow-form-panel {
+    max-width: 620px;
+    padding: 24px;
+    border: 1px solid var(--line);
+    border-radius: 20px;
+    background: white;
+}
+
+.narrow-form-panel>.form-field+.form-field {
+    margin-top: 16px;
+}
+
+.narrow-form-panel>p {
+    color: var(--muted);
+}
+
+.account-gate>p {
+    max-width: 780px;
+    color: var(--muted);
+}
+
+.security-callout,
+.dashboard-header,
+.edit-form-heading {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 20px;
+}
+
+.security-callout,
+.dashboard-header {
+    margin-bottom: 18px;
+}
+
+.security-callout .eyebrow,
+.dashboard-header .eyebrow {
+    margin-bottom: 8px;
+}
+
+.security-callout h2,
+.dashboard-header h2 {
+    margin-bottom: 0;
+}
+
+.registration-page .security-callout .button.compact,
+.registration-page .dashboard-header .button.compact,
+.registration-page .edit-form-heading .button.compact {
+    flex: 0 0 auto;
+    margin-top: 0;
+}
+
+.team-summary {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 1px;
+    margin: 0 0 20px;
+    overflow: hidden;
+    border: 1px solid var(--line);
+    border-radius: 18px;
+    background: var(--line);
+}
+
+.team-summary>div {
+    min-width: 0;
+    padding: 16px;
+    background: white;
+}
+
+.team-summary dt {
+    margin-bottom: 4px;
+    color: var(--muted);
+    font-size: 0.78rem;
+    font-weight: 850;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+
+.team-summary dd {
+    margin: 0;
+    overflow-wrap: anywhere;
+    color: var(--text);
+    font-weight: 750;
+}
+
+.dashboard-content-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px;
+    margin-bottom: 16px;
+}
+
+.account-card {
+    margin-top: 20px;
+    padding: 22px;
+    border: 1px solid var(--line);
+    border-radius: 18px;
+    background: white;
+}
+
+.dashboard-content-grid .account-card {
+    margin-top: 0;
+}
+
+.account-card>p,
+.account-card li {
+    color: var(--muted);
+}
+
+.account-card>p:last-child {
+    margin-bottom: 0;
+}
+
+.dashboard-list {
+    margin: 0;
+    padding-left: 1.2rem;
+}
+
+.dashboard-list li+li {
+    margin-top: 5px;
+}
+
+#dashboard-sync-status {
+    padding: 10px 12px;
+    border-radius: 10px;
+    font-weight: 700;
+}
+
+#dashboard-sync-status[data-state="success"] {
+    color: #145c38;
+    background: #e9f7ef;
+}
+
+#dashboard-sync-status[data-state="warning"] {
+    color: #765312;
+    background: #fff8df;
+}
+
+.member-summary-card {
+    margin-bottom: 20px;
+}
+
+.member-table {
+    min-width: 680px;
+}
+
+.member-table th,
+.member-table td {
+    overflow-wrap: anywhere;
+}
+
+.edit-team-form {
+    padding-top: 8px;
+}
+
+.edit-form-heading {
+    margin-bottom: 18px;
+}
+
+.edit-form-heading h3 {
+    margin-bottom: 6px;
+}
+
+.edit-form-heading p {
+    margin: 0;
+    color: var(--muted);
+}
+
+.password-card {
+    margin-top: 30px;
+}
+
+.password-card>p {
+    margin-bottom: 18px;
+}
+
+.registration-page :is(button, input, a):focus-visible {
+    outline: 3px solid rgba(0, 125, 180, 0.78);
+    outline-offset: 3px;
+}
+
+/* Contextual BibTeX guidance */
+.citation-block {
+    margin-top: 22px;
+    padding-top: 20px;
+    border-top: 1px solid var(--line);
+}
+
+.citation-block>p {
+    margin-bottom: 10px;
+    color: var(--muted);
+    font-size: 0.92rem;
+}
+
+.citation-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 10px;
+}
+
+.citation-actions .button.compact {
+    margin-top: 0;
+    border: 0;
+    font: inherit;
+    cursor: pointer;
+}
+
+.citation-actions .button:disabled {
+    cursor: wait;
+    opacity: 0.65;
+}
+
+.citation-actions .button:focus-visible {
+    outline: 3px solid rgba(0, 125, 180, 0.78);
+    outline-offset: 3px;
+}
+
+.copy-status {
+    color: var(--muted);
+    font-size: 0.84rem;
+    font-weight: 700;
+}
+
+.citation-block pre {
+    max-width: 100%;
+    margin: 0;
+    padding: 16px;
+    overflow: auto;
+    border-radius: 13px;
+    background: #071127;
+    color: #f3f6ff;
+    font: 0.78rem/1.5 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    text-align: left;
+    white-space: pre;
+}
+
+.citation-block pre code {
+    padding: 0;
+    border-radius: 0;
+    color: inherit;
+    background: transparent;
+    font: inherit;
+}
+
+.citation-note {
+    margin-top: 20px;
+    padding: 13px 15px;
+    border-radius: 12px;
+    color: #273158;
+    background: rgba(93, 124, 255, 0.1);
+    font-weight: 750;
+}
+
+.clipboard-fallback {
+    position: fixed;
+    left: -10000px;
+    top: 0;
+    width: 1px;
+    height: 1px;
+    opacity: 0;
+}
+
+@media (max-width: 900px) {
+    .form-grid.member-fields,
+    .form-grid.three-fields,
+    .team-summary {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 680px) {
+    .registration-section {
+        padding-top: 12px;
+    }
+
+    .auth-tabs,
+    .form-grid.two-fields,
+    .checkbox-grid,
+    .dashboard-content-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .registration-portal,
+    .form-section,
+    .narrow-form-panel,
+    .account-card {
+        padding: 20px;
+    }
+
+    .member-slot {
+        padding: 16px;
+    }
+
+    .security-callout,
+    .dashboard-header,
+    .edit-form-heading {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .registration-page .security-callout .button.compact,
+    .registration-page .dashboard-header .button.compact,
+    .registration-page .edit-form-heading .button.compact {
+        align-self: flex-start;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .auth-tab,
+    .registration-page .button,
+    .registration-page input {
+        scroll-behavior: auto;
+        transition: none;
+    }
+}
+
 @media (max-width: 680px) {
 
     .section {

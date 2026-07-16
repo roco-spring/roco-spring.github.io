@@ -1,0 +1,56 @@
+{
+  "functions": {
+    "source": "functions",
+    "runtime": "nodejs22",
+    "ignore": [
+      "node_modules",
+      ".git",
+      "firebase-debug.log",
+      "firebase-debug.*.log",
+      ".secret.local",
+      ".env",
+      ".env.*",
+      ".env.local",
+      ".env.*.local",
+      "service-account*.json",
+      "*service_account*.json",
+      "credentials*.json",
+      "*credentials*.json",
+      "client_secret*.json",
+      "token*.json",
+      "oauth-token*.json",
+      "*firebase-adminsdk*.json",
+      ".runtimeconfig.json",
+      "*.pem",
+      "*.key",
+      "*.p12",
+      "*.pfx",
+      "*.jks",
+      "*.keystore",
+      "coverage"
+    ],
+    "predeploy": [
+      "npm --prefix \"$RESOURCE_DIR\" run build"
+    ]
+  },
+  "firestore": {
+    "rules": "firestore.rules",
+    "indexes": "firestore.indexes.json"
+  },
+  "emulators": {
+    "auth": {
+      "port": 9099
+    },
+    "firestore": {
+      "port": 8081
+    },
+    "functions": {
+      "port": 5001
+    },
+    "ui": {
+      "enabled": true,
+      "port": 4000
+    },
+    "singleProjectMode": true
+  }
+}

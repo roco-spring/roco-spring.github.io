@@ -1,0 +1,37 @@
+name: Question or discussion
+description: Ask a public question about participation, data, evaluation, or the challenge workflow.
+title: "[Question]: "
+labels:
+  - question
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for your interest in RoCo-Spring. Do not include passwords, tokens, private team data, unpublished benchmark outputs, or other credentials.
+  - type: dropdown
+    id: area
+    attributes:
+      label: Topic
+      options:
+        - Registration and team account
+        - Starting kit and environment
+        - Datasets
+        - Submission format
+        - Evaluation and rules
+        - Other challenge question
+    validations:
+      required: true
+  - type: textarea
+    id: question
+    attributes:
+      label: Question
+      description: Include enough non-sensitive context for the organizers to answer.
+    validations:
+      required: true
+  - type: checkboxes
+    id: safety
+    attributes:
+      label: Safety check
+      options:
+        - label: I have not included credentials, passwords, tokens, or private team/member data.
+          required: true

@@ -1,0 +1,35 @@
+{
+  "name": "roco-spring-website",
+  "version": "1.0.0",
+  "private": true,
+  "description": "RoCo-Spring challenge website and registration deployment tooling",
+  "type": "module",
+  "scripts": {
+    "build": "npm --prefix functions run build",
+    "test": "npm run test:site && npm --prefix functions test && npm run test:rules && npm run test:browser",
+    "test:site": "node --test test/*.test.mjs",
+    "test:rules": "node scripts/firebase-safe.mjs emulators:exec --only firestore --project demo-roco-spring-rules \"node --test test/emulator/firestore-rules.test.mjs\"",
+    "test:browser": "playwright test",
+    "lint": "npm --prefix functions run lint",
+    "security:scan": "node scripts/security-scan.mjs",
+    "oauth:bootstrap": "node scripts/bootstrap-google-oauth.mjs",
+    "secrets:verify": "node scripts/verify-secret-metadata.mjs",
+    "identity:configure": "node scripts/configure-identity-platform.mjs",
+    "preemulators": "npm run build",
+    "emulators": "node scripts/firebase-safe.mjs emulators:start --only auth,firestore,functions --project roco-spring-registration-2026",
+    "deploy:firebase": "node scripts/firebase-safe.mjs deploy --only firestore:rules,firestore:indexes,functions --project roco-spring-registration-2026",
+    "deploy:production": "npm test && npm run build && npm run lint && npm run security:scan && npm run identity:configure && npm run secrets:verify && npm run deploy:firebase"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "googleapis": "173.0.0"
+  },
+  "devDependencies": {
+    "@firebase/rules-unit-testing": "5.0.1",
+    "@playwright/test": "1.61.1",
+    "firebase": "12.16.0",
+    "firebase-tools": "15.23.0"
+  }
+}
