@@ -36,3 +36,4 @@ oauth-token*.json
 *.keystore
 
 .DS_Store
+debugging/
