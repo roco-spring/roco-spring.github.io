@@ -186,13 +186,27 @@ npm run backend:smoke
 
 For each callable, it first sends a browser-equivalent `OPTIONS` preflight from `https://roco-spring.github.io` and requires the exact origin, `POST`, and the `authorization`, `content-type`, and `x-firebase-appcheck` headers. It then sends a token-free `{data:{}}` callable request. It never sends credentials, Auth/App Check tokens, or prints a response body. A pass requires the Firebase callable protocol's HTTP `401 UNAUTHENTICATED` JSON rejection with production-origin CORS and reports `PASS ... [DEPLOYED_GUARD]`. Because `registerTeam` is otherwise public, that result is runtime evidence that its missing App Check token was rejected. For the other three authenticated callables, the result proves a deployed guard but cannot distinguish Auth rejection from App Check rejection. HTTP 404, unguarded HTTP 2xx, blocked invocation, bad CORS/protocol, redirects, and persistent timeouts/5xx/network failures all fail. Missing, transient-backend, network, and timeout failures receive at most five bounded attempts with 1/2/4/8-second delays.
 
-The live valid-App-Check gate is also safe to rerun:
+`deploy:production` finishes with a deterministic CI App Check gate. It can also be rerun from an operator-authenticated terminal using the same Firebase CLI login or Application Default Credentials (ADC):
+
+```bash
+npm run backend:appcheck-ci-smoke
+```
+
+The gate uses the stable Firebase App Check API to create one random UUID4 debug registration for the exact production web app, exchanges it server-side for a short-lived App Check token, and passes only that short-lived token to direct requests from the deployed page's browser origin. The Firebase browser debug provider is never enabled, so it cannot echo the debug credential to the browser console. Neither credential is placed in production source, an environment variable, a URL, a file, or process output. The two non-mutating probes, `registerTeam({})` and `getMyTeam({productionSmokeProbe:true})`, must both reach their handlers and return `functions/invalid-argument`.
+
+Cleanup runs in a `finally` path even when exchange or probing fails. It deletes the exact temporary resource, requires exact-resource `GET` read-back to return 404, and lists the app's debug-token inventory without token values to ensure the unique display label is absent. A cleanup or read-back failure blocks the release and identifies only the non-secret resource name/display label for manual revocation. A pass reports `PASS ... [TEMPORARY_DEBUG_APP_CHECK_TO_VALIDATION_BOUNDARY]` for both handlers plus `PASS appCheckDebugToken [CI_DEBUG_TOKEN_REVOKED_AND_DELETION_VERIFIED]`.
+
+This deterministic gate proves that the deployed page targets the expected Firebase app, a server-minted App Check token is accepted, both callable routes cross browser CORS/infrastructure, and each request reaches the safe validation boundary without creating a team or reading private data. Firebase explicitly warns that a registered debug token bypasses normal app attestation, so this gate does **not** prove that reCAPTCHA Enterprise accepted a real visitor. The debug-token mechanism is documented in [Firebase's web debug-provider guidance](https://firebase.google.com/docs/app-check/web/debug-provider); the input-only token and create/delete/list lifecycle are documented in the [stable App Check debug-token REST resource](https://firebase.google.com/docs/reference/appcheck/rest/v1/projects.apps.debugTokens). Never lower the production risk threshold or leave a permanent debug token merely to make automation pass.
+
+The operator identity must have the `cloud-platform` scope and permission to administer App Check debug tokens for this one project. When ADC is used, it must also have a quota project. If `gcloud auth application-default login` reports that it could not set one, fix it before this gate with `gcloud auth application-default set-quota-project roco-spring-registration-2026`; do not treat the warning as harmless in a production release.
+
+The independent real-provider probe remains available:
 
 ```bash
 npm run backend:appcheck-smoke
 ```
 
-It opens the deployed registration page in Chromium, reuses that page's initialized Firebase App Check instance, and sends two non-mutating, credential-free validation probes. `registerTeam({})` and `getMyTeam({productionSmokeProbe:true})` must both reach their handlers and return `functions/invalid-argument`. This establishes that the live origin obtained an accepted App Check token and crossed CORS/infrastructure to the intended validation boundary without creating a team or reading private data. The browser probe retries at most three times to tolerate transient reCAPTCHA or propagation failures.
+It does not create a debug token or use operator credentials. It opens the deployed page in Chromium, reuses its normal reCAPTCHA Enterprise-backed App Check instance, and requires the same two safe handler responses, reported as `PASS ... [VALID_APP_CHECK_TO_VALIDATION_BOUNDARY]`. This is evidence for the normal live provider path from that browser session, but a headless browser can be rejected by reCAPTCHA risk analysis even when configuration is correct. Use production App Check/reCAPTCHA metrics and, when needed, a normal current browser/device/network to evaluate real-user attestation.
 
 These two gates do not prove an authenticated dashboard session, Google OAuth refresh-token health, private Drive/Sheets creation, or Gmail delivery. Those end-to-end paths require organizer-approved test data and controlled cleanup; record them as `NOT RUN (optional)` when that authorization is unavailable rather than overclaiming coverage.
 
@@ -203,7 +217,8 @@ After deployment, verify:
 - Firestore rules reject authenticated and unauthenticated browser reads/writes.
 - Identity Platform read-back shows `disabledUserSignup=true`, `disabledUserDeletion=true`, `enableImprovedEmailPrivacy=true`, `signIn.email.enabled=true`, and `signIn.email.passwordRequired=true`.
 - `npm run backend:smoke` reports `PASS ... [DEPLOYED_GUARD]` for all four callables; do not treat a bare non-404 response as sufficient.
-- `npm run backend:appcheck-smoke` reports `PASS ... [VALID_APP_CHECK_TO_VALIDATION_BOUNDARY]` for both safe probes.
+- `npm run backend:appcheck-ci-smoke` reports `PASS ... [VALID_CI_DEBUG_APP_CHECK_TO_VALIDATION_BOUNDARY]` for both safe probes and `PASS appCheckDebugToken [CI_DEBUG_TOKEN_REVOKED_AND_DELETION_VERIFIED]`.
+- `npm run backend:appcheck-smoke`, when run as the separate real-provider check, reports `PASS ... [VALID_APP_CHECK_TO_VALIDATION_BOUNDARY]` for both safe probes.
 - All four callables and `reconcileRegistrations` exist in `europe-west3`; record their revision/update time and confirm they correspond to the committed release source.
 - The scheduled reconciliation job exists, is enabled, targets only its associated function, and has a recent safe execution status.
 - Functions that do not require Google credentials have no Google secrets bound.
@@ -242,7 +257,7 @@ When `cleanupState=failed`, stop automatic retries and correct the underlying pe
 
 - **`unauthenticated` after login:** force-refresh the ID token and confirm the Auth project/domain. A first-login user may only complete the required initial password change.
 - **`failed-precondition` on edit:** reload the team; the submitted revision is stale or the Sheet sync is incomplete.
-- **App Check rejected:** confirm the Enterprise key is attached to the correct Firebase web app and domain. For localhost, use only the official registered debug token.
+- **App Check rejected:** confirm the Enterprise key is attached to the correct Firebase web app and domain. For localhost, use only the official registered debug token. A real reCAPTCHA exchange can reject headless automation; do not weaken the risk threshold. The deployment smoke gate uses a distinct ephemeral API-registered debug credential and must prove its revocation before passing. If its cleanup fails, revoke only the reported non-secret resource in the App Check console before retrying.
 - **OAuth returns no refresh token:** retain the narrow scopes, revoke the prior app grant if appropriate, and rerun with explicit consent. Never print token responses.
 - **Drive parent or permission check fails:** stop. Do not fall back to My Drive root and do not make a Sheet public.
 - **Gmail sender rejected:** authenticate the organizer mailbox shown above. Do not switch to SMTP, an app password, third-party mail, or the Google Group as sender.

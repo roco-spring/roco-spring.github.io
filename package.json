@@ -18,10 +18,11 @@
     "release:source": "node scripts/verify-release-source.mjs",
     "backend:smoke": "node scripts/verify-production-callables.mjs",
     "backend:appcheck-smoke": "node scripts/verify-live-app-check.mjs",
+    "backend:appcheck-ci-smoke": "node scripts/verify-app-check-ci.mjs",
     "preemulators": "npm run build",
     "emulators": "node scripts/firebase-safe.mjs emulators:start --only auth,firestore,functions --project roco-spring-registration-2026",
     "deploy:firebase": "node scripts/firebase-safe.mjs deploy --only firestore:rules,firestore:indexes,functions --project roco-spring-registration-2026",
-    "deploy:production": "npm run release:source && npm test && npm run build && npm run lint && npm run security:scan && npm run release:source && npm run identity:configure && npm run secrets:verify && npm run deploy:firebase && npm run backend:smoke && npm run backend:appcheck-smoke"
+    "deploy:production": "npm run release:source && npm test && npm run build && npm run lint && npm run security:scan && npm run release:source && npm run identity:configure && npm run secrets:verify && npm run deploy:firebase && npm run backend:smoke && npm run backend:appcheck-ci-smoke"
   },
   "engines": {
     "node": ">=22"

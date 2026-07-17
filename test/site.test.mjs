@@ -140,7 +140,11 @@ test("production deployment disables public Auth signup/deletion and verifies em
     assert.match(packageConfig.scripts["deploy:production"], /deploy:firebase/u);
     assert.match(packageConfig.scripts["deploy:production"], /release:source/u);
     assert.match(packageConfig.scripts["deploy:production"], /backend:smoke/u);
-    assert.match(packageConfig.scripts["deploy:production"], /backend:appcheck-smoke/u);
+    assert.match(packageConfig.scripts["deploy:production"], /backend:appcheck-ci-smoke/u);
+    assert.equal(
+        packageConfig.scripts["backend:appcheck-smoke"],
+        "node scripts/verify-live-app-check.mjs"
+    );
 });
 
 test("every production callable declares the required region, CORS allowlist, and App Check", async () => {
