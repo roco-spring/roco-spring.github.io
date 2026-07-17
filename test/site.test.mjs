@@ -229,3 +229,13 @@ test("deployment scripts invoke the pinned Firebase CLI through Node", async () 
         assert.doesNotMatch(script, /"\.bin"/u, file);
     }
 });
+
+test("Firebase deploys use a bounded backend-discovery timeout", async () => {
+    const firebaseSafe = await source("scripts/firebase-safe.mjs");
+    assert.match(firebaseSafe, /firebaseArgs\[0\]\s*===\s*["']deploy["']/u);
+    assert.match(
+        firebaseSafe,
+        /environment\.FUNCTIONS_DISCOVERY_TIMEOUT\s*=\s*["']30["']/u
+    );
+    assert.match(firebaseSafe, /\[firebase,\s*\.\.\.firebaseArgs\]/u);
+});

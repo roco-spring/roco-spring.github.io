@@ -176,6 +176,8 @@ npm run deploy:production
 
 `deploy:production` verifies the clean committed source both before and after the local test/build/lint/security gate; re-verifies that public end-user signup and deletion are disabled, improved email privacy is enabled, and email/password login remains enabled; checks that the latest version of each required Secret Manager secret is enabled without accessing plaintext; deploys only Firestore rules, indexes, and Functions; then runs both production health gates described below. Any failed pre-deployment gate stops before deployment. A failed post-deployment smoke gate does not roll back resources that Firebase already updated: keep the release blocked, inspect safe logs and resource inventory, and roll forward with a reviewed fix.
 
+The safe Firebase wrapper gives backend source discovery a bounded 30-second window for deploy commands, following Firebase's documented `FUNCTIONS_DISCOVERY_TIMEOUT` fallback. This covers cold dependency loading on shared filesystems without changing any deployed Function runtime timeout. If discovery still exceeds 30 seconds, stop the release and remove or defer slow module-scope initialization rather than increasing the bound again.
+
 The credential-free endpoint gate can be rerun independently at any time:
 
 ```bash

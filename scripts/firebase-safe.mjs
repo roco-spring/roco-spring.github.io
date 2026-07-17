@@ -14,6 +14,7 @@ const firebase = path.join(
     "firebase.js"
 );
 const environment = { ...process.env };
+const firebaseArgs = process.argv.slice(2);
 
 // Firebase tooling and some transitive libraries treat DEBUG as permission to
 // print verbose process context. Never inherit debug flags into auth, emulator,
@@ -26,10 +27,19 @@ delete environment.GOOGLE_OAUTH_REFRESH_TOKEN;
 delete environment.GOOGLE_OAUTH_ACCESS_TOKEN;
 delete environment.RATE_LIMIT_HMAC_SECRET;
 
+// Firebase's default 10-second discovery window can be too short on a cold
+// shared filesystem even when the Functions entry point performs no network
+// work at module scope. Keep production deployments deterministic with the
+// bounded timeout documented by Firebase. This affects CLI source discovery
+// only; it does not change any deployed Function's runtime timeout.
+if (firebaseArgs[0] === "deploy") {
+    environment.FUNCTIONS_DISCOVERY_TIMEOUT = "30";
+}
+
 // Invoke the pinned CLI through Node instead of relying on npm's platform
 // shim or its executable bit. Some shared filesystems preserve the package
 // contents but not that mode bit after a clean install.
-const result = spawnSync(process.execPath, [firebase, ...process.argv.slice(2)], {
+const result = spawnSync(process.execPath, [firebase, ...firebaseArgs], {
     cwd: root,
     env: environment,
     stdio: "inherit"
