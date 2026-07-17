@@ -1,26 +1,18 @@
 #!/usr/bin/env node
 
 import { randomUUID } from "node:crypto";
-import { createRequire } from "node:module";
-import path from "node:path";
 import process from "node:process";
 import { pathToFileURL } from "node:url";
-import { chromium } from "@playwright/test";
 
 import {
-    EXPECTED_PROBES,
-    LIVE_REGISTRATION_URL,
-    PROJECT_ID,
+    isUuidV4,
     runLiveAppCheckGate,
-    verifyProductionProjectId,
+    runLiveAppCheckProbe,
     verifyProbeResults
 } from "./verify-live-app-check.mjs";
 
 const PROJECT_NUMBER = "149052181991";
 const APP_ID = "1:149052181991:web:291a3915eb3b5bbd6fc142";
-const FIREBASE_API_KEY = "AIzaSyA4Qrg-9o6jA8chu-s3PDks4yfnH_A3mcE";
-const FIREBASE_VERSION = "12.16.0";
-const FUNCTIONS_REGION = "europe-west3";
 const APP_PARENT = `projects/${PROJECT_NUMBER}/apps/${APP_ID}`;
 const DEBUG_TOKEN_COLLECTION = `${APP_PARENT}/debugTokens`;
 const APP_CHECK_API_ROOT = "https://firebaseappcheck.googleapis.com/v1";
@@ -28,23 +20,84 @@ const DISPLAY_NAME_PREFIX = "Ephemeral CI ";
 const LIST_PAGE_SIZE = 100;
 const MAX_LIST_PAGES = 10;
 const REQUEST_TIMEOUT_MS = 30_000;
-const DEFAULT_REGISTRATION_DELAY_MS = 5_000;
-const CI_PROOF_MARKER = "TEMPORARY_DEBUG_APP_CHECK_TO_VALIDATION_BOUNDARY";
+const CI_PROOF_MARKER = "VALID_CI_DEBUG_APP_CHECK_TO_VALIDATION_BOUNDARY";
 const CLEANUP_PROOF_MARKER = "CI_DEBUG_TOKEN_REVOKED_AND_DELETION_VERIFIED";
 
-// Provider diagnostics may include HTTP bodies. Keep them disabled because the
-// one-use UUID4 is an ephemeral credential. It is exchanged only server-side.
+// HTTP diagnostics can expose request bodies. The UUID4 debug token is an
+// ephemeral credential and must remain only in memory and the browser init script.
 delete process.env.DEBUG;
 delete process.env.FIREBASE_DEBUG;
 delete process.env.NODE_DEBUG;
 
-function isUuidV4(value) {
-    return typeof value === "string"
-        && /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu.test(value);
-}
-
 function encodeResourcePath(resourceName) {
     return resourceName.split("/").map((segment) => encodeURIComponent(segment)).join("/");
+}
+
+function statusFromError(error) {
+    for (const candidate of [error?.response?.status, error?.status, error?.code]) {
+        const status = Number(candidate);
+        if (Number.isInteger(status) && status >= 100 && status <= 599) return status;
+    }
+    return null;
+}
+
+function safeApiError(operation, error) {
+    const status = statusFromError(error);
+    const suffix = status === null ? "" : ` (HTTP ${status})`;
+    return new Error(`Firebase App Check debug-token ${operation} failed${suffix}.`);
+}
+
+function createAppCheckRestApi(requestImplementation) {
+    if (typeof requestImplementation !== "function") {
+        throw new Error("Firebase App Check API requires an authenticated request implementation.");
+    }
+
+    async function request(operation, options) {
+        try {
+            const response = await requestImplementation({
+                timeout: REQUEST_TIMEOUT_MS,
+                ...options
+            });
+            return response?.data ?? response;
+        } catch (error) {
+            throw safeApiError(operation, error);
+        }
+    }
+
+    return Object.freeze({
+        createDebugToken: ({ parent, displayName, token }) => request("creation", {
+            method: "POST",
+            url: `${APP_CHECK_API_ROOT}/${encodeResourcePath(parent)}/debugTokens`,
+            data: { displayName, token }
+        }),
+        deleteDebugToken: (name) => request("revocation", {
+            method: "DELETE",
+            url: `${APP_CHECK_API_ROOT}/${encodeResourcePath(name)}`
+        }),
+        listDebugTokens: (parent, pageToken) => request("listing", {
+            method: "GET",
+            url: `${APP_CHECK_API_ROOT}/${encodeResourcePath(parent)}/debugTokens`,
+            params: {
+                pageSize: LIST_PAGE_SIZE,
+                ...(pageToken ? { pageToken } : {})
+            }
+        })
+    });
+}
+
+async function createAdcAppCheckApi() {
+    try {
+        const { google } = await import("googleapis");
+        const auth = new google.auth.GoogleAuth({
+            scopes: ["https://www.googleapis.com/auth/cloud-platform"]
+        });
+        const client = await auth.getClient();
+        return createAppCheckRestApi((options) => client.request(options));
+    } catch {
+        throw new Error(
+            "Application Default Credentials with Firebase App Check administration access are required."
+        );
+    }
 }
 
 function isExpectedResourceName(name) {
@@ -65,151 +118,13 @@ function validateDisplayName(displayName) {
     }
 }
 
-function validateAppCheckToken(token) {
-    if (
-        typeof token !== "string"
-        || token.length < 32
-        || token.length > 16_384
-        || token.split(".").length !== 3
-    ) {
-        throw new Error("Firebase App Check did not return a valid short-lived token.");
-    }
-}
-
-function safeApiError(operation, status) {
-    const suffix = Number.isInteger(status) ? ` (HTTP ${status})` : "";
-    return new Error(`Firebase App Check ${operation} failed${suffix}.`);
-}
-
-function createAppCheckRestApi({
-    fetchImplementation = globalThis.fetch,
-    accessTokenProvider
-} = {}) {
-    if (typeof fetchImplementation !== "function" || typeof accessTokenProvider !== "function") {
-        throw new Error("Firebase App Check API requires fetch and operator authentication.");
-    }
-
-    async function request(operation, url, {
-        method = "GET",
-        body,
-        authenticated = true,
-        notFoundIsNull = false
-    } = {}) {
-        const headers = { accept: "application/json" };
-        if (body !== undefined) headers["content-type"] = "application/json";
-
-        if (authenticated) {
-            let accessToken;
-            try {
-                accessToken = await accessTokenProvider();
-            } catch {
-                throw safeApiError("operator authentication");
-            }
-            if (typeof accessToken !== "string" || accessToken.length < 16) {
-                throw safeApiError("operator authentication");
-            }
-            headers.authorization = `Bearer ${accessToken}`;
-            headers["x-goog-user-project"] = PROJECT_ID;
-        }
-
-        let response;
-        try {
-            response = await fetchImplementation(url, {
-                method,
-                headers,
-                ...(body === undefined ? {} : { body: JSON.stringify(body) }),
-                signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS)
-            });
-        } catch {
-            throw safeApiError(operation);
-        }
-
-        if (notFoundIsNull && response.status === 404) return null;
-        if (!response.ok) throw safeApiError(operation, response.status);
-        if (response.status === 204) return undefined;
-
-        try {
-            return await response.json();
-        } catch {
-            throw safeApiError(`${operation} response parsing`, response.status);
-        }
-    }
-
-    const collectionUrl = `${APP_CHECK_API_ROOT}/${encodeResourcePath(DEBUG_TOKEN_COLLECTION)}`;
-
-    return Object.freeze({
-        createDebugToken: ({ displayName, token }) => request(
-            "debug-token creation",
-            collectionUrl,
-            { method: "POST", body: { displayName, token } }
-        ),
-        deleteDebugToken: (name) => request(
-            "debug-token revocation",
-            `${APP_CHECK_API_ROOT}/${encodeResourcePath(name)}`,
-            { method: "DELETE" }
-        ),
-        getDebugToken: (name) => request(
-            "debug-token read-back",
-            `${APP_CHECK_API_ROOT}/${encodeResourcePath(name)}`,
-            { notFoundIsNull: true }
-        ),
-        listDebugTokens: (pageToken) => {
-            const query = new URLSearchParams({ pageSize: String(LIST_PAGE_SIZE) });
-            if (pageToken) query.set("pageToken", pageToken);
-            return request("debug-token listing", `${collectionUrl}?${query}`);
-        },
-        exchangeDebugToken: async (debugToken) => {
-            const url = new URL(
-                `${APP_CHECK_API_ROOT}/${encodeResourcePath(APP_PARENT)}:exchangeDebugToken`
-            );
-            url.searchParams.set("key", FIREBASE_API_KEY);
-            const response = await request("debug-token exchange", url.href, {
-                method: "POST",
-                authenticated: false,
-                body: { debugToken }
-            });
-            validateAppCheckToken(response?.token);
-            return response.token;
-        }
-    });
-}
-
-async function createFirebaseCliAppCheckApi() {
-    try {
-        const require = createRequire(import.meta.url);
-        const firebaseAuth = require("firebase-tools/lib/auth.js");
-        const { getAccessToken } = require("firebase-tools/lib/apiv2.js");
-        const { requireAuth } = require("firebase-tools/lib/requireAuth.js");
-        const projectRoot = path.resolve(process.cwd());
-        const options = { project: PROJECT_ID, projectId: PROJECT_ID };
-        const account = firebaseAuth.getProjectDefaultAccount(projectRoot)
-            ?? firebaseAuth.getGlobalDefaultAccount();
-        if (account) firebaseAuth.setActiveAccount(options, account);
-        await requireAuth(options);
-
-        return createAppCheckRestApi({
-            accessTokenProvider: async () => {
-                const accessToken = await getAccessToken();
-                if (typeof accessToken !== "string" || accessToken.length < 16) {
-                    throw new Error("missing operator access token");
-                }
-                return accessToken;
-            }
-        });
-    } catch {
-        throw new Error(
-            "Firebase CLI login or Application Default Credentials with App Check administration access are required."
-        );
-    }
-}
-
-async function listAllDebugTokens(api) {
+async function listAllDebugTokens(api, parent = APP_PARENT) {
     const resources = [];
     const seenPageTokens = new Set();
     let pageToken;
 
     for (let page = 0; page < MAX_LIST_PAGES; page += 1) {
-        const response = await api.listDebugTokens(pageToken);
+        const response = await api.listDebugTokens(parent, pageToken);
         if (response?.debugTokens !== undefined && !Array.isArray(response.debugTokens)) {
             throw new Error("Firebase App Check returned an invalid debug-token inventory.");
         }
@@ -242,16 +157,23 @@ function cleanupFailure(resourceName, displayName) {
     );
 }
 
-async function revokeAndVerifyDebugToken({ api, resourceName, displayName }) {
+async function revokeAndVerifyDebugToken({
+    api,
+    resourceName,
+    displayName,
+    parent = APP_PARENT
+}) {
     const candidates = new Set();
     if (isExpectedResourceName(resourceName)) candidates.add(resourceName);
 
     try {
-        const inventory = await listAllDebugTokens(api);
+        const inventory = await listAllDebugTokens(api, parent);
         for (const resource of inventory) {
             if (resource.displayName === displayName) candidates.add(resource.name);
         }
     } catch {
+        // A known create response is sufficient to attempt revocation even when
+        // the preliminary inventory request is temporarily unavailable.
         if (candidates.size === 0) throw cleanupFailure(resourceName, displayName);
     }
 
@@ -259,131 +181,39 @@ async function revokeAndVerifyDebugToken({ api, resourceName, displayName }) {
         try {
             await api.deleteDebugToken(candidate);
         } catch {
-            // Exact GET and final inventory read-back are authoritative.
+            // The final inventory is authoritative: a timed-out DELETE may have
+            // succeeded, while a retained resource must fail the release.
         }
     }
 
+    let verifiedInventory;
     try {
-        for (const candidate of candidates) {
-            if (await api.getDebugToken(candidate) !== null) {
-                throw cleanupFailure(resourceName, displayName);
-            }
-        }
-        const finalInventory = await listAllDebugTokens(api);
-        if (finalInventory.some((resource) => (
-            candidates.has(resource.name) || resource.displayName === displayName
-        ))) {
-            throw cleanupFailure(resourceName, displayName);
-        }
-    } catch (error) {
-        if (error?.message?.startsWith("Temporary App Check CI")) throw error;
+        verifiedInventory = await listAllDebugTokens(api, parent);
+    } catch {
         throw cleanupFailure(resourceName, displayName);
     }
-}
 
-async function runDirectAppCheckProbe({
-    appCheckToken,
-    url = LIVE_REGISTRATION_URL,
-    launch = (options) => chromium.launch(options)
-} = {}) {
-    validateAppCheckToken(appCheckToken);
-    const browser = await launch({ headless: true });
-
-    try {
-        const page = await browser.newPage();
-        const target = new URL(url);
-        target.searchParams.set("production-smoke", Date.now().toString(36));
-        await page.goto(target.href, { waitUntil: "domcontentloaded", timeout: 60_000 });
-        await page.waitForFunction(
-            () => window.rocoTeamRegistrationReady === true,
-            undefined,
-            { timeout: 60_000 }
-        );
-
-        const liveProjectId = await page.evaluate(async (firebaseVersion) => {
-            const { getApp } = await import(
-                `https://www.gstatic.com/firebasejs/${firebaseVersion}/firebase-app.js`
-            );
-            return getApp().options.projectId;
-        }, FIREBASE_VERSION);
-        verifyProductionProjectId(liveProjectId);
-
-        const results = await page.evaluate(async ({ probes, projectId, region, token }) => {
-            const normalizeCode = (status) => {
-                if (typeof status !== "string" || !/^[A-Z_]+$/u.test(status)) {
-                    return "functions/unknown";
-                }
-                return `functions/${status.toLowerCase().replaceAll("_", "-")}`;
-            };
-
-            return Promise.all(probes.map(async ({ name, payload }) => {
-                try {
-                    const response = await fetch(
-                        `https://${region}-${projectId}.cloudfunctions.net/${encodeURIComponent(name)}`,
-                        {
-                            method: "POST",
-                            headers: {
-                                "content-type": "application/json",
-                                "x-firebase-appcheck": token
-                            },
-                            body: JSON.stringify({ data: payload })
-                        }
-                    );
-                    let responseStatus;
-                    try {
-                        const responseBody = await response.json();
-                        responseStatus = responseBody?.error?.status;
-                    } catch {
-                        responseStatus = undefined;
-                    }
-                    return { name, code: normalizeCode(responseStatus) };
-                } catch {
-                    return { name, code: "functions/network-error" };
-                }
-            }));
-        }, {
-            probes: EXPECTED_PROBES.map(({ name, payload }) => ({ name, payload })),
-            projectId: PROJECT_ID,
-            region: FUNCTIONS_REGION,
-            token: appCheckToken
-        });
-
-        verifyProbeResults(results);
-        return results;
-    } finally {
-        await browser.close();
+    if (verifiedInventory.some((resource) => (
+        candidates.has(resource.name) || resource.displayName === displayName
+    ))) {
+        throw cleanupFailure(resourceName, displayName);
     }
-}
-
-function sleep(milliseconds) {
-    return new Promise((resolve) => setTimeout(resolve, milliseconds));
 }
 
 async function runAppCheckCiGate({
     api,
     tokenFactory = randomUUID,
     displayNameFactory = () => `${DISPLAY_NAME_PREFIX}${randomUUID()}`,
-    registrationDelayMs = DEFAULT_REGISTRATION_DELAY_MS,
-    sleepImplementation = sleep,
-    probeImplementation = (appCheckToken) => runLiveAppCheckGate({
-        probeImplementation: () => runDirectAppCheckProbe({ appCheckToken })
+    probeImplementation = (debugToken) => runLiveAppCheckGate({
+        probeImplementation: () => runLiveAppCheckProbe({ debugToken })
     })
 } = {}) {
     if (
         typeof api?.createDebugToken !== "function"
-        || typeof api?.exchangeDebugToken !== "function"
         || typeof api?.deleteDebugToken !== "function"
-        || typeof api?.getDebugToken !== "function"
         || typeof api?.listDebugTokens !== "function"
     ) {
-        throw new Error("The App Check CI gate requires create, exchange, read, list, and delete operations.");
-    }
-    if (
-        !Number.isFinite(registrationDelayMs)
-        || registrationDelayMs < 0
-        || registrationDelayMs > 30_000
-    ) {
-        throw new Error("The App Check CI registration delay must be between 0 and 30000.");
+        throw new Error("The App Check CI gate requires create, list, and delete API operations.");
     }
 
     let debugToken = tokenFactory();
@@ -395,27 +225,26 @@ async function runAppCheckCiGate({
     validateDisplayName(displayName);
 
     let resourceName;
-    let appCheckToken;
     let gateResult;
     let primaryFailure;
     let cleanupError;
 
     try {
-        const created = await api.createDebugToken({ displayName, token: debugToken });
+        const created = await api.createDebugToken({
+            parent: APP_PARENT,
+            displayName,
+            token: debugToken
+        });
         if (isExpectedResourceName(created?.name)) resourceName = created.name;
         if (!resourceName || created?.displayName !== displayName) {
             throw new Error("Firebase App Check did not confirm the temporary debug-token resource.");
         }
 
-        if (registrationDelayMs > 0) await sleepImplementation(registrationDelayMs);
-        appCheckToken = await api.exchangeDebugToken(debugToken);
-        validateAppCheckToken(appCheckToken);
-        gateResult = await probeImplementation(appCheckToken);
+        gateResult = await probeImplementation(debugToken);
         verifyProbeResults(gateResult?.results);
     } catch (error) {
         primaryFailure = error;
     } finally {
-        appCheckToken = undefined;
         debugToken = undefined;
         try {
             await revokeAndVerifyDebugToken({ api, resourceName, displayName });
@@ -431,14 +260,14 @@ async function runAppCheckCiGate({
 
 async function main() {
     try {
-        const api = await createFirebaseCliAppCheckApi();
+        const api = await createAdcAppCheckApi();
         const { results, attempts } = await runAppCheckCiGate({ api });
         for (const result of results) {
             process.stdout.write(`PASS ${result.name} [${CI_PROOF_MARKER}]\n`);
         }
         process.stdout.write(`PASS appCheckDebugToken [${CLEANUP_PROOF_MARKER}]\n`);
         process.stdout.write(
-            `CI App Check plumbing probe passed in ${attempts} attempt(s); neither temporary credential was logged or persisted.\n`
+            `CI App Check probe passed in ${attempts} attempt(s); the temporary debug token was never logged or persisted.\n`
         );
     } catch (error) {
         const message = error instanceof Error ? error.message : "CI App Check probe failed.";
@@ -456,15 +285,12 @@ export {
     CI_PROOF_MARKER,
     CLEANUP_PROOF_MARKER,
     DEBUG_TOKEN_COLLECTION,
-    DEFAULT_REGISTRATION_DELAY_MS,
     DISPLAY_NAME_PREFIX,
     PROJECT_NUMBER,
+    createAdcAppCheckApi,
     createAppCheckRestApi,
-    createFirebaseCliAppCheckApi,
     isExpectedResourceName,
-    isUuidV4,
     listAllDebugTokens,
     revokeAndVerifyDebugToken,
-    runAppCheckCiGate,
-    runDirectAppCheckProbe
+    runAppCheckCiGate
 };

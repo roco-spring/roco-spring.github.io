@@ -46,12 +46,22 @@ function verifyProductionProjectId(projectId) {
 
 async function runLiveAppCheckProbe({
     url = LIVE_REGISTRATION_URL,
-    launch = (options) => chromium.launch(options)
+    launch = (options) => chromium.launch(options),
+    debugToken
 } = {}) {
+    if (debugToken !== undefined && !isUuidV4(debugToken)) {
+        throw new Error("The injected App Check debug token must be a UUID4 value.");
+    }
+
     const browser = await launch({ headless: true });
 
     try {
         const page = await browser.newPage();
+        if (debugToken !== undefined) {
+            await page.addInitScript((token) => {
+                self.FIREBASE_APPCHECK_DEBUG_TOKEN = token;
+            }, debugToken);
+        }
         const target = new URL(url);
         target.searchParams.set("production-smoke", Date.now().toString(36));
         await page.goto(target.href, { waitUntil: "domcontentloaded", timeout: 60_000 });
@@ -106,6 +116,11 @@ async function runLiveAppCheckProbe({
 
 function sleep(milliseconds) {
     return new Promise((resolve) => setTimeout(resolve, milliseconds));
+}
+
+function isUuidV4(value) {
+    return typeof value === "string"
+        && /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu.test(value);
 }
 
 async function runLiveAppCheckGate({
@@ -163,6 +178,7 @@ export {
     EXPECTED_PROBES,
     LIVE_REGISTRATION_URL,
     PROJECT_ID,
+    isUuidV4,
     runLiveAppCheckGate,
     runLiveAppCheckProbe,
     verifyProductionProjectId,

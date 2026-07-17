@@ -3,7 +3,9 @@ import test from "node:test";
 
 import {
     EXPECTED_PROBES,
+    isUuidV4,
     runLiveAppCheckGate,
+    runLiveAppCheckProbe,
     verifyProductionProjectId,
     verifyProbeResults
 } from "../scripts/verify-live-app-check.mjs";
@@ -41,6 +43,73 @@ test("live App Check probe rejects a live page configured for another project", 
         () => verifyProductionProjectId("stale-or-unexpected-project"),
         /unexpected Firebase project/u
     );
+});
+
+test("live App Check probe injects an optional UUID4 before navigation", async () => {
+    const debugToken = "123e4567-e89b-42d3-a456-426614174000";
+    const events = [];
+    let evaluations = 0;
+    let closed = false;
+    const expected = [
+        { name: "registerTeam", code: "functions/invalid-argument" },
+        { name: "getMyTeam", code: "functions/invalid-argument" }
+    ];
+
+    const results = await runLiveAppCheckProbe({
+        debugToken,
+        launch: async (options) => {
+            assert.deepEqual(options, { headless: true });
+            return {
+                async newPage() {
+                    return {
+                        async addInitScript(script, value) {
+                            events.push("init");
+                            assert.match(String(script), /FIREBASE_APPCHECK_DEBUG_TOKEN/u);
+                            assert.equal(value, debugToken);
+                        },
+                        async goto(url) {
+                            events.push("goto");
+                            assert.equal(new URL(url).origin, "https://roco-spring.github.io");
+                        },
+                        async waitForFunction() {
+                            events.push("ready");
+                        },
+                        async evaluate(_implementation, argument) {
+                            evaluations += 1;
+                            if (evaluations === 1) return "roco-spring-registration-2026";
+                            assert.deepEqual(
+                                argument.probes,
+                                EXPECTED_PROBES.map(({ name, payload }) => ({ name, payload }))
+                            );
+                            return expected;
+                        }
+                    };
+                },
+                async close() {
+                    closed = true;
+                }
+            };
+        }
+    });
+
+    assert.deepEqual(results, expected);
+    assert.deepEqual(events.slice(0, 2), ["init", "goto"]);
+    assert.equal(closed, true);
+    assert.equal(isUuidV4(debugToken), true);
+});
+
+test("live App Check probe rejects malformed injected credentials before browser launch", async () => {
+    let launches = 0;
+    await assert.rejects(
+        runLiveAppCheckProbe({
+            debugToken: "not-a-debug-token",
+            launch: async () => {
+                launches += 1;
+            }
+        }),
+        /must be a UUID4/u
+    );
+    assert.equal(launches, 0);
 });
 
 test("live App Check gate retries transient probe failures with a strict bound", async () => {
