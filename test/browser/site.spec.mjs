@@ -76,7 +76,7 @@ test("registration portal starts with three slots, validates partial members, an
   expect(pageErrors).toEqual([]);
 });
 
-test("team members can be added progressively to ten without losing entered values", async ({ page }) => {
+test("team members can be added beyond ten without losing entered values", async ({ page }) => {
   await page.goto("/team-registration.html");
   await expect(page.locator("#public-auth")).toBeVisible({ timeout: 15_000 });
 
@@ -98,16 +98,16 @@ test("team members can be added progressively to ten without losing entered valu
   await page.locator("#register-member-2-email").fill("second@example.org");
   await expect(secondMemberClearButton).toBeVisible();
 
-  for (let expectedCount = 4; expectedCount <= 10; expectedCount += 1) {
+  for (let expectedCount = 4; expectedCount <= 12; expectedCount += 1) {
     await page.locator("#add-registration-member").click();
     await expect(page.locator("#registration-members .member-slot")).toHaveCount(expectedCount);
     await expect(page.locator(`#register-member-${expectedCount}-fullName`)).toBeFocused();
   }
 
-  await expect(page.locator("#add-registration-member")).toBeDisabled();
+  await expect(page.locator("#add-registration-member")).toBeEnabled();
   await expect(page.locator("#register-member-1-fullName")).toHaveValue("Persistent Member");
   await expect(page.locator("#register-member-2-email")).toHaveValue("second@example.org");
-  await expect(page.locator("#registration-members legend").nth(9)).toContainText("Team member 10");
+  await expect(page.locator("#registration-members legend").nth(11)).toContainText("Team member 12");
   await expect(page.locator("#registration-members .member-slot").nth(1)
     .locator(".member-remove-button")).toBeVisible();
   await expect(page.locator("#registration-members .member-slot").nth(2)
@@ -117,26 +117,26 @@ test("team members can be added progressively to ten without losing entered valu
 
   await page.locator("#registration-members .member-slot").nth(1)
     .locator(".member-remove-button").click();
-  await expect(page.locator("#registration-members .member-slot")).toHaveCount(10);
+  await expect(page.locator("#registration-members .member-slot")).toHaveCount(12);
   await expect(page.locator("#register-member-2-email")).toHaveValue("");
   await expect(page.locator("#registration-members .member-slot").nth(1)
     .locator(".member-remove-button")).toBeHidden();
 
   await page.locator("#register-member-5-fullName").fill("Member That Moves Up");
-  await page.locator("#register-member-10-email").fill("last-member@example.org");
+  await page.locator("#register-member-12-email").fill("last-member@example.org");
   await page.locator("#registration-members .member-slot").nth(3)
     .locator(".member-remove-button").click();
 
-  await expect(page.locator("#registration-members .member-slot")).toHaveCount(9);
+  await expect(page.locator("#registration-members .member-slot")).toHaveCount(11);
   await expect(page.locator("#register-member-4-fullName")).toHaveValue("Member That Moves Up");
-  await expect(page.locator("#register-member-9-email")).toHaveValue("last-member@example.org");
-  await expect(page.locator("#registration-members legend").nth(8)).toContainText("Team member 9");
+  await expect(page.locator("#register-member-11-email")).toHaveValue("last-member@example.org");
+  await expect(page.locator("#registration-members legend").nth(10)).toContainText("Team member 11");
   await expect(page.locator("#add-registration-member")).toBeEnabled();
 
   await page.locator("#add-registration-member").click();
-  await expect(page.locator("#registration-members .member-slot")).toHaveCount(10);
-  await expect(page.locator("#register-member-10-fullName")).toBeFocused();
-  await expect(page.locator("#add-registration-member")).toBeDisabled();
+  await expect(page.locator("#registration-members .member-slot")).toHaveCount(12);
+  await expect(page.locator("#register-member-12-fullName")).toBeFocused();
+  await expect(page.locator("#add-registration-member")).toBeEnabled();
 });
 
 test("login query mode and keyboard tab behavior are accessible", async ({ page }) => {
@@ -156,10 +156,10 @@ test("registration page remains within the viewport on mobile and desktop", asyn
     await page.setViewportSize(viewport);
     await page.goto("/team-registration.html");
     await expect(page.locator("#public-auth")).toBeVisible({ timeout: 15_000 });
-    for (let memberIndex = 4; memberIndex <= 10; memberIndex += 1) {
+    for (let memberIndex = 4; memberIndex <= 12; memberIndex += 1) {
       await page.locator("#add-registration-member").click();
     }
-    await expect(page.locator("#registration-members .member-slot")).toHaveCount(10);
+    await expect(page.locator("#registration-members .member-slot")).toHaveCount(12);
     const dimensions = await page.evaluate(() => ({
       clientWidth: document.documentElement.clientWidth,
       scrollWidth: document.documentElement.scrollWidth
@@ -185,13 +185,19 @@ test("citation copy button copies the code block exactly", async ({ page, contex
   await context.grantPermissions(["clipboard-read", "clipboard-write"], {
     origin: "http://127.0.0.1:4173"
   });
-  await page.goto("/participate.html");
-  const citation = page.locator("#citation-ptlflow");
-  const expected = await citation.textContent();
-  await page.locator('[data-copy-target="citation-ptlflow"]').click();
-  await expect(page.locator(".copy-status").first()).toHaveText("BibTeX copied.");
-  const copied = await page.evaluate(() => navigator.clipboard.readText());
-  expect(copied).toBe(expected);
+  for (const [path, citationId] of [
+    ["/participate.html", "citation-ptlflow"],
+    ["/tasks-data.html", "citation-flowbench"]
+  ]) {
+    await page.goto(path);
+    const citation = page.locator(`#${citationId}`);
+    const expected = await citation.textContent();
+    await page.locator(`[data-copy-target="${citationId}"]`).click();
+    await expect(page.locator(`[data-copy-target="${citationId}"] + .copy-status`))
+      .toHaveText("BibTeX copied.");
+    const copied = await page.evaluate(() => navigator.clipboard.readText());
+    expect(copied).toBe(expected);
+  }
 });
 
 test("registration startup failure replaces the indefinite loading state", async ({ page }) => {

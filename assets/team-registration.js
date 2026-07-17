@@ -39,6 +39,7 @@ const elements = {
     loginEmail: document.getElementById("login-email"),
     loginPassword: document.getElementById("login-password"),
     loginStatus: document.getElementById("login-status"),
+    registrationSpamNotice: document.getElementById("registration-spam-notice"),
     forgotPasswordButton: document.getElementById("forgot-password-button"),
     initialPasswordPanel: document.getElementById("initial-password-panel"),
     initialPasswordForm: document.getElementById("initial-password-form"),
@@ -72,7 +73,6 @@ const elements = {
 };
 
 const INITIAL_MEMBER_SLOTS = 3;
-const MAX_TEAM_MEMBERS = 10;
 const MEMBER_FIELDS = Object.freeze([
     Object.freeze({ key: "fullName", label: "Full name", type: "text", maximum: 120, autocomplete: "name" }),
     Object.freeze({ key: "email", label: "Contact email address", type: "email", maximum: 254, autocomplete: "email" }),
@@ -124,7 +124,7 @@ function initializeMemberEditor(editor) {
 }
 
 function resetMemberEditor(editor, members = []) {
-    const safeMembers = Array.isArray(members) ? members.slice(0, MAX_TEAM_MEMBERS) : [];
+    const safeMembers = Array.isArray(members) ? members : [];
     const slotCount = Math.max(INITIAL_MEMBER_SLOTS, safeMembers.length);
     const fragment = document.createDocumentFragment();
 
@@ -172,11 +172,6 @@ function createMemberSlot(editor, index, member = {}) {
 
 function addMemberSlot(editor) {
     const slotCount = editor.container.querySelectorAll(".member-slot").length;
-
-    if (slotCount >= MAX_TEAM_MEMBERS) {
-        announceMemberEditor(editor, "A team may have no more than 10 members.");
-        return;
-    }
 
     const slot = createMemberSlot(editor, slotCount);
     editor.container.append(slot);
@@ -268,20 +263,16 @@ function renumberMemberSlots(editor) {
 function updateMemberEditorState(editor) {
     const slots = [...editor.container.querySelectorAll(".member-slot")];
     const slotCount = slots.length;
-    const atMaximum = slotCount >= MAX_TEAM_MEMBERS;
     const formIsBusy = editor.form.getAttribute("aria-busy") === "true";
 
     if (editor.count) {
-        editor.count.textContent = `${slotCount} shown · ${MAX_TEAM_MEMBERS} max`;
+        editor.count.textContent = `${slotCount} shown · add as needed`;
     }
 
     if (editor.addButton) {
-        editor.addButton.disabled = atMaximum || formIsBusy;
-        editor.addButton.textContent = atMaximum ? "Maximum 10 members added" : "+ Add Team Member";
-        editor.addButton.setAttribute(
-            "aria-label",
-            atMaximum ? "Maximum of 10 team members reached" : `Add team member ${slotCount + 1}`
-        );
+        editor.addButton.disabled = formIsBusy;
+        editor.addButton.textContent = "+ Add Team Member";
+        editor.addButton.setAttribute("aria-label", `Add team member ${slotCount + 1}`);
     }
 
     slots.forEach((slot, index) => {
@@ -367,6 +358,8 @@ function initializeTabs() {
 function activateTab(mode) {
     const showLogin = mode === "login";
 
+    if (!showLogin) setRegistrationSpamNotice(false);
+
     elements.registerTab.setAttribute("aria-selected", String(!showLogin));
     elements.registerTab.tabIndex = showLogin ? -1 : 0;
     elements.loginTab.setAttribute("aria-selected", String(showLogin));
@@ -375,12 +368,26 @@ function activateTab(mode) {
     elements.loginPanel.hidden = !showLogin;
 }
 
+function setRegistrationSpamNotice(visible) {
+    elements.registrationSpamNotice.hidden = !visible;
+
+    if (visible) {
+        elements.loginEmail.setAttribute(
+            "aria-describedby",
+            "login-status registration-spam-notice"
+        );
+    } else {
+        elements.loginEmail.removeAttribute("aria-describedby");
+    }
+}
+
 function initializeEventHandlers() {
     elements.registrationForm.addEventListener("input", () => {
         registrationAttempt = null;
     });
     elements.registrationForm.addEventListener("submit", handleRegistration);
     elements.loginForm.addEventListener("submit", handleLogin);
+    elements.loginEmail.addEventListener("input", () => setRegistrationSpamNotice(false));
     elements.forgotPasswordButton.addEventListener("click", handleForgotPassword);
     elements.initialPasswordForm.addEventListener("submit", handleInitialPasswordChange);
     elements.editTeamForm.addEventListener("submit", handleTeamUpdate);
@@ -458,6 +465,7 @@ async function handleAuthenticationState(user) {
 function clearPrivateState() {
     currentTeam = null;
     elements.loginPassword.value = "";
+    setRegistrationSpamNotice(false);
     elements.dashboardView.hidden = true;
     elements.editTeamForm.hidden = true;
     elements.initialPasswordForm.reset();
@@ -595,6 +603,7 @@ async function handleRegistration(event) {
             emailStatus === "failed" ? failedMessage : emailStatus === "pending" ? pendingMessage : successfulMessage,
             ["pending", "failed"].includes(emailStatus) ? "warning" : "success"
         );
+        setRegistrationSpamNotice(emailStatus === "sent");
         elements.loginEmail.focus();
     } catch (error) {
         if (errorCode(error) === "functions/failed-precondition") {
@@ -609,6 +618,7 @@ async function handleRegistration(event) {
 
 async function handleLogin(event) {
     event.preventDefault();
+    setRegistrationSpamNotice(false);
     const email = normalizeEmail(elements.loginEmail.value);
     const password = elements.loginPassword.value;
 
@@ -633,6 +643,7 @@ async function handleLogin(event) {
 }
 
 async function handleForgotPassword() {
+    setRegistrationSpamNotice(false);
     const email = normalizeEmail(elements.loginEmail.value);
 
     if (!isValidEmail(email)) {

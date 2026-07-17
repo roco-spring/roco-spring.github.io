@@ -70,13 +70,14 @@ describe("authoritative registration validation", () => {
     expect(parseRegistrationInput(registration()).members).toHaveLength(1);
   });
 
-  it("accepts ten complete members", () => {
-    const members = Array.from({ length: 10 }, (_, index) => member(index + 1));
-    expect(parseRegistrationInput(registration({ members })).members).toHaveLength(10);
+  it("accepts more than ten complete members without a configured count cap", () => {
+    const members = Array.from({ length: 25 }, (_, index) => member(index + 1));
+    expect(parseRegistrationInput(registration({ members })).members).toHaveLength(25);
   });
 
-  it("rejects eleven members", () => {
-    const members = Array.from({ length: 11 }, (_, index) => member(index + 1));
+  it("validates member rows beyond the former tenth-row boundary", () => {
+    const members = Array.from({ length: 12 }, (_, index) => member(index + 1));
+    members[10] = { ...members[10], affiliation: "" };
     expect(() => parseRegistrationInput(registration({ members }))).toThrow();
   });
 

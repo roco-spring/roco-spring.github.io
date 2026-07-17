@@ -86,14 +86,10 @@ function validateTeamInput(input, { requireSubmitterConfirmation = false } = {})
 
     const rawMembers = Array.isArray(input?.members) ? input.members : [];
 
-    if (rawMembers.length > 10) {
-        errors.push({ field: "members", message: "A team may have no more than ten members." });
-    }
-
     const members = [];
     const seenEmails = new Map();
 
-    rawMembers.slice(0, 10).forEach((member, index) => {
+    rawMembers.forEach((member, index) => {
         const fullNameValue = typeof member?.fullName === "string" ? member.fullName : "";
         const emailValue = typeof member?.email === "string" ? member.email : "";
         const affiliationValue = typeof member?.affiliation === "string" ? member.affiliation : "";

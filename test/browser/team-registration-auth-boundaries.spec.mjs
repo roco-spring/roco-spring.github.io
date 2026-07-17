@@ -409,7 +409,7 @@ test("a rejected token refresh removes all rendered private data and password ca
 
 test("the edit form preserves every loaded member beyond the initial three rows", async ({ page }) => {
   const team = teamFixture("Expanded", 36);
-  team.members = Array.from({ length: 5 }, (_, index) => ({
+  team.members = Array.from({ length: 12 }, (_, index) => ({
     fullName: `Expanded Member ${index + 1}`,
     email: `expanded-${index + 1}@private.example`,
     affiliation: `Expanded Laboratory ${index + 1}`
@@ -420,7 +420,7 @@ test("the edit form preserves every loaded member beyond the initial three rows"
   await loadUserTeam(page, "uid-expanded", team);
   await page.getByRole("button", { name: "Edit team details" }).click();
 
-  await expect(page.locator("#edit-members .member-slot")).toHaveCount(5);
+  await expect(page.locator("#edit-members .member-slot")).toHaveCount(12);
   for (let memberIndex = 1; memberIndex <= team.members.length; memberIndex += 1) {
     const member = team.members[memberIndex - 1];
     await expect(page.locator(`#edit-member-${memberIndex}-fullName`)).toHaveValue(
@@ -431,6 +431,19 @@ test("the edit form preserves every loaded member beyond the initial three rows"
       member.affiliation
     );
   }
+
+  await page.getByRole("button", { name: "Save team details" }).click();
+  await waitForCall(page, "updateMyTeam", "uid-expanded");
+  const updatePayload = await page.evaluate(() => (
+    window.__rocoFirebaseHarness.pendingCallPayload("updateMyTeam", "uid-expanded")
+  ));
+  expect(updatePayload.members).toHaveLength(12);
+  expect(updatePayload.members[11]).toEqual(team.members[11]);
+  await resolveCall(page, "updateMyTeam", "uid-expanded", {
+    team,
+    synchronizationStatus: "synced"
+  });
+  await expect(page.locator("#dashboard-view")).toBeVisible();
 });
 
 test("a delayed update from user A is ignored after user B signs in", async ({ page }) => {
@@ -667,8 +680,17 @@ test("a registration retry reuses one UUID and renders the safe success result",
   await expect(page.locator("#login-tab-panel")).toBeVisible();
   await expect(page.locator("#login-email")).toHaveValue("owner@example.org");
   await expect(page.locator("#login-status")).toContainText("Registration completed for RoCo-81");
+  await expect(page.locator("#registration-spam-notice")).toBeVisible();
+  await expect(page.locator("#registration-spam-notice")).toContainText("Check your spam or junk folder");
+  await expect(page.locator("#login-email")).toHaveAttribute(
+    "aria-describedby",
+    "login-status registration-spam-notice"
+  );
+  await expect(page.locator("#registration-spam-notice")).toHaveCSS("color", "rgb(141, 30, 30)");
 
   await page.getByRole("tab", { name: "Register a new team" }).click();
+  await expect(page.locator("#registration-spam-notice")).toBeHidden();
+  await expect(page.locator("#login-email")).not.toHaveAttribute("aria-describedby", /.+/u);
   await expect(page.locator("#registration-members .member-slot")).toHaveCount(3);
   await expect(page.locator("#register-team-name")).toHaveValue("");
   for (let memberIndex = 1; memberIndex <= 3; memberIndex += 1) {

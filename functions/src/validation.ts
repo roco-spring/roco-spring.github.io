@@ -93,7 +93,6 @@ const tracksSchema = z
 
 const membersSchema = z
   .array(memberInputSchema)
-  .max(10, "A team may have at most ten members.")
   .transform((members) =>
     members.filter(
       (member) =>

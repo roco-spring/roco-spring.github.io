@@ -304,6 +304,32 @@ p {
     background: rgba(93, 124, 255, 0.12);
 }
 
+.button.starter-kit {
+    gap: 9px;
+    color: #fff;
+    background: linear-gradient(135deg, #11182a 0%, #252f4a 58%, #17264e 100%);
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    box-shadow: 0 10px 26px rgba(12, 21, 44, 0.26), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+    transition: transform 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
+}
+
+.button.starter-kit:hover {
+    transform: translateY(-2px);
+    background: linear-gradient(135deg, #0b1020 0%, #1b294d 58%, #14396f 100%);
+    box-shadow: 0 15px 34px rgba(12, 21, 44, 0.34), 0 0 0 1px rgba(0, 212, 255, 0.18);
+}
+
+.button.starter-kit:focus-visible {
+    outline: 3px solid rgba(0, 125, 180, 0.78);
+    outline-offset: 3px;
+}
+
+.button-icon {
+    width: 19px;
+    height: 19px;
+    flex: 0 0 auto;
+}
+
 .button.compact {
     align-self: flex-start;
     min-height: 34px;
@@ -562,6 +588,93 @@ p {
     border: 1px solid var(--line);
     border-radius: 22px;
     background: var(--panel-strong);
+}
+
+.flowbench-resource {
+    position: relative;
+    isolation: isolate;
+    margin-top: 28px;
+    padding: 26px;
+    overflow: hidden;
+    border: 1px solid rgba(93, 124, 255, 0.3);
+    border-radius: 20px;
+    background:
+        radial-gradient(circle at 100% 0, rgba(0, 212, 255, 0.2), transparent 34%),
+        linear-gradient(145deg, #f4f6ff 0%, #edf8fc 100%);
+    box-shadow: 0 18px 45px rgba(51, 74, 165, 0.13);
+}
+
+.flowbench-resource::after {
+    position: absolute;
+    z-index: -1;
+    right: -54px;
+    bottom: -76px;
+    width: 190px;
+    height: 190px;
+    border: 28px solid rgba(93, 124, 255, 0.08);
+    border-radius: 50%;
+    content: "";
+}
+
+.flowbench-resource-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 18px;
+    margin-bottom: 14px;
+}
+
+.flowbench-label {
+    display: inline-block;
+    margin-bottom: 6px;
+    color: #3150bf;
+    font-size: 0.75rem;
+    font-weight: 850;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+}
+
+.flowbench-resource h4 {
+    margin: 0;
+    color: #172033;
+    font-size: 1.55rem;
+    letter-spacing: -0.035em;
+}
+
+.flowbench-resource-header .button.compact {
+    margin-top: 0;
+    white-space: nowrap;
+}
+
+.flowbench-metrics {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 10px;
+    margin: 20px 0;
+}
+
+.flowbench-metrics span {
+    display: flex;
+    min-height: 76px;
+    flex-direction: column;
+    justify-content: center;
+    padding: 13px;
+    border: 1px solid rgba(51, 74, 165, 0.12);
+    border-radius: 13px;
+    color: #44506a;
+    background: rgba(255, 255, 255, 0.74);
+    font-size: 0.8rem;
+    font-weight: 750;
+    line-height: 1.35;
+}
+
+.flowbench-metrics strong {
+    color: #2437a6;
+    font-size: 1.32rem;
+}
+
+.flowbench-resource .citation-block {
+    border-top-color: rgba(51, 74, 165, 0.16);
 }
 
 .keynote-affiliation {
@@ -1880,6 +1993,25 @@ details p {
     background: #eef1ff;
 }
 
+.registration-spam-notice {
+    margin: 12px 0 0;
+    padding: 13px 15px;
+    border: 1px solid rgba(141, 30, 30, 0.2);
+    border-left: 5px solid #b4232e;
+    border-radius: 10px;
+    color: #8d1e1e;
+    background: #fff0f0;
+    box-shadow: 0 8px 22px rgba(141, 30, 30, 0.08);
+    font-size: 0.93rem;
+    font-weight: 650;
+    line-height: 1.5;
+}
+
+.registration-spam-notice strong {
+    color: #74131d;
+    font-weight: 850;
+}
+
 .registration-action-panel {
     margin-top: 28px;
     padding: 20px;
@@ -2698,6 +2830,23 @@ details p {
     .hero-card {
         padding: 34px 24px;
         border-radius: 26px;
+    }
+
+    .flowbench-resource {
+        padding: 21px;
+    }
+
+    .flowbench-resource-header {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .flowbench-resource-header .button.compact {
+        align-self: flex-start;
+    }
+
+    .flowbench-metrics {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 
     .card-grid.four,

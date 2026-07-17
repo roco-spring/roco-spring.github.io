@@ -55,22 +55,27 @@ test("one complete member is accepted", () => {
     assert.equal(validate(validInput()).success, true);
 });
 
-test("ten complete members are accepted", () => {
-    const members = Array.from({ length: 10 }, (_, index) => ({
+test("more than ten complete members are accepted without a configured count cap", () => {
+    const members = Array.from({ length: 25 }, (_, index) => ({
         fullName: `Member ${index + 1}`,
         email: index === 0 ? "ada@example.org" : `member${index + 1}@example.org`,
         affiliation: `Institute ${index + 1}`
     }));
-    assert.equal(validate(validInput({ members })).success, true);
+    const result = validate(validInput({ members }));
+    assert.equal(result.success, true);
+    assert.equal(result.data.members.length, 25);
 });
 
-test("eleven members are rejected", () => {
-    const members = Array.from({ length: 11 }, (_, index) => ({
+test("member validation continues beyond the former tenth-row boundary", () => {
+    const members = Array.from({ length: 12 }, (_, index) => ({
         fullName: `Member ${index + 1}`,
         email: index === 0 ? "ada@example.org" : `member${index + 1}@example.org`,
         affiliation: `Institute ${index + 1}`
     }));
-    assert.equal(validate(validInput({ members })).success, false);
+    members[10].email = "";
+    const result = validate(validInput({ members }));
+    assert.equal(result.success, false);
+    assert.ok(result.errors.some(({ field }) => field === "members.10.email"));
 });
 
 test("a completely blank optional row is ignored", () => {

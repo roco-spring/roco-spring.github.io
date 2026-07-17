@@ -66,12 +66,15 @@ test("homepage and Participate registration placeholders link to the live page",
     assert.match(participate, /href="team-registration\.html"[\s\S]{0,120}Register/u);
 });
 
-test("published repository, starting-kit framework, and support destinations replace active placeholders", async () => {
+test("the devkit is the published GitHub resource and support destinations are active", async () => {
     const index = await source("index.html");
     const participate = await source("participate.html");
     const faq = await source("rules-faq.html");
 
-    assert.match(index, /https:\/\/github\.com\/roco-spring\/roco-spring\.github\.io/u);
+    assert.match(index, /class="button starter-kit"[\s\S]{0,180}https:\/\/github\.com\/hmorimitsu\/roco-spring-devkit/u);
+    assert.match(index, /Starter kit \(codebase\)/u);
+    assert.match(index, /Starter kit codebase:[\s\S]{0,180}hmorimitsu\/roco-spring-devkit/u);
+    assert.doesNotMatch(index, /roco-spring\/roco-spring\.github\.io/u);
     assert.match(participate, /https:\/\/github\.com\/hmorimitsu\/roco-spring-devkit/u);
     for (const html of [participate, faq]) {
         assert.match(html, /https:\/\/github\.com\/roco-spring\/roco-spring\.github\.io\/issues/u);
@@ -94,7 +97,17 @@ test("registration page includes the exact introduction and required controls", 
     assert.match(html, /Sign in to an existing team/u);
     assert.match(html, /id="add-registration-member"/u);
     assert.match(html, /id="add-edit-member"/u);
+    assert.match(html, /No fixed<\/strong> member limit/u);
+    assert.doesNotMatch(html, /10 (?:members maximum|max)|up to 10 members|teammates up to 10/u);
     assert.match(html, /I confirm that the person submitting this registration is one of the team members listed below\.|I confirm that the person submitting this registration is one of the team members listed above\./u);
+});
+
+test("registration success includes an initially hidden spam-folder reminder", async () => {
+    const html = (await source("team-registration.html")).replace(/\s+/gu, " ");
+    assert.match(
+        html,
+        /id="registration-spam-notice" role="note" hidden><strong>Check your spam or junk folder\.<\/strong> The team-registration email contains your temporary password and sign-in instructions\./u
+    );
 });
 
 test("public Firebase configuration and regional App Check setup are exact", async () => {
@@ -188,9 +201,24 @@ test("citation BibTeX appears verbatim in its required context", async () => {
     booktitle={Proc. International Conference on Learning Representations (ICLR)},
     year={2026}
 }`;
+    const flowBench = String.raw`@article{
+agnihotri2025flowbench,
+title={FlowBench: Benchmarking Optical Flow Estimation Methods for Reliability and Generalization},
+author={Shashank Agnihotri and Julian Yuya Caspary and Luca Schwarz and Xinyan Gao and Jenny Schmalfuss and Andres Bruhn and Margret Keuper},
+journal={Transactions on Machine Learning Research},
+issn={2835-8856},
+year={2025},
+url={https://openreview.net/forum?id=Kh4bj6YDNm},
+note={}
+}`;
     assert.ok(participate.includes(ptlflow));
     assert.ok(tasks.includes(spring));
     assert.ok(tasks.includes(robustSpring));
+    assert.ok(tasks.includes(flowBench));
+    assert.match(tasks, /57[\s\S]{0,80}model checkpoints/u);
+    assert.match(tasks, /23[\s\S]{0,80}common corruptions/u);
+    assert.match(tasks, /data-copy-target="citation-flowbench"/u);
+    assert.match(tasks, /https:\/\/openreview\.net\/forum\?id=Kh4bj6YDNm/u);
 });
 
 test("citation blocks use semantic code and accessible native copy buttons", async () => {
