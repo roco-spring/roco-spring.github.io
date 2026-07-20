@@ -16,6 +16,7 @@
     "secrets:verify": "node scripts/verify-secret-metadata.mjs",
     "google:health:latest": "node scripts/verify-google-integration-health.mjs --secret-source=latest",
     "google:health:bound": "node scripts/verify-google-integration-health.mjs --secret-source=bound",
+    "function-secrets:configure": "node scripts/configure-function-secrets.mjs --apply",
     "identity:configure": "node scripts/configure-identity-platform.mjs",
     "release:source": "node scripts/verify-release-source.mjs",
     "backend:smoke": "node scripts/verify-production-callables.mjs",
@@ -27,7 +28,7 @@
     "preemulators": "npm run build",
     "emulators": "node scripts/firebase-safe.mjs emulators:start --only auth,firestore,functions --project roco-spring-registration-2026",
     "deploy:firebase": "node scripts/firebase-safe.mjs deploy --only firestore:rules,firestore:indexes,functions --project roco-spring-registration-2026",
-    "deploy:production": "npm run release:source && npm test && npm run build && npm run lint && npm run security:scan && npm run release:source && npm run identity:configure && npm run secrets:verify && npm run google:health:latest && npm run deploy:firebase && npm run google:health:bound && npm run backend:smoke && npm run backend:appcheck-ci-smoke && npm run monitoring:configure && npm run production:runtime:verify"
+    "deploy:production": "npm run release:source && npm test && npm run build && npm run lint && npm run security:scan && npm run release:source && npm run identity:configure && npm run secrets:verify && npm run google:health:latest && npm run deploy:firebase && npm run function-secrets:configure && npm run google:health:bound && npm run backend:smoke && npm run backend:appcheck-ci-smoke && npm run monitoring:configure && npm run production:runtime:verify"
   },
   "engines": {
     "node": ">=22"

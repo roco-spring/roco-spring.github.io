@@ -72,6 +72,7 @@ These commands may run on this editing node, but none remains running or partici
 - [ ] `npm run monitoring:configure` idempotently creates or repairs the four managed alert policies only after finding the existing enabled, `VERIFIED` organizer email channel.
 - [ ] `npm run production:runtime:verify` proves the exact active second-generation Node.js 22 Function inventory, Cloud Run IAM boundary, exact remote OIDC Scheduler target, a successful invocation within the preceding 15 minutes, organizer channel, and alert definitions; the read-only command may exit afterward.
 - [ ] `npm run google:health:bound` proves numeric OAuth bindings exist only on `reconcileRegistrations`, validates the numeric HMAC-only `registerTeam` binding and secret-free `updateMyTeam`, and refreshes the exact reconciler OAuth versions successfully.
+- [ ] `npm run function-secrets:configure` has removed any stale secret environment variables retained from an older Firebase revision and passed its exact five-Function read-back.
 - [ ] Backend CORS/guard smoke passes for all callables.
 - [ ] Deterministic App Check CI smoke passes and cleanup is verified.
 

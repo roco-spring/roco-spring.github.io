@@ -130,6 +130,7 @@ Do not rotate secrets, delete Auth users, or clear Firestore broadly before coll
 
    ```bash
    npm run backend:smoke
+   npm run function-secrets:configure
    npm run google:health:bound
    ```
 

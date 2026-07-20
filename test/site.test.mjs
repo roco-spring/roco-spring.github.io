@@ -155,6 +155,7 @@ test("production deployment disables public Auth signup/deletion and verifies em
     assert.match(identityConfig, /"x-goog-user-project":\s*PROJECT_ID/u);
     assert.match(packageConfig.scripts["deploy:production"], /identity:configure/u);
     assert.match(packageConfig.scripts["deploy:production"], /deploy:firebase/u);
+    assert.match(packageConfig.scripts["deploy:production"], /function-secrets:configure/u);
     assert.match(packageConfig.scripts["deploy:production"], /release:source/u);
     assert.match(packageConfig.scripts["deploy:production"], /backend:smoke/u);
     assert.match(packageConfig.scripts["deploy:production"], /backend:appcheck-ci-smoke/u);
