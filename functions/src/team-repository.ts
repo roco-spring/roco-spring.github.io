@@ -7,6 +7,8 @@ import {
 import { randomUUID } from "node:crypto";
 import { AppError, isRetryableSafeCategory } from "./errors.js";
 import {
+  AMBIGUOUS_SHEET_CLEANUP_HORIZON_MS,
+  AMBIGUOUS_SHEET_NO_FILE_OBSERVATIONS,
   MAX_RECONCILIATION_ATTEMPTS,
   RESOURCE_LEASE_MS,
 } from "./config.js";
@@ -15,6 +17,7 @@ import type {
   TeamDocument,
   UpdateTeamInput,
 } from "./models.js";
+import { stableEmailOwnershipId } from "./security.js";
 import { assertPrimaryMember } from "./validation.js";
 
 export async function assertPrimaryEmailUnowned(
@@ -92,66 +95,77 @@ export async function persistNewTeam(
 
   try {
     await db.runTransaction(async (transaction) => {
-    const [teamSnapshot, ownerSnapshot, sagaSnapshot, emailOwnerSnapshot] = await Promise.all([
-      transaction.get(teamReference),
-      transaction.get(ownerReference),
-      saga ? transaction.get(saga.reference) : Promise.resolve(undefined),
-      emailOwnerReference
-        ? transaction.get(emailOwnerReference)
-        : Promise.resolve(undefined),
-    ]);
-    if (
-      isExactCommittedState(
-        teamSnapshot,
-        ownerSnapshot,
-        sagaSnapshot,
-        emailOwnerSnapshot,
-      )
-    ) {
-      return;
-    }
-    if (teamSnapshot.exists || ownerSnapshot.exists || emailOwnerSnapshot?.exists) {
-      throw new AppError(
-        "already-exists",
-        "This account already owns a team.",
-        "conflict",
-      );
-    }
-    transaction.create(teamReference, {
-      ...team,
-      createdAt: FieldValue.serverTimestamp(),
-      updatedAt: FieldValue.serverTimestamp(),
-    });
-    transaction.create(ownerReference, {
-      teamId: team.teamId,
-      createdAt: FieldValue.serverTimestamp(),
-    });
-    if (emailOwnerReference) {
-      transaction.create(emailOwnerReference, {
-        teamId: team.teamId,
-        ownerUid: team.ownerUid,
-        createdAt: FieldValue.serverTimestamp(),
-      });
-    }
-    if (saga) {
-      if (!sagaSnapshot?.exists || sagaSnapshot.get("leaseId") !== saga.leaseId) {
+      const [teamSnapshot, ownerSnapshot, sagaSnapshot, emailOwnerSnapshot] =
+        await Promise.all([
+          transaction.get(teamReference),
+          transaction.get(ownerReference),
+          saga ? transaction.get(saga.reference) : Promise.resolve(undefined),
+          emailOwnerReference
+            ? transaction.get(emailOwnerReference)
+            : Promise.resolve(undefined),
+        ]);
+      if (
+        isExactCommittedState(
+          teamSnapshot,
+          ownerSnapshot,
+          sagaSnapshot,
+          emailOwnerSnapshot,
+        )
+      ) {
+        return;
+      }
+      if (
+        teamSnapshot.exists ||
+        ownerSnapshot.exists ||
+        emailOwnerSnapshot?.exists
+      ) {
         throw new AppError(
-          "aborted",
-          "Registration processing was superseded. Please retry.",
+          "already-exists",
+          "This account already owns a team.",
           "conflict",
         );
       }
-      transaction.update(saga.reference, {
-        state: "email_pending",
-        teamId: team.teamId,
-        teamNumber: team.teamNumber,
-        ownerUid: team.ownerUid,
-        sheetId: team.sheetId,
-        sheetUrl: team.sheetUrl,
-        emailStatus: "pending",
+      transaction.create(teamReference, {
+        ...team,
+        createdAt: FieldValue.serverTimestamp(),
         updatedAt: FieldValue.serverTimestamp(),
       });
-    }
+      transaction.create(ownerReference, {
+        teamId: team.teamId,
+        createdAt: FieldValue.serverTimestamp(),
+      });
+      if (emailOwnerReference) {
+        transaction.create(emailOwnerReference, {
+          teamId: team.teamId,
+          ownerUid: team.ownerUid,
+          createdAt: FieldValue.serverTimestamp(),
+        });
+      }
+      if (saga) {
+        if (
+          !sagaSnapshot?.exists ||
+          sagaSnapshot.get("leaseId") !== saga.leaseId
+        ) {
+          throw new AppError(
+            "aborted",
+            "Registration processing was superseded. Please retry.",
+            "conflict",
+          );
+        }
+        transaction.update(saga.reference, {
+          state: "email_pending",
+          teamId: team.teamId,
+          teamNumber: team.teamNumber,
+          ownerUid: team.ownerUid,
+          sheetId: team.sheetId,
+          sheetUrl: team.sheetUrl,
+          ...(normalizedEmailHash
+            ? { emailOwnershipId: normalizedEmailHash }
+            : {}),
+          emailStatus: "pending",
+          updatedAt: FieldValue.serverTimestamp(),
+        });
+      }
     });
   } catch (error: unknown) {
     // Firestore may commit and then return an ambiguous transport error. Verify
@@ -187,15 +201,39 @@ export async function deleteTeamResources(
 ): Promise<void> {
   const teamReference = db.collection("teams").doc(teamId);
   const ownerReference = db.collection("teamOwners").doc(ownerUid);
+  const requestReference = db
+    .collection("registrationRequests")
+    .doc(registrationRequestId);
   await db.runTransaction(async (transaction) => {
-    const [teamSnapshot, ownerSnapshot] = await Promise.all([
+    const [teamSnapshot, ownerSnapshot, requestSnapshot] = await Promise.all([
       transaction.get(teamReference),
       transaction.get(ownerReference),
+      transaction.get(requestReference),
     ]);
     const matchingTeam =
       teamSnapshot.exists &&
       teamSnapshot.get("registrationRequestId") === registrationRequestId &&
       teamSnapshot.get("ownerUid") === ownerUid;
+    const primaryContactEmail: unknown = matchingTeam
+      ? teamSnapshot.get("primaryContactEmail")
+      : undefined;
+    const storedEmailOwnershipId: unknown = requestSnapshot.exists
+      ? requestSnapshot.get("cleanupEmailOwnershipId") ??
+        requestSnapshot.get("emailOwnershipId")
+      : undefined;
+    const emailOwnershipId =
+      typeof primaryContactEmail === "string"
+        ? stableEmailOwnershipId(primaryContactEmail)
+        : typeof storedEmailOwnershipId === "string"
+          ? storedEmailOwnershipId
+          : undefined;
+    const emailOwnerReference = emailOwnershipId
+      ? db.collection("teamEmails").doc(emailOwnershipId)
+      : undefined;
+    const emailOwnerSnapshot = emailOwnerReference
+      ? await transaction.get(emailOwnerReference)
+      : undefined;
+
     if (matchingTeam) transaction.delete(teamReference);
     if (
       ownerSnapshot.exists &&
@@ -203,6 +241,15 @@ export async function deleteTeamResources(
       (matchingTeam || !teamSnapshot.exists)
     ) {
       transaction.delete(ownerReference);
+    }
+    if (
+      emailOwnerReference &&
+      emailOwnerSnapshot?.exists &&
+      emailOwnerSnapshot.get("teamId") === teamId &&
+      emailOwnerSnapshot.get("ownerUid") === ownerUid &&
+      (matchingTeam || !teamSnapshot.exists)
+    ) {
+      transaction.delete(emailOwnerReference);
     }
   });
 }
@@ -294,6 +341,93 @@ export async function commitTeamUpdate(
 export interface SheetSynchronizationClaim {
   leaseId: string;
   team: TeamDocument;
+}
+
+export type SheetProvisioningMutation =
+  | { state: "complete"; team: TeamDocument }
+  | { state: "lost" };
+
+export async function markTeamSpreadsheetCreateAttempt(
+  db: Firestore,
+  teamId: string,
+  leaseId: string,
+  now = Date.now(),
+): Promise<SheetProvisioningMutation> {
+  const reference = db.collection("teams").doc(teamId);
+  return db.runTransaction(async (transaction) => {
+    const snapshot = await transaction.get(reference);
+    if (!snapshot.exists || snapshot.get("sheetSyncLeaseId") !== leaseId) {
+      return { state: "lost" };
+    }
+    const current = asTeamDocument(snapshot.data() ?? {});
+    if (typeof current.sheetId === "string" && current.sheetId.length > 0) {
+      return { state: "complete", team: current };
+    }
+    const existingAttempt = current.sheetCreateAttemptedAt;
+    const attemptedAt =
+      existingAttempt instanceof Timestamp
+        ? existingAttempt
+        : Timestamp.fromMillis(now);
+    if (!(existingAttempt instanceof Timestamp)) {
+      transaction.update(reference, {
+        sheetCreateAttemptedAt: attemptedAt,
+        sheetCreateNoFileObservationCount: 0,
+      });
+    }
+    return {
+      state: "complete",
+      team: {
+        ...current,
+        sheetCreateAttemptedAt: attemptedAt,
+        sheetCreateNoFileObservationCount:
+          typeof current.sheetCreateNoFileObservationCount === "number"
+            ? current.sheetCreateNoFileObservationCount
+            : 0,
+      },
+    };
+  });
+}
+
+export async function attachTeamSpreadsheet(
+  db: Firestore,
+  teamId: string,
+  leaseId: string,
+  sheetId: string,
+  sheetUrl: string,
+): Promise<SheetProvisioningMutation> {
+  const reference = db.collection("teams").doc(teamId);
+  return db.runTransaction(async (transaction) => {
+    const snapshot = await transaction.get(reference);
+    if (!snapshot.exists || snapshot.get("sheetSyncLeaseId") !== leaseId) {
+      return { state: "lost" };
+    }
+    const current = asTeamDocument(snapshot.data() ?? {});
+    if (
+      typeof current.sheetId === "string" &&
+      current.sheetId.length > 0 &&
+      current.sheetId !== sheetId
+    ) {
+      throw new AppError(
+        "internal",
+        "The team spreadsheet changed during provisioning.",
+        "internal",
+      );
+    }
+    transaction.update(reference, {
+      sheetId,
+      sheetUrl,
+      sheetCreateNoFileObservationCount: 0,
+    });
+    return {
+      state: "complete",
+      team: {
+        ...current,
+        sheetId,
+        sheetUrl,
+        sheetCreateNoFileObservationCount: 0,
+      },
+    };
+  });
 }
 
 export async function claimSheetSynchronization(
@@ -388,6 +522,12 @@ export async function failClaimedSheetSynchronization(
   teamId: string,
   leaseId: string,
   safeCategory: string,
+  options: {
+    ambiguousCreatePending?: boolean;
+    ambiguousCreateNoFileObserved?: boolean;
+    definitiveCreateRejected?: boolean;
+    now?: number;
+  } = {},
 ): Promise<"pending" | "failed"> {
   const reference = db.collection("teams").doc(teamId);
   return db.runTransaction(async (transaction) => {
@@ -397,18 +537,54 @@ export async function failClaimedSheetSynchronization(
     }
     const existingCount: unknown = snapshot.get("sheetSyncRetryCount");
     const retryCount = (typeof existingCount === "number" ? existingCount : 0) + 1;
+    const sheetId: unknown = snapshot.get("sheetId");
+    const provisioning = typeof sheetId !== "string" || sheetId.length === 0;
+    const recoverableCategory =
+      isRetryableSafeCategory(safeCategory) ||
+      safeCategory === "google_configuration";
     const status =
-      isRetryableSafeCategory(safeCategory) &&
-      retryCount < MAX_RECONCILIATION_ATTEMPTS
+      provisioning && options.ambiguousCreatePending === true
+      ? "pending"
+      : recoverableCategory && retryCount < MAX_RECONCILIATION_ATTEMPTS
         ? "pending"
         : "failed";
+    const existingObservationCount: unknown = snapshot.get(
+      "sheetCreateNoFileObservationCount",
+    );
+    const noFileObservationCount = options.ambiguousCreateNoFileObserved
+      ? (typeof existingObservationCount === "number"
+          ? existingObservationCount
+          : 0) + 1
+      : typeof existingObservationCount === "number"
+        ? existingObservationCount
+        : 0;
+    const attemptedAt: unknown = snapshot.get("sheetCreateAttemptedAt");
+    const ambiguityHorizonPassed =
+      attemptedAt instanceof Timestamp &&
+      (options.now ?? Date.now()) - attemptedAt.toMillis() >=
+        AMBIGUOUS_SHEET_CLEANUP_HORIZON_MS;
+    const clearAmbiguousCreateFence =
+      provisioning &&
+      options.ambiguousCreateNoFileObserved === true &&
+      ambiguityHorizonPassed &&
+      noFileObservationCount >= AMBIGUOUS_SHEET_NO_FILE_OBSERVATIONS;
+    const clearCreateFence =
+      clearAmbiguousCreateFence ||
+      (provisioning && options.definitiveCreateRejected === true);
     transaction.update(reference, {
       sheetSyncStatus: status,
       sheetSyncLastAttemptAt: FieldValue.serverTimestamp(),
-      sheetSyncRetryCount: retryCount,
+      // Reset accumulated ambiguity observations after the conservative
+      // horizon. A definitive rejected request clears only the create fence;
+      // its retry count must continue toward the global bounded cap.
+      sheetSyncRetryCount: clearAmbiguousCreateFence ? 0 : retryCount,
       sheetSyncSafeErrorCategory: safeCategory,
       sheetSyncLeaseId: null,
       sheetSyncLeaseExpiresAt: null,
+      sheetCreateAttemptedAt: clearCreateFence ? null : attemptedAt ?? null,
+      sheetCreateNoFileObservationCount: clearCreateFence
+        ? 0
+        : noFileObservationCount,
     });
     return status;
   });
@@ -482,7 +658,8 @@ export async function finishRegistrationEmailAttempt(
     const status =
       outcome === "sent"
         ? "sent"
-        : isRetryableSafeCategory(safeCategory ?? "") &&
+        : (safeCategory === "google_configuration" ||
+              isRetryableSafeCategory(safeCategory ?? "")) &&
             retryCount < MAX_RECONCILIATION_ATTEMPTS
           ? "pending"
           : "failed";
@@ -503,6 +680,133 @@ export async function finishRegistrationEmailAttempt(
       updatedAt: FieldValue.serverTimestamp(),
     });
     return status;
+  });
+}
+
+function isFailedRevivalEligible(
+  snapshot: { get(field: string): unknown },
+  statusField: string,
+  lastAttemptField: string,
+  categoryField: string,
+  cutoffMs: number,
+): boolean {
+  const lastAttemptAt = snapshot.get(lastAttemptField);
+  const category = snapshot.get(categoryField);
+  return (
+    snapshot.get(statusField) === "failed" &&
+    lastAttemptAt instanceof Timestamp &&
+    lastAttemptAt.toMillis() <= cutoffMs &&
+    (category === "transient" || category === "google_transient")
+  );
+}
+
+/**
+ * Reopens one old transient terminal failure at the final retry count. A
+ * failed recovery probe therefore returns directly to the 24-hour backoff
+ * instead of entering another rapid retry burst.
+ */
+export async function reviveFailedSheetSynchronization(
+  db: Firestore,
+  teamId: string,
+  cutoffMs: number,
+): Promise<boolean> {
+  const reference = db.collection("teams").doc(teamId);
+  return db.runTransaction(async (transaction) => {
+    const snapshot = await transaction.get(reference);
+    if (
+      !snapshot.exists ||
+      !isFailedRevivalEligible(
+        snapshot,
+        "sheetSyncStatus",
+        "sheetSyncLastAttemptAt",
+        "sheetSyncSafeErrorCategory",
+        cutoffMs,
+      )
+    ) {
+      return false;
+    }
+    transaction.update(reference, {
+      sheetSyncStatus: "pending",
+      sheetSyncRetryCount: MAX_RECONCILIATION_ATTEMPTS - 1,
+      sheetSyncLeaseId: null,
+      sheetSyncLeaseExpiresAt: null,
+    });
+    return true;
+  });
+}
+
+export async function reviveFailedRegistrationEmail(
+  db: Firestore,
+  teamId: string,
+  cutoffMs: number,
+): Promise<boolean> {
+  const teamReference = db.collection("teams").doc(teamId);
+  return db.runTransaction(async (transaction) => {
+    const teamSnapshot = await transaction.get(teamReference);
+    if (
+      !teamSnapshot.exists ||
+      teamSnapshot.get("registrationEmailRetryIneligible") === true ||
+      !isFailedRevivalEligible(
+        teamSnapshot,
+        "registrationEmailStatus",
+        "registrationEmailLastAttemptAt",
+        "registrationEmailSafeErrorCategory",
+        cutoffMs,
+      )
+    ) {
+      return false;
+    }
+    const registrationRequestId: unknown = teamSnapshot.get(
+      "registrationRequestId",
+    );
+    if (typeof registrationRequestId !== "string") return false;
+    const requestReference = db
+      .collection("registrationRequests")
+      .doc(registrationRequestId);
+    const requestSnapshot = await transaction.get(requestReference);
+    if (!requestSnapshot.exists) return false;
+    transaction.update(teamReference, {
+      registrationEmailStatus: "pending",
+      registrationEmailRetryCount: MAX_RECONCILIATION_ATTEMPTS - 1,
+      registrationEmailLeaseId: null,
+      registrationEmailLeaseExpiresAt: null,
+    });
+    transaction.update(requestReference, {
+      state: "email_pending",
+      emailStatus: "pending",
+      updatedAt: FieldValue.serverTimestamp(),
+    });
+    return true;
+  });
+}
+
+export async function reviveFailedCleanup(
+  db: Firestore,
+  registrationRequestId: string,
+  cutoffMs: number,
+): Promise<boolean> {
+  const reference = db
+    .collection("registrationRequests")
+    .doc(registrationRequestId);
+  return db.runTransaction(async (transaction) => {
+    const snapshot = await transaction.get(reference);
+    if (
+      !snapshot.exists ||
+      !isFailedRevivalEligible(
+        snapshot,
+        "cleanupState",
+        "cleanupLastAttemptAt",
+        "cleanupSafeErrorCategory",
+        cutoffMs,
+      )
+    ) {
+      return false;
+    }
+    transaction.update(reference, {
+      cleanupState: "pending",
+      cleanupRetryCount: MAX_RECONCILIATION_ATTEMPTS - 1,
+    });
+    return true;
   });
 }
 

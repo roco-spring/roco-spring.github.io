@@ -59,6 +59,8 @@ function externalErrorDetails(error: unknown): {
     const reason = (item as Record<string, unknown>).reason;
     return typeof reason === "string" ? [reason] : [];
   });
+  const oauthError = responseData?.error;
+  if (typeof oauthError === "string") reasons.push(oauthError);
   return {
     looksExternal:
       status !== undefined ||
@@ -74,6 +76,12 @@ function externalErrorDetails(error: unknown): {
 export function toHttpsError(error: unknown): HttpsError {
   if (error instanceof HttpsError) return error;
   if (error instanceof AppError) return new HttpsError(error.code, error.message);
+  if (isRetryableSafeCategory(safeErrorCategory(error))) {
+    return new HttpsError(
+      "unavailable",
+      "A required service is temporarily unavailable. Please retry safely.",
+    );
+  }
   return new HttpsError("internal", "The operation could not be completed.");
 }
 
@@ -108,12 +116,34 @@ export function safeErrorCategory(error: unknown): SafeErrorCategory {
       return "transient";
     }
   }
-  const { looksExternal, status } = externalErrorDetails(error);
+  const { looksExternal, status, code, reasons } = externalErrorDetails(error);
   if (looksExternal) {
     if (isTransientExternalError(error)) {
       return "google_transient";
     }
-    if (status === 401 || status === 403) return "google_configuration";
+    if (
+      status === 401 ||
+      status === 403 ||
+      [code, ...reasons].some((value) =>
+        [
+          "admin_policy_enforced",
+          "invalid_grant",
+          "invalid_client",
+          "invalid_request",
+          "invalid_scope",
+          "invalid_token",
+          "unauthorized_client",
+          "unsupported_grant_type",
+          "access_denied",
+          "deleted_client",
+          "insufficient_scope",
+          "insufficientPermissions",
+          "org_internal",
+        ].includes(value),
+      )
+    ) {
+      return "google_configuration";
+    }
     return "external_permanent";
   }
   return "internal";
@@ -134,6 +164,9 @@ export function isTransientExternalError(error: unknown): boolean {
           ["rateLimitExceeded", "userRateLimitExceeded"].includes(reason),
         )) ||
       (status !== undefined && status >= 500) ||
+      reasons.some((reason) =>
+        ["server_error", "temporarily_unavailable"].includes(reason),
+      ) ||
       ["ECONNRESET", "ETIMEDOUT", "EAI_AGAIN"].includes(code))
   );
 }

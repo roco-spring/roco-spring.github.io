@@ -175,6 +175,10 @@ function syncGoogle(
   return {
     clients: {
       auth: {} as GoogleApiClients["auth"],
+      oauthScopes: [
+        "https://www.googleapis.com/auth/drive.file",
+        "https://www.googleapis.com/auth/gmail.send",
+      ],
       drive: {
         files: {
           update: rename,
@@ -201,7 +205,7 @@ function syncGoogle(
 }
 
 describe("sheet synchronization fencing", () => {
-  it("serializes writers and repairs to the newest Firestore revision", async () => {
+  it("serializes writers and performs only one spreadsheet pass per claim", async () => {
     const fake = new FakeFirestore();
     seed(fake);
     const db = fake as unknown as Firestore;
@@ -240,9 +244,24 @@ describe("sheet synchronization fencing", () => {
     expect(competingGoogle.rename).not.toHaveBeenCalled();
 
     blocked.resolve();
-    await expect(first).resolves.toBe("synced");
-    expect(firstGoogle.details).toHaveLength(2);
-    const finalWrite = JSON.stringify(firstGoogle.details.at(-1));
+    await expect(first).resolves.toBe("pending");
+    expect(firstGoogle.details).toHaveLength(1);
+    expect(fake.read("teams/RoCo-1")).toMatchObject({
+      revision: 3,
+      sheetSyncStatus: "pending",
+      sheetSyncLeaseId: null,
+    });
+
+    await expect(
+      synchronizeLatestTeamOperation(
+        db,
+        competingGoogle.clients,
+        "RoCo-1",
+        "Reconciliation",
+      ),
+    ).resolves.toBe("synced");
+    expect(competingGoogle.details).toHaveLength(1);
+    const finalWrite = JSON.stringify(competingGoogle.details.at(-1));
     expect(finalWrite).toContain("Revision Three");
     expect(finalWrite).toContain("3");
     expect(fake.read("teams/RoCo-1")).toMatchObject({

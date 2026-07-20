@@ -2,6 +2,7 @@ import { randomBytes } from "node:crypto";
 import type { gmail_v1 } from "googleapis";
 import { EMAIL_REPLY_TO, EMAIL_SENDER } from "./config.js";
 import { AppError } from "./errors.js";
+import { GOOGLE_API_REQUEST_OPTIONS } from "./google-retry.js";
 import { registrationEmailContent } from "./email-templates.js";
 import type { TeamDocument } from "./models.js";
 
@@ -65,5 +66,5 @@ export async function sendRegistrationEmail(
   await gmail.users.messages.send({
       userId: "me",
       requestBody: { raw },
-    });
+    }, GOOGLE_API_REQUEST_OPTIONS);
 }

@@ -51,6 +51,60 @@
           "order": "ASCENDING"
         },
         {
+          "fieldPath": "sheetSyncSafeErrorCategory",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "sheetSyncLastAttemptAt",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "teams",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "registrationEmailStatus",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "registrationEmailSafeErrorCategory",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "registrationEmailLastAttemptAt",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "registrationRequests",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "cleanupState",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "cleanupSafeErrorCategory",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "cleanupLastAttemptAt",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "teams",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "sheetSyncStatus",
+          "order": "ASCENDING"
+        },
+        {
           "fieldPath": "sheetAuditAt",
           "order": "ASCENDING"
         }

@@ -286,7 +286,7 @@ test("backend smoke gate has an exact deployment inventory and safe URL boundary
     );
     assert.match(
         packageConfig.scripts["deploy:production"],
-        /deploy:firebase && npm run backend:smoke(?: &&|$)/u
+        /google:health:latest && npm run deploy:firebase && npm run google:health:bound && npm run backend:smoke(?: &&|$)/u
     );
 
     assert.equal(normalizeBaseUrl("https://example.test///"), "https://example.test");

@@ -53,6 +53,36 @@ describe("registration idempotency", () => {
     ).toHaveLength(1);
   });
 
+  it("backfills the cleanup email hash when reacquiring a legacy saga", async () => {
+    const fake = new FakeFirestore();
+    const db = fake as unknown as Firestore;
+    const first = await reserveRegistration(
+      db,
+      "legacy-without-email-ownership",
+      "a".repeat(64),
+      "b".repeat(64),
+      0,
+    );
+    fake.update(first.reference.path, {
+      leaseExpiresAt: Timestamp.fromMillis(0),
+    });
+
+    const reacquired = await reserveRegistration(
+      db,
+      "legacy-without-email-ownership",
+      "a".repeat(64),
+      "b".repeat(64),
+      1,
+      undefined,
+      "stable-email-ownership-id",
+    );
+
+    expect(reacquired.emailOwnershipId).toBe("stable-email-ownership-id");
+    expect(fake.read(first.reference.path)?.emailOwnershipId).toBe(
+      "stable-email-ownership-id",
+    );
+  });
+
   it("does not overwrite a saga owned by a newer lease when marking failure", async () => {
     const fake = new FakeFirestore();
     const reservation = await reserveRegistration(
@@ -129,7 +159,7 @@ describe("registration idempotency", () => {
     expect(fake.read(first.reference.path)?.state).toBe("allocating");
   });
 
-  it("makes stale cleanup terminal before a later client can reacquire", async () => {
+  it("blocks while stale cleanup is pending, then revives the same safe attempt", async () => {
     const fake = new FakeFirestore();
     const db = fake as unknown as Firestore;
     const reservation = await reserveRegistration(
@@ -143,6 +173,8 @@ describe("registration idempotency", () => {
       updatedAt: Timestamp.fromMillis(0),
       leaseExpiresAt: Timestamp.fromMillis(0),
       sheetCreateAttemptedAt: Timestamp.fromMillis(1),
+      teamId: "RoCo-17",
+      teamNumber: 17,
     });
 
     await expect(
@@ -166,11 +198,117 @@ describe("registration idempotency", () => {
         "b".repeat(64),
         700_001,
       ),
+    ).rejects.toMatchObject({ code: "aborted" });
+
+    fake.update(reservation.reference.path, { cleanupState: "complete" });
+    const revived = await reserveRegistration(
+      db,
+      "key-cleanup-wins",
+      "a".repeat(64),
+      "b".repeat(64),
+      700_002,
+    );
+    expect(revived).toMatchObject({
+      requestId: reservation.requestId,
+      state: "allocating",
+      isNew: false,
+      teamId: "RoCo-17",
+      teamNumber: 17,
+    });
+    expect(revived.leaseId).not.toBe(reservation.leaseId);
+    expect(fake.read(reservation.reference.path)).toMatchObject({
+      state: "allocating",
+      teamId: "RoCo-17",
+      teamNumber: 17,
+    });
+    expect(fake.read(reservation.reference.path)).not.toHaveProperty(
+      "cleanupState",
+    );
+  });
+
+  it.each(["google_transient", "google_configuration"])(
+    "revives a fully cleaned %s failure",
+    async (safeCategory) => {
+      const fake = new FakeFirestore();
+      const db = fake as unknown as Firestore;
+      const reservation = await reserveRegistration(
+        db,
+        `key-${safeCategory}`,
+        "a".repeat(64),
+        "b".repeat(64),
+        1_000,
+      );
+      await markRegistrationFailed(db, reservation, safeCategory, {
+        required: false,
+      });
+
+      await expect(
+        reserveRegistration(
+          db,
+          `key-${safeCategory}`,
+          "a".repeat(64),
+          "b".repeat(64),
+          2_000,
+        ),
+      ).resolves.toMatchObject({ state: "allocating", isNew: false });
+    },
+  );
+
+  it("keeps unsafe failed attempts terminal", async () => {
+    const fake = new FakeFirestore();
+    const db = fake as unknown as Firestore;
+    const reservation = await reserveRegistration(
+      db,
+      "key-unsafe-failure",
+      "a".repeat(64),
+      "b".repeat(64),
+      1_000,
+    );
+    await markRegistrationFailed(db, reservation, "external_permanent", {
+      required: false,
+    });
+
+    await expect(
+      reserveRegistration(
+        db,
+        "key-unsafe-failure",
+        "a".repeat(64),
+        "b".repeat(64),
+        2_000,
+      ),
     ).rejects.toMatchObject({ code: "failed-precondition" });
   });
 });
 
 describe("transactional rate limits", () => {
+  it("does not increment rate limits when reviving the same cleaned request", async () => {
+    const fake = new FakeFirestore();
+    const db = fake as unknown as Firestore;
+    const reservation = await reserveRegistration(
+      db,
+      "same-cleaned-request",
+      "a".repeat(64),
+      "normalized-email",
+      100_000,
+      { ip: "same-ip", email: "same-email" },
+    );
+    await markRegistrationFailed(db, reservation, "transient", {
+      required: false,
+    });
+
+    await reserveRegistration(
+      db,
+      "same-cleaned-request",
+      "a".repeat(64),
+      "normalized-email",
+      100_001,
+      { ip: "same-ip", email: "same-email" },
+    );
+
+    expect(fake.read("rateLimits/ip_same-ip")?.count).toBe(1);
+    expect(fake.read("rateLimits/email_same-email")?.count).toBe(1);
+  });
+
   it("permits five IP attempts per hour and rejects the sixth", async () => {
     const fake = new FakeFirestore();
     const db = fake as unknown as Firestore;

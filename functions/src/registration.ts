@@ -1,21 +1,11 @@
 import type { Auth, UserRecord } from "firebase-admin/auth";
 import { Timestamp, type Firestore } from "firebase-admin/firestore";
 import { logger } from "firebase-functions";
-import type { GoogleApiClients } from "./google-auth.js";
 import {
   AppError,
   isRetryableSafeCategory,
   safeErrorCategory,
 } from "./errors.js";
-import { sendRegistrationEmail } from "./gmail.js";
-import {
-  deleteTeamSpreadsheet,
-  findOrCreateTeamSpreadsheet,
-  renameTeamSpreadsheet,
-  SpreadsheetProvisioningError,
-  verifyPrivateTeamSpreadsheet,
-} from "./google-drive.js";
-import { synchronizeTeamSpreadsheet } from "./google-sheets.js";
 import {
   advanceRegistration,
   inspectRegistration,
@@ -38,8 +28,6 @@ import { allocateTeamIdentity } from "./team-id.js";
 import {
   deleteTeamResources,
   assertPrimaryEmailUnowned,
-  claimRegistrationEmailAttempt,
-  finishRegistrationEmailAttempt,
   persistNewTeam,
 } from "./team-repository.js";
 import { canonicalRegistrationHash } from "./validation.js";
@@ -47,7 +35,6 @@ import { canonicalRegistrationHash } from "./validation.js";
 export interface RegistrationDependencies {
   db: Firestore;
   adminAuth: Auth;
-  google: GoogleApiClients;
   rateLimitHmacSecret: string;
 }
 
@@ -167,7 +154,7 @@ export async function registerTeamOperation(
   input: RegistrationInput,
   requestIp: string | undefined,
 ): Promise<RegistrationSafeResult> {
-  const { db, adminAuth, google, rateLimitHmacSecret } = dependencies;
+  const { db, adminAuth, rateLimitHmacSecret } = dependencies;
   const requestHash = canonicalRegistrationHash(input);
   const emailDigest = hmacIdentifier(
     rateLimitHmacSecret,
@@ -193,15 +180,18 @@ export async function registerTeamOperation(
     emailDigest,
     Date.now(),
     { ip: ipDigest, email: emailDigest },
+    emailOwnershipId,
   );
   if (reservation.result) return reservation.result;
 
   let ownerUid = reservation.ownerUid;
-  let sheetId = reservation.sheetId;
-  let corePersisted = false;
+  const sheetId = reservation.sheetId;
+  let stage = "email_ownership";
+  const startedAt = Date.now();
   try {
     await assertPrimaryEmailUnowned(db, emailOwnershipId);
 
+    stage = "team_identity";
     const identity =
       reservation.teamId && reservation.teamNumber
         ? { teamId: reservation.teamId, teamNumber: reservation.teamNumber }
@@ -209,6 +199,7 @@ export async function registerTeamOperation(
 
     // A plaintext temporary credential exists only in this invocation's memory.
     const temporaryPassword = generateTemporaryPassword();
+    stage = "authentication";
     if (reservation.state === "allocating") {
       const user = await createRegistrationUser(
         adminAuth,
@@ -225,45 +216,14 @@ export async function registerTeamOperation(
       throw new Error("Registration owner state is incomplete.");
     }
 
-    let spreadsheet: Awaited<ReturnType<typeof findOrCreateTeamSpreadsheet>>;
-    if (reservation.sheetId) {
-      const verified = await verifyPrivateTeamSpreadsheet(
-        google.drive,
-        reservation.sheetId,
-        reservation.requestId,
-      );
-      spreadsheet = {
-        id: reservation.sheetId,
-        url: verified.url,
-        wasCreated: false,
-      };
-    } else {
-      const allowCreate = reservation.sheetCreateAttemptedAt === undefined;
-      if (allowCreate) {
-        const sheetCreateAttemptedAt = Timestamp.now();
-        await advanceRegistration(db, reservation, reservation.state, {
-          sheetCreateAttemptedAt,
-        });
-        reservation.sheetCreateAttemptedAt = sheetCreateAttemptedAt;
-      }
-      spreadsheet = await findOrCreateTeamSpreadsheet(
-        google.drive,
-        reservation.requestId,
-        identity.teamId,
-        input.teamName,
-        allowCreate,
-      );
-    }
-    sheetId = spreadsheet.id;
-    reservation.sheetId = spreadsheet.id;
-    if (reservation.state === "auth_created") {
-      await advanceRegistration(db, reservation, "sheet_created", {
-        sheetId: spreadsheet.id,
-        sheetUrl: spreadsheet.url,
-      });
-    }
-
     const now = Timestamp.now();
+    // Firestore is the authoritative registration record. Drive/Sheets are
+    // deliberately provisioned after this transaction by the reconciler so a
+    // Google outage cannot roll back a valid Auth account and team.
+    const legacySheetId = reservation.sheetId ?? null;
+    const legacySheetUrl = legacySheetId
+      ? `https://docs.google.com/spreadsheets/d/${encodeURIComponent(legacySheetId)}/edit`
+      : null;
     const team: TeamDocument = {
       teamId: identity.teamId,
       teamNumber: identity.teamNumber,
@@ -276,11 +236,13 @@ export async function registerTeamOperation(
       updatedAt: now,
       revision: 1,
       status: "active",
-      sheetId: spreadsheet.id,
-      sheetUrl: spreadsheet.url,
-      sheetSyncStatus: "synced",
-      sheetLastSyncedRevision: 1,
-      sheetSyncLastAttemptAt: now,
+      sheetId: legacySheetId,
+      sheetUrl: legacySheetUrl,
+      sheetCreateAttemptedAt: reservation.sheetCreateAttemptedAt ?? null,
+      sheetCreateNoFileObservationCount: 0,
+      sheetSyncStatus: "pending",
+      sheetLastSyncedRevision: 0,
+      sheetSyncLastAttemptAt: null,
       sheetSyncRetryCount: 0,
       sheetSyncLeaseId: null,
       sheetSyncLeaseExpiresAt: null,
@@ -293,131 +255,90 @@ export async function registerTeamOperation(
       registrationEmailRetryIneligible: false,
       registrationRequestId: reservation.requestId,
     };
-    await renameTeamSpreadsheet(
-      google.drive,
-      spreadsheet.id,
-      identity.teamId,
-      input.teamName,
-    );
-    await synchronizeTeamSpreadsheet(google.sheets, team, "Registration");
+    stage = "team_persistence";
     await persistNewTeam(db, team, {
       reference: reservation.reference,
       leaseId: reservation.leaseId,
     }, emailOwnershipId);
     reservation.state = "email_pending";
-    corePersisted = true;
-
-    const emailClaim = await claimRegistrationEmailAttempt(db, team.teamId);
-    if (!emailClaim) {
-      return { teamId: team.teamId, emailStatus: "pending" };
-    }
-    try {
-      await sendRegistrationEmail(google.gmail, team, temporaryPassword);
-      const emailStatus = await finishRegistrationEmailAttempt(
-        db,
-        team.teamId,
-        emailClaim.leaseId,
-        "sent",
-      );
-      logger.info("Registration activated", {
-        operation: "registerTeam",
-        teamId: team.teamId,
-        status: "active",
-      });
-      return { teamId: team.teamId, emailStatus };
-    } catch (error: unknown) {
-      const category = safeErrorCategory(error);
-      const emailStatus = await finishRegistrationEmailAttempt(
-        db,
-        team.teamId,
-        emailClaim.leaseId,
-        "failed",
-        category,
-      );
-      logger.warn("Registration email deferred", {
-        operation: "registerTeam",
-        teamId: team.teamId,
-        status: "email_pending",
-        errorCategory: category,
-      });
-      return { teamId: team.teamId, emailStatus };
-    }
+    logger.info("Registration core committed", {
+      operation: "registerTeam",
+      teamId: team.teamId,
+      status: "email_pending",
+      durationMs: Date.now() - startedAt,
+    });
+    return { teamId: team.teamId, emailStatus: "pending" };
   } catch (error: unknown) {
-    if (error instanceof SpreadsheetProvisioningError) {
-      sheetId = error.fileId;
-    }
     const category = safeErrorCategory(error);
-    if (!corePersisted) {
-      if (isRetryableSafeCategory(category)) {
-        try {
-          await releaseRegistrationForRetry(db, reservation, category);
-        } catch (releaseError: unknown) {
-          logger.warn("Registration retry lease release deferred", {
-            operation: "registerTeam",
-            teamId: reservation.teamId ?? null,
-            status: reservation.state,
-            errorCategory: safeErrorCategory(releaseError),
-          });
-        }
-        logger.warn("Registration deferred for idempotent retry", {
+    if (isRetryableSafeCategory(category)) {
+      try {
+        await releaseRegistrationForRetry(db, reservation, category);
+      } catch (releaseError: unknown) {
+        logger.warn("Registration retry lease release deferred", {
           operation: "registerTeam",
           teamId: reservation.teamId ?? null,
           status: reservation.state,
-          errorCategory: category,
+          stage,
+          errorCategory: safeErrorCategory(releaseError),
         });
-        throw error;
       }
-      const cleanupOwnerUid =
-        ownerUid ?? reservation.ownerUid ?? `roco_${reservation.requestId}`;
-      let cleanupRequired = false;
-      if (reservation.teamId) {
-        try {
-          await deleteTeamResources(
-            db,
-            reservation.teamId,
-            cleanupOwnerUid,
-            reservation.requestId,
-          );
-        } catch {
-          cleanupRequired = true;
-        }
-      }
-      if (sheetId) {
-        try {
-          await deleteTeamSpreadsheet(google.drive, sheetId);
-        } catch {
-          cleanupRequired = true;
-        }
-      }
-      try {
-        await adminAuth.deleteUser(cleanupOwnerUid);
-      } catch (deleteError: unknown) {
-        if (
-          typeof deleteError !== "object" ||
-          deleteError === null ||
-          !("code" in deleteError) ||
-          deleteError.code !== "auth/user-not-found"
-        ) {
-          cleanupRequired = true;
-        }
-      }
-      await markRegistrationFailed(db, reservation, category, {
-        required:
-          cleanupRequired || reservation.sheetCreateAttemptedAt !== undefined,
-        ownerUid: cleanupOwnerUid,
-        ...(sheetId ? { sheetId } : {}),
-        ...(reservation.teamId ? { teamId: reservation.teamId } : {}),
-        ambiguousSheet: reservation.sheetCreateAttemptedAt !== undefined,
-        ...(reservation.sheetCreateAttemptedAt
-          ? { sheetCreateAttemptedAt: reservation.sheetCreateAttemptedAt }
-          : {}),
+      logger.warn("Registration deferred for idempotent retry", {
+        operation: "registerTeam",
+        teamId: reservation.teamId ?? null,
+        status: reservation.state,
+        stage,
+        errorCategory: category,
       });
+      throw error;
     }
+    const cleanupOwnerUid =
+      ownerUid ?? reservation.ownerUid ?? `roco_${reservation.requestId}`;
+    let cleanupRequired = false;
+    if (reservation.teamId) {
+      try {
+        await deleteTeamResources(
+          db,
+          reservation.teamId,
+          cleanupOwnerUid,
+          reservation.requestId,
+        );
+      } catch {
+        cleanupRequired = true;
+      }
+    }
+    try {
+      await adminAuth.deleteUser(cleanupOwnerUid);
+    } catch (deleteError: unknown) {
+      if (
+        typeof deleteError !== "object" ||
+        deleteError === null ||
+        !("code" in deleteError) ||
+        deleteError.code !== "auth/user-not-found"
+      ) {
+        cleanupRequired = true;
+      }
+    }
+    await markRegistrationFailed(db, reservation, category, {
+      required:
+        cleanupRequired ||
+        sheetId !== undefined ||
+        reservation.sheetCreateAttemptedAt !== undefined,
+      ownerUid: cleanupOwnerUid,
+      emailOwnershipId,
+      ...(sheetId ? { sheetId } : {}),
+      ...(reservation.teamId ? { teamId: reservation.teamId } : {}),
+      ambiguousSheet: reservation.sheetCreateAttemptedAt !== undefined,
+      ...(reservation.sheetCreateAttemptedAt
+        ? { sheetCreateAttemptedAt: reservation.sheetCreateAttemptedAt }
+        : {}),
+    });
     logger.error("Registration failed", {
       operation: "registerTeam",
       teamId: reservation.teamId ?? null,
-      status: corePersisted ? "email_pending" : "failed",
+      status: "failed",
+      stage,
       errorCategory: category,
+      durationMs: Date.now() - startedAt,
     });
     throw error;
   }

@@ -129,11 +129,14 @@ test("public Firebase configuration and regional App Check setup are exact", asy
     }
 });
 
-test("frontend contains no direct account creation, direct Firestore, or manual data storage", async () => {
+test("frontend contains no direct account creation, direct Firestore, or persistent local storage", async () => {
     const javascript = `${await source("assets/firebase-config.js")}\n${await source("assets/team-registration.js")}`;
     assert.doesNotMatch(javascript, /createUserWithEmailAndPassword/u);
     assert.doesNotMatch(javascript, /firebase-firestore|from\s+["'][^"']*firestore/u);
-    assert.doesNotMatch(javascript, /\b(?:localStorage|sessionStorage)\b/u);
+    assert.doesNotMatch(javascript, /\blocalStorage\b/u);
+    assert.match(javascript, /crypto\.subtle\.digest\("SHA-256"/u);
+    assert.match(javascript, /timeout:\s*REGISTER_TEAM_TIMEOUT_MS/u);
+    assert.match(javascript, /REGISTER_TEAM_TIMEOUT_MS\s*=\s*75000/u);
 });
 
 test("production deployment disables public Auth signup/deletion and verifies email/password login", async () => {
@@ -162,6 +165,7 @@ test("production deployment disables public Auth signup/deletion and verifies em
 
 test("every production callable declares the required region, CORS allowlist, and App Check", async () => {
     const functionsIndex = await source("functions/src/index.ts");
+    const functionsConfig = await source("functions/src/config.ts");
     for (const name of [
         "registerTeam",
         "getMyTeam",
@@ -174,7 +178,17 @@ test("every production callable declares the required region, CORS allowlist, an
         assert.match(declaration, /region:\s*REGION/u, name);
         assert.match(declaration, /cors:\s*callableCors/u, name);
         assert.match(declaration, /enforceAppCheck:\s*true/u, name);
+        if (name === "registerTeam") {
+            assert.match(declaration, /timeoutSeconds:\s*60/u, name);
+        }
+        if (name === "updateMyTeam") {
+            assert.match(declaration, /timeoutSeconds:\s*60/u, name);
+        }
     }
+    assert.match(
+        functionsConfig,
+        /REGISTRATION_LEASE_MS\s*=\s*2\s*\*\s*60\s*\*\s*1_000/u
+    );
 });
 
 test("citation BibTeX appears verbatim in its required context", async () => {
@@ -246,6 +260,9 @@ test("OAuth bootstrap requests only the required narrow scopes", async () => {
         "https://www.googleapis.com/auth/gmail.send"
     ]);
     assert.doesNotMatch(bootstrap, /auth\/drive(?:["'`\s,])/u);
+    assert.match(bootstrap, /hasRateLimitSecret\s*=\s*firebaseSecretExists/u);
+    assert.match(bootstrap, /if\s*\(!hasRateLimitSecret\)/u);
+    assert.match(bootstrap, /Preserving the independent rate-limit HMAC secret/u);
 });
 
 test("deployment scripts invoke the pinned Firebase CLI through Node", async () => {

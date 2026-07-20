@@ -10,7 +10,7 @@ import {
 } from "./auth.js";
 import { REGION } from "./config.js";
 import { AppError, safeErrorCategory, toHttpsError } from "./errors.js";
-import { createGoogleApiClients } from "./google-auth.js";
+import { createGoogleApiClientFactory } from "./google-auth.js";
 import { parseInitialPasswordChangeInput } from "./password.js";
 import { reconcileRegistrationsOperation } from "./reconciliation.js";
 import { registerTeamOperation } from "./registration.js";
@@ -47,27 +47,18 @@ export const registerTeam = onCall(
     region: REGION,
     enforceAppCheck: true,
     cors: callableCors,
-    timeoutSeconds: 300,
+    timeoutSeconds: 60,
     memory: "512MiB",
     maxInstances: 10,
-    secrets: [
-      googleOAuthClientSecret,
-      googleOAuthRefreshToken,
-      rateLimitHmacSecret,
-    ],
+    secrets: [rateLimitHmacSecret],
   },
   async (request) => {
     try {
       const input = parseRegistrationInput(request.data);
-      const google = createGoogleApiClients(
-        googleOAuthClientSecret.value(),
-        googleOAuthRefreshToken.value(),
-      );
       return await registerTeamOperation(
         {
           db,
           adminAuth,
-          google,
           rateLimitHmacSecret: rateLimitHmacSecret.value(),
         },
         input,
@@ -120,22 +111,16 @@ export const updateMyTeam = onCall(
     region: REGION,
     enforceAppCheck: true,
     cors: callableCors,
-    timeoutSeconds: 180,
+    timeoutSeconds: 60,
     memory: "512MiB",
-    secrets: [googleOAuthClientSecret, googleOAuthRefreshToken],
   },
   async (request) => {
     try {
       const context = requireProtectedAuthentication(request.auth);
       const input = parseUpdateTeamInput(request.data);
-      const google = createGoogleApiClients(
-        googleOAuthClientSecret.value(),
-        googleOAuthRefreshToken.value(),
-      );
       return await updateMyTeamOperation(
         db,
         adminAuth,
-        google,
         context.uid,
         input,
       );
@@ -182,7 +167,7 @@ export const completeInitialPasswordChange = onCall(
 export const reconcileRegistrations = onSchedule(
   {
     region: REGION,
-    schedule: "every 15 minutes",
+    schedule: "every 5 minutes",
     timeZone: "Europe/Berlin",
     timeoutSeconds: 300,
     memory: "512MiB",
@@ -190,7 +175,7 @@ export const reconcileRegistrations = onSchedule(
     secrets: [googleOAuthClientSecret, googleOAuthRefreshToken],
   },
   async () => {
-    const google = createGoogleApiClients(
+    const google = createGoogleApiClientFactory(
       googleOAuthClientSecret.value(),
       googleOAuthRefreshToken.value(),
     );

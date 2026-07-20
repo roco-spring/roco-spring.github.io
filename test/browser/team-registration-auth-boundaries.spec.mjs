@@ -274,8 +274,22 @@ async function installFirebaseHarness(page) {
 async function openPortal(page) {
   await installFirebaseHarness(page);
   await page.goto("/team-registration.html");
+  await waitForPortal(page);
+}
+
+async function waitForPortal(page) {
   await expect.poll(() => page.evaluate(() => window.rocoTeamRegistrationReady)).toBe(true);
   await expect.poll(() => page.evaluate(() => window.rocoTeamRegistrationSettled)).toBe(true);
+}
+
+async function fillRegistrationForm(page, teamName = "Idempotent Browser Team") {
+  await page.locator("#register-team-name").fill(teamName);
+  await page.locator("#register-primary-email").fill("OWNER@EXAMPLE.ORG");
+  await page.locator('#registration-form input[name="tracks"][value="optical-flow"]').check();
+  await page.locator("#register-member-1-fullName").fill("Owner Person");
+  await page.locator("#register-member-1-email").fill("owner@example.org");
+  await page.locator("#register-member-1-affiliation").fill("Example Institute");
+  await page.locator("#submitter-is-member").check();
 }
 
 async function configureToken(page, uid, claims = {}) {
@@ -625,17 +639,11 @@ test("sign-in, successful edit, and dashboard sign-out complete without browser 
   expect(failedRequests).toEqual([]);
 });
 
-test("a registration retry reuses one UUID and renders the safe success result", async ({ page }) => {
+test("a registration retry survives reload, stores no plaintext participant data, and rotates for changed data", async ({ page }) => {
   await openPortal(page);
   await page.locator("#add-registration-member").click();
   await expect(page.locator("#registration-members .member-slot")).toHaveCount(4);
-  await page.locator("#register-team-name").fill("Idempotent Browser Team");
-  await page.locator("#register-primary-email").fill("OWNER@EXAMPLE.ORG");
-  await page.locator('#registration-form input[name="tracks"][value="optical-flow"]').check();
-  await page.locator("#register-member-1-fullName").fill("Owner Person");
-  await page.locator("#register-member-1-email").fill("owner@example.org");
-  await page.locator("#register-member-1-affiliation").fill("Example Institute");
-  await page.locator("#submitter-is-member").check();
+  await fillRegistrationForm(page);
   await page.getByRole("button", { name: "Register team" }).click();
   await waitForCall(page, "registerTeam", null);
 
@@ -666,12 +674,56 @@ test("a registration retry reuses one UUID and renders the safe success result",
     window.__rocoFirebaseHarness.rejectCall("registerTeam", null, "functions/unavailable");
   });
   await expect(page.locator("#registration-status")).not.toHaveAttribute("data-state", "loading");
+
+  const storedEntries = await page.evaluate(() => Object.fromEntries(
+    Array.from({ length: sessionStorage.length }, (_, index) => sessionStorage.key(index))
+      .filter(Boolean)
+      .map((key) => [key, sessionStorage.getItem(key)])
+  ));
+  expect(Object.keys(storedEntries)).toEqual(["roco.registrationAttempt.v1"]);
+  const storedAttempt = JSON.parse(storedEntries["roco.registrationAttempt.v1"]);
+  expect(Object.keys(storedAttempt).sort()).toEqual(["fingerprint", "idempotencyKey"]);
+  expect(storedAttempt.fingerprint).toMatch(/^[0-9a-f]{64}$/u);
+  expect(storedAttempt.idempotencyKey).toBe(firstPayload.idempotencyKey);
+  for (const privateValue of [
+    "Idempotent Browser Team",
+    "owner@example.org",
+    "Owner Person",
+    "Example Institute"
+  ]) {
+    expect(JSON.stringify(storedEntries)).not.toContain(privateValue);
+  }
+
+  await page.reload();
+  await waitForPortal(page);
+  await fillRegistrationForm(page);
   await page.getByRole("button", { name: "Register team" }).click();
   await waitForCall(page, "registerTeam", null);
   const replayPayload = await page.evaluate(() => (
     window.__rocoFirebaseHarness.pendingCallPayload("registerTeam", null)
   ));
   expect(replayPayload.idempotencyKey).toBe(firstPayload.idempotencyKey);
+
+  await page.evaluate(() => {
+    window.__rocoFirebaseHarness.rejectCall("registerTeam", null, "functions/internal");
+  });
+  await expect(page.locator("#registration-status")).not.toHaveAttribute("data-state", "loading");
+  expect(await page.evaluate(() => JSON.parse(
+    sessionStorage.getItem("roco.registrationAttempt.v1")
+  ).idempotencyKey)).toBe(firstPayload.idempotencyKey);
+
+  await page.locator("#register-team-name").fill("Changed Browser Team");
+  await page.getByRole("button", { name: "Register team" }).click();
+  await waitForCall(page, "registerTeam", null);
+  const changedPayload = await page.evaluate(() => (
+    window.__rocoFirebaseHarness.pendingCallPayload("registerTeam", null)
+  ));
+  expect(changedPayload.idempotencyKey).not.toBe(firstPayload.idempotencyKey);
+  const changedStoredAttempt = await page.evaluate(() => JSON.parse(
+    sessionStorage.getItem("roco.registrationAttempt.v1")
+  ));
+  expect(changedStoredAttempt.idempotencyKey).toBe(changedPayload.idempotencyKey);
+  expect(changedStoredAttempt.fingerprint).not.toBe(storedAttempt.fingerprint);
 
   await resolveCall(page, "registerTeam", null, {
     teamId: "RoCo-81",
@@ -687,6 +739,9 @@ test("a registration retry reuses one UUID and renders the safe success result",
     "login-status registration-spam-notice"
   );
   await expect(page.locator("#registration-spam-notice")).toHaveCSS("color", "rgb(141, 30, 30)");
+  expect(await page.evaluate(() => sessionStorage.getItem(
+    "roco.registrationAttempt.v1"
+  ))).toBeNull();
 
   await page.getByRole("tab", { name: "Register a new team" }).click();
   await expect(page.locator("#registration-spam-notice")).toBeHidden();
@@ -697,6 +752,170 @@ test("a registration retry reuses one UUID and renders the safe success result",
     for (const field of ["fullName", "email", "affiliation"]) {
       await expect(page.locator(`#register-member-${memberIndex}-${field}`)).toHaveValue("");
     }
+  }
+});
+
+test("a terminal registration failure clears the replay UUID before a deliberate retry", async ({ page }) => {
+  await openPortal(page);
+  await fillRegistrationForm(page, "Terminal Browser Team");
+  await page.getByRole("button", { name: "Register team" }).click();
+  await waitForCall(page, "registerTeam", null);
+  const firstPayload = await page.evaluate(() => (
+    window.__rocoFirebaseHarness.pendingCallPayload("registerTeam", null)
+  ));
+
+  await page.evaluate(() => {
+    window.__rocoFirebaseHarness.rejectCall(
+      "registerTeam",
+      null,
+      "functions/failed-precondition"
+    );
+  });
+  await expect(page.locator("#registration-status")).not.toHaveAttribute("data-state", "loading");
+  expect(await page.evaluate(() => sessionStorage.getItem(
+    "roco.registrationAttempt.v1"
+  ))).toBeNull();
+
+  await page.getByRole("button", { name: "Register team" }).click();
+  await waitForCall(page, "registerTeam", null);
+  const retryPayload = await page.evaluate(() => (
+    window.__rocoFirebaseHarness.pendingCallPayload("registerTeam", null)
+  ));
+  expect(retryPayload.idempotencyKey).not.toBe(firstPayload.idempotencyKey);
+
+  await resolveCall(page, "registerTeam", null, {
+    teamId: "RoCo-82",
+    emailStatus: "sent"
+  });
+  await expect(page.locator("#login-status")).toContainText("Registration completed for RoCo-82");
+});
+
+test("an active registration lease keeps and reuses its replay UUID", async ({ page }) => {
+  await openPortal(page);
+  await fillRegistrationForm(page, "Active Lease Browser Team");
+  await page.getByRole("button", { name: "Register team" }).click();
+  await waitForCall(page, "registerTeam", null);
+  const firstPayload = await page.evaluate(() => (
+    window.__rocoFirebaseHarness.pendingCallPayload("registerTeam", null)
+  ));
+
+  await page.evaluate(() => {
+    window.__rocoFirebaseHarness.rejectCall("registerTeam", null, "functions/aborted");
+  });
+  await expect(page.locator("#registration-status")).toContainText(
+    "already being processed"
+  );
+  await expect(page.locator("#registration-status")).toContainText(
+    "saved request identifier will prevent a duplicate team"
+  );
+  expect(await page.evaluate(() => JSON.parse(
+    sessionStorage.getItem("roco.registrationAttempt.v1")
+  ).idempotencyKey)).toBe(firstPayload.idempotencyKey);
+
+  await page.getByRole("button", { name: "Register team" }).click();
+  await waitForCall(page, "registerTeam", null);
+  const retryPayload = await page.evaluate(() => (
+    window.__rocoFirebaseHarness.pendingCallPayload("registerTeam", null)
+  ));
+  expect(retryPayload.idempotencyKey).toBe(firstPayload.idempotencyKey);
+
+  await resolveCall(page, "registerTeam", null, {
+    teamId: "RoCo-83",
+    emailStatus: "sent"
+  });
+  await expect(page.locator("#login-status")).toContainText("Registration completed for RoCo-83");
+});
+
+for (const scenario of [
+  {
+    emailStatus: "sent",
+    teamId: "RoCo-91",
+    expectedMessage: "Registration completed for RoCo-91",
+    expectedState: "success",
+    spamVisible: true
+  },
+  {
+    emailStatus: "pending",
+    teamId: "RoCo-92",
+    expectedMessage: "RoCo-92 was created. Confirmation-email delivery is still pending",
+    expectedState: "warning",
+    spamVisible: true
+  },
+  {
+    emailStatus: "failed",
+    teamId: "RoCo-93",
+    expectedMessage: "RoCo-93 was created, but confirmation-email delivery needs organizer attention",
+    expectedState: "warning",
+    spamVisible: false
+  }
+]) {
+  test(`a ${scenario.emailStatus} registration result renders the matching email guidance`, async ({ page }) => {
+    await openPortal(page);
+    await fillRegistrationForm(page, `${scenario.emailStatus} Email Browser Team`);
+    await page.getByRole("button", { name: "Register team" }).click();
+    await waitForCall(page, "registerTeam", null);
+
+    await resolveCall(page, "registerTeam", null, {
+      teamId: scenario.teamId,
+      emailStatus: scenario.emailStatus
+    });
+
+    await expect(page.locator("#login-tab-panel")).toBeVisible();
+    await expect(page.locator("#login-status")).toContainText(scenario.expectedMessage);
+    await expect(page.locator("#login-status")).toHaveAttribute(
+      "data-state",
+      scenario.expectedState
+    );
+    if (scenario.spamVisible) {
+      await expect(page.locator("#registration-spam-notice")).toBeVisible();
+      await expect(page.locator("#login-email")).toHaveAttribute(
+        "aria-describedby",
+        "login-status registration-spam-notice"
+      );
+    } else {
+      await expect(page.locator("#registration-spam-notice")).toBeHidden();
+      await expect(page.locator("#login-email")).not.toHaveAttribute("aria-describedby", /.+/u);
+    }
+    expect(await page.evaluate(() => sessionStorage.getItem(
+      "roco.registrationAttempt.v1"
+    ))).toBeNull();
+  });
+}
+
+test("malformed registration results keep the form and replay UUID", async ({ page }) => {
+  await openPortal(page);
+  await fillRegistrationForm(page, "Malformed Response Browser Team");
+
+  const malformedResponses = [
+    { emailStatus: "sent" },
+    { teamId: "RoCo-94", emailStatus: "queued" }
+  ];
+  let replayUuid = "";
+
+  for (const response of malformedResponses) {
+    await page.getByRole("button", { name: "Register team" }).click();
+    await waitForCall(page, "registerTeam", null);
+    const payload = await page.evaluate(() => (
+      window.__rocoFirebaseHarness.pendingCallPayload("registerTeam", null)
+    ));
+    replayUuid ||= payload.idempotencyKey;
+    expect(payload.idempotencyKey).toBe(replayUuid);
+
+    await resolveCall(page, "registerTeam", null, response);
+    await expect(page.locator("#registration-status")).toContainText(
+      "returned an incomplete response"
+    );
+    await expect(page.locator("#registration-status")).toContainText(
+      "saved request identifier have been kept"
+    );
+    await expect(page.locator("#register-tab-panel")).toBeVisible();
+    await expect(page.locator("#register-team-name")).toHaveValue(
+      "Malformed Response Browser Team"
+    );
+    await expect(page.locator("#registration-spam-notice")).toBeHidden();
+    expect(await page.evaluate(() => JSON.parse(
+      sessionStorage.getItem("roco.registrationAttempt.v1")
+    ).idempotencyKey)).toBe(replayUuid);
   }
 });
 

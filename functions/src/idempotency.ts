@@ -27,8 +27,15 @@ export interface RegistrationReservation {
   ownerUid?: string;
   sheetId?: string;
   sheetCreateAttemptedAt?: Timestamp;
+  emailOwnershipId?: string;
   result?: RegistrationSafeResult;
 }
+
+const REVIVABLE_FAILED_CATEGORIES = new Set([
+  "transient",
+  "google_transient",
+  "google_configuration",
+]);
 
 export function idempotencyDocumentId(idempotencyKey: string): string {
   return createHash("sha256").update(idempotencyKey).digest("hex");
@@ -81,6 +88,7 @@ export async function reserveRegistration(
   normalizedPrimaryEmailHash: string,
   now = Date.now(),
   rateLimitDigests?: { ip: string; email: string },
+  emailOwnershipId?: string,
 ): Promise<RegistrationReservation> {
   const requestId = idempotencyDocumentId(idempotencyKey);
   const reference = db.collection("registrationRequests").doc(requestId);
@@ -136,6 +144,7 @@ export async function reserveRegistration(
       transaction.create(reference, {
         requestHash,
         normalizedPrimaryEmailHash,
+        ...(emailOwnershipId ? { emailOwnershipId } : {}),
         state: "allocating",
         leaseId,
         leaseExpiresAt: Timestamp.fromMillis(now + REGISTRATION_LEASE_MS),
@@ -148,6 +157,7 @@ export async function reserveRegistration(
         leaseId,
         state: "allocating",
         isNew: true,
+        ...(emailOwnershipId ? { emailOwnershipId } : {}),
       };
     }
 
@@ -186,11 +196,71 @@ export async function reserveRegistration(
     }
 
     if (state === "failed") {
-      throw new AppError(
-        "failed-precondition",
-        "This registration attempt failed. Submit again to start a new attempt.",
-        "conflict",
-      );
+      const safeCategory =
+        typeof data.safeErrorCategory === "string"
+          ? data.safeErrorCategory
+          : "";
+      if (!REVIVABLE_FAILED_CATEGORIES.has(safeCategory)) {
+        throw new AppError(
+          "failed-precondition",
+          "This registration attempt failed. Submit again to start a new attempt.",
+          "conflict",
+        );
+      }
+      if (data.cleanupState !== "complete") {
+        throw new AppError(
+          "aborted",
+          "This registration is still being recovered. Please retry shortly.",
+          "conflict",
+        );
+      }
+      const storedEmailOwnershipId =
+        typeof data.emailOwnershipId === "string"
+          ? data.emailOwnershipId
+          : emailOwnershipId;
+
+      transaction.update(reference, {
+        state: "allocating",
+        leaseId,
+        leaseExpiresAt: Timestamp.fromMillis(now + REGISTRATION_LEASE_MS),
+        ...(storedEmailOwnershipId
+          ? { emailOwnershipId: storedEmailOwnershipId }
+          : {}),
+        ownerUid: FieldValue.delete(),
+        sheetId: FieldValue.delete(),
+        sheetUrl: FieldValue.delete(),
+        sheetCreateAttemptedAt: FieldValue.delete(),
+        emailStatus: FieldValue.delete(),
+        safeErrorCategory: FieldValue.delete(),
+        cleanupState: FieldValue.delete(),
+        cleanupRetryCount: FieldValue.delete(),
+        cleanupLastAttemptAt: FieldValue.delete(),
+        cleanupOwnerUid: FieldValue.delete(),
+        cleanupSheetId: FieldValue.delete(),
+        cleanupTeamId: FieldValue.delete(),
+        cleanupAmbiguousSheet: FieldValue.delete(),
+        cleanupNoSheetObservationCount: FieldValue.delete(),
+        cleanupSheetCreateAttemptedAt: FieldValue.delete(),
+        cleanupEmailOwnershipId: FieldValue.delete(),
+        cleanupSafeErrorCategory: FieldValue.delete(),
+        updatedAt: FieldValue.serverTimestamp(),
+      });
+
+      const revived: RegistrationReservation = {
+        requestId,
+        reference,
+        leaseId,
+        state: "allocating",
+        isNew: false,
+      };
+      if (typeof data.teamId === "string") revived.teamId = data.teamId;
+      if (typeof data.teamNumber === "number") {
+        revived.teamNumber = data.teamNumber;
+      }
+      if (storedEmailOwnershipId) {
+        revived.emailOwnershipId = storedEmailOwnershipId;
+      }
+      return revived;
     }
 
     const leaseExpiresAt: unknown = data.leaseExpiresAt;
@@ -209,6 +279,9 @@ export async function reserveRegistration(
     transaction.update(reference, {
       leaseId,
       leaseExpiresAt: Timestamp.fromMillis(now + REGISTRATION_LEASE_MS),
+      ...(typeof data.emailOwnershipId !== "string" && emailOwnershipId
+        ? { emailOwnershipId }
+        : {}),
       updatedAt: FieldValue.serverTimestamp(),
     });
 
@@ -225,6 +298,13 @@ export async function reserveRegistration(
     if (typeof data.sheetId === "string") reservation.sheetId = data.sheetId;
     if (data.sheetCreateAttemptedAt instanceof Timestamp) {
       reservation.sheetCreateAttemptedAt = data.sheetCreateAttemptedAt;
+    }
+    const storedEmailOwnershipId =
+      typeof data.emailOwnershipId === "string"
+        ? data.emailOwnershipId
+        : emailOwnershipId;
+    if (storedEmailOwnershipId) {
+      reservation.emailOwnershipId = storedEmailOwnershipId;
     }
     return reservation;
   });
@@ -263,6 +343,7 @@ export async function markRegistrationFailed(
     ownerUid?: string;
     sheetId?: string;
     teamId?: string;
+    emailOwnershipId?: string;
     ambiguousSheet?: boolean;
     sheetCreateAttemptedAt?: Timestamp;
   },
@@ -282,6 +363,8 @@ export async function markRegistrationFailed(
       cleanupOwnerUid: cleanup?.ownerUid ?? null,
       cleanupSheetId: cleanup?.sheetId ?? null,
       cleanupTeamId: cleanup?.teamId ?? null,
+      cleanupEmailOwnershipId:
+        cleanup?.emailOwnershipId ?? reservation.emailOwnershipId ?? null,
       cleanupAmbiguousSheet: cleanup?.ambiguousSheet === true,
       cleanupNoSheetObservationCount: 0,
       cleanupSheetCreateAttemptedAt:
@@ -329,6 +412,7 @@ export async function fenceStaleRegistrationForCleanup(
     const sheetCreateAttemptedAt: unknown = snapshot.get(
       "sheetCreateAttemptedAt",
     );
+    const emailOwnershipId: unknown = snapshot.get("emailOwnershipId");
     transaction.update(reference, {
       state: "failed",
       safeErrorCategory: "transient",
@@ -341,6 +425,8 @@ export async function fenceStaleRegistrationForCleanup(
           : `roco_${registrationRequestId}`,
       cleanupTeamId: typeof teamId === "string" ? teamId : null,
       cleanupSheetId: typeof sheetId === "string" ? sheetId : null,
+      cleanupEmailOwnershipId:
+        typeof emailOwnershipId === "string" ? emailOwnershipId : null,
       cleanupAmbiguousSheet: sheetCreateAttemptedAt instanceof Timestamp,
       cleanupNoSheetObservationCount: 0,
       cleanupSheetCreateAttemptedAt:

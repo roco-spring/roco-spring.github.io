@@ -1,9 +1,14 @@
 import type { drive_v3 } from "googleapis";
 import { DRIVE_FOLDER_ID } from "./config.js";
 import { AppError, safeErrorCategory } from "./errors.js";
-import { withBoundedGoogleRetry } from "./google-retry.js";
+import {
+  GOOGLE_API_REQUEST_OPTIONS,
+  withBoundedGoogleRetry,
+} from "./google-retry.js";
 
 const SPREADSHEET_MIME_TYPE = "application/vnd.google-apps.spreadsheet";
+const MAX_DRIVE_LIST_PAGES = 3;
+const AMBIGUOUS_RECOVERY_LIST_PAGES = 1;
 
 export interface TeamSpreadsheetFile {
   id: string;
@@ -26,6 +31,54 @@ export class SpreadsheetProvisioningError extends AppError {
   }
 }
 
+/**
+ * The non-idempotent create may have committed without returning a file ID.
+ * Callers use this distinct safe error to retain the create fence until Drive
+ * search has produced enough no-file observations to permit another create.
+ */
+export class SpreadsheetCreationPendingError extends AppError {
+  public constructor(
+    cause?: unknown,
+    public readonly noFileObserved = true,
+    public readonly recoveryCause: unknown = undefined,
+  ) {
+    super(
+      "aborted",
+      "Spreadsheet creation is still being reconciled. Please retry later.",
+      cause === undefined ? "transient" : safeErrorCategory(cause),
+    );
+    this.name = "SpreadsheetCreationPendingError";
+    this.cause = cause;
+  }
+}
+
+/**
+ * Drive returned a definitive client rejection, proving that this particular
+ * create did not commit. Callers may therefore clear the non-idempotent create
+ * fence while retaining the original safe error category and retry policy.
+ */
+export class SpreadsheetCreationRejectedError extends AppError {
+  public constructor(cause: unknown) {
+    super(
+      "internal",
+      "The registration spreadsheet create request was rejected.",
+      safeErrorCategory(cause),
+    );
+    this.name = "SpreadsheetCreationRejectedError";
+    this.cause = cause;
+  }
+}
+
+function isDefinitiveCreateRejection(error: unknown): boolean {
+  if (typeof error !== "object" || error === null) return false;
+  const response = (error as Record<string, unknown>).response;
+  if (typeof response !== "object" || response === null) return false;
+  const status = (response as Record<string, unknown>).status;
+  // A concrete non-timeout 4xx response proves that Drive rejected the
+  // request. A 408 remains ambiguous because the server timed out handling it.
+  return typeof status === "number" && status >= 400 && status < 500 && status !== 408;
+}
+
 export function safeSpreadsheetTitle(teamId: string, teamName: string): string {
   const cleanedName = teamName
     .replace(/[<>:"/\\|?*\p{Cc}]/gu, " ")
@@ -35,21 +88,20 @@ export function safeSpreadsheetTitle(teamId: string, teamName: string): string {
   return `${teamId} - ${cleanedName || "Team"}`;
 }
 
-const AMBIGUOUS_CREATE_RECOVERY_DELAYS_MS = [
-  250,
-  500,
-  1_000,
-  2_000,
-  4_000,
-  5_000,
-  5_000,
-  5_000,
-] as const;
+// Three single-attempt marker reads over one second are enough for an
+// immediate same-account Drive consistency check. If the file is still not
+// visible, Firestore retains the create fence and the scheduled reconciler
+// observes it again later; this invocation must not poll for tens of seconds.
+const AMBIGUOUS_CREATE_RECOVERY_DELAYS_MS = [250, 750] as const;
 
 export async function findRegistrationSpreadsheets(
   drive: drive_v3.Drive,
   registrationRequestId: string,
-  options: { requireConfiguredParent?: boolean } = {},
+  options: {
+    requireConfiguredParent?: boolean;
+    retryAttempts?: 1 | 2;
+    maxPages?: 1 | 2 | 3;
+  } = {},
 ): Promise<drive_v3.Schema$File[]> {
   const queryParts = [
     `mimeType = '${SPREADSHEET_MIME_TYPE}'`,
@@ -61,23 +113,49 @@ export async function findRegistrationSpreadsheets(
   }
   const query = queryParts.join(" and ");
   const files: drive_v3.Schema$File[] = [];
+  const maxPages =
+    options.maxPages === 1 || options.maxPages === 2
+      ? options.maxPages
+      : MAX_DRIVE_LIST_PAGES;
   let pageToken: string | undefined;
-  do {
-    const response = await withBoundedGoogleRetry(() =>
-      drive.files.list({
-        q: query,
-        spaces: "drive",
-        fields: "nextPageToken,files(id,name,webViewLink,parents)",
-        pageSize: 100,
-        ...(pageToken ? { pageToken } : {}),
-        supportsAllDrives: true,
-        includeItemsFromAllDrives: true,
-      }),
+  const observedPageTokens = new Set<string>();
+  for (let page = 0; page < maxPages; page += 1) {
+    const response = await withBoundedGoogleRetry(
+      (requestOptions) =>
+        drive.files.list(
+          {
+            q: query,
+            spaces: "drive",
+            fields: "nextPageToken,files(id,name,webViewLink,parents)",
+            pageSize: 100,
+            ...(pageToken ? { pageToken } : {}),
+            supportsAllDrives: true,
+            includeItemsFromAllDrives: true,
+          },
+          requestOptions,
+        ),
+      options.retryAttempts === undefined
+        ? {}
+        : { attempts: options.retryAttempts },
     );
     files.push(...(response.data.files ?? []));
-    pageToken = response.data.nextPageToken ?? undefined;
-  } while (pageToken);
-  return files;
+    const nextPageToken = response.data.nextPageToken ?? undefined;
+    if (!nextPageToken) return files;
+    if (observedPageTokens.has(nextPageToken)) {
+      throw new AppError(
+        "internal",
+        "Drive returned a repeated spreadsheet page.",
+        "external_permanent",
+      );
+    }
+    observedPageTokens.add(nextPageToken);
+    pageToken = nextPageToken;
+  }
+  throw new AppError(
+    "internal",
+    "Drive spreadsheet results exceeded the safety bound.",
+    "external_permanent",
+  );
 }
 
 async function recoverAmbiguousSpreadsheetCreate(
@@ -92,6 +170,7 @@ async function recoverAmbiguousSpreadsheetCreate(
     const recovered = await findRegistrationSpreadsheets(
       drive,
       registrationRequestId,
+      { retryAttempts: 1, maxPages: AMBIGUOUS_RECOVERY_LIST_PAGES },
     );
     if (recovered.length > 1) {
       throw new AppError(
@@ -117,28 +196,55 @@ export async function verifyPrivateTeamSpreadsheet(
   fileId: string,
   expectedRegistrationRequestId?: string,
 ): Promise<{ url: string }> {
-  const fileResponse = await withBoundedGoogleRetry(() =>
-    drive.files.get({
-      fileId,
-      fields: "id,mimeType,parents,webViewLink,trashed,appProperties",
-      supportsAllDrives: true,
-    }),
+  const fileResponse = await withBoundedGoogleRetry((requestOptions) =>
+    drive.files.get(
+      {
+        fileId,
+        fields: "id,mimeType,parents,webViewLink,trashed,appProperties",
+        supportsAllDrives: true,
+      },
+      requestOptions,
+    ),
   );
   const permissions: drive_v3.Schema$Permission[] = [];
   let pageToken: string | undefined;
-  do {
-    const permissionResponse = await withBoundedGoogleRetry(() =>
-      drive.permissions.list({
-        fileId,
-        fields: "nextPageToken,permissions(id,type,role,allowFileDiscovery)",
-        ...(pageToken ? { pageToken } : {}),
-        pageSize: 100,
-        supportsAllDrives: true,
-      }),
+  const observedPageTokens = new Set<string>();
+  for (let page = 0; page < MAX_DRIVE_LIST_PAGES; page += 1) {
+    const permissionResponse = await withBoundedGoogleRetry((requestOptions) =>
+      drive.permissions.list(
+        {
+          fileId,
+          fields: "nextPageToken,permissions(id,type,role,allowFileDiscovery)",
+          ...(pageToken ? { pageToken } : {}),
+          pageSize: 100,
+          supportsAllDrives: true,
+        },
+        requestOptions,
+      ),
     );
     permissions.push(...(permissionResponse.data.permissions ?? []));
-    pageToken = permissionResponse.data.nextPageToken ?? undefined;
-  } while (pageToken);
+    const nextPageToken = permissionResponse.data.nextPageToken ?? undefined;
+    if (!nextPageToken) {
+      pageToken = undefined;
+      break;
+    }
+    if (observedPageTokens.has(nextPageToken)) {
+      throw new AppError(
+        "internal",
+        "Drive returned a repeated permission page.",
+        "external_permanent",
+      );
+    }
+    observedPageTokens.add(nextPageToken);
+    pageToken = nextPageToken;
+  }
+  if (pageToken) {
+    throw new AppError(
+      "internal",
+      "Drive spreadsheet permissions exceeded the safety bound.",
+      "external_permanent",
+    );
+  }
   const parents = fileResponse.data.parents ?? [];
   if (
     fileResponse.data.trashed === true ||
@@ -179,6 +285,7 @@ export async function findOrCreateTeamSpreadsheet(
   teamId: string,
   teamName: string,
   allowCreate = true,
+  beforeCreate?: () => Promise<void>,
 ): Promise<TeamSpreadsheetFile> {
   const title = safeSpreadsheetTitle(teamId, teamName);
   const existing = await findRegistrationSpreadsheets(drive, registrationRequestId);
@@ -205,10 +312,19 @@ export async function findOrCreateTeamSpreadsheet(
   }
 
   if (!allowCreate) {
-    const recoveredId = await recoverAmbiguousSpreadsheetCreate(
-      drive,
-      registrationRequestId,
-    );
+    let recoveredId: string | undefined;
+    try {
+      recoveredId = await recoverAmbiguousSpreadsheetCreate(
+        drive,
+        registrationRequestId,
+      );
+    } catch (error: unknown) {
+      // The initial lookup above was a successful post-create no-file
+      // observation. Keep that observation even if the longer recovery poll
+      // subsequently loses access to Drive.
+      if (error instanceof AppError && error.category === "internal") throw error;
+      throw new SpreadsheetCreationPendingError(error, true);
+    }
     if (recoveredId) {
       try {
         const verified = await verifyPrivateTeamSpreadsheet(
@@ -221,32 +337,53 @@ export async function findOrCreateTeamSpreadsheet(
         throw new SpreadsheetProvisioningError(recoveredId, error);
       }
     }
-    throw new AppError(
-      "aborted",
-      "Spreadsheet creation is still being reconciled. Please retry later.",
-      "transient",
-    );
+    throw new SpreadsheetCreationPendingError();
   }
 
+  // Fence the non-idempotent write only after the preceding read has
+  // completed. A transient files.list failure means no create was attempted
+  // and must remain safely retryable with the same registration key. Keep the
+  // fence write outside the Drive-create recovery block: if the Firestore
+  // fence itself fails, a Drive create was definitely never issued.
+  await beforeCreate?.();
   let createdResponse;
   try {
     // Do not blindly retry a non-idempotent create after an ambiguous response.
-    createdResponse = await drive.files.create({
-      requestBody: {
-        name: title,
-        mimeType: SPREADSHEET_MIME_TYPE,
-        parents: [DRIVE_FOLDER_ID],
-        appProperties: { registrationRequestId },
+    createdResponse = await drive.files.create(
+      {
+        requestBody: {
+          name: title,
+          mimeType: SPREADSHEET_MIME_TYPE,
+          parents: [DRIVE_FOLDER_ID],
+          appProperties: { registrationRequestId },
+        },
+        fields: "id,webViewLink,parents",
+        supportsAllDrives: true,
       },
-      fields: "id,webViewLink,parents",
-      supportsAllDrives: true,
-    });
-  } catch (error: unknown) {
-    // The API may have created the file before returning a transient error.
-    const recoveredId = await recoverAmbiguousSpreadsheetCreate(
-      drive,
-      registrationRequestId,
+      GOOGLE_API_REQUEST_OPTIONS,
     );
+  } catch (error: unknown) {
+    if (isDefinitiveCreateRejection(error)) {
+      throw new SpreadsheetCreationRejectedError(error);
+    }
+    // The API may have created the file before returning a transient error.
+    let recoveredId: string | undefined;
+    try {
+      recoveredId = await recoverAmbiguousSpreadsheetCreate(
+        drive,
+        registrationRequestId,
+      );
+    } catch (recoveryError: unknown) {
+      if (
+        recoveryError instanceof AppError &&
+        recoveryError.category === "internal"
+      ) {
+        throw recoveryError;
+      }
+      // No post-create observation completed, so retain the fence without
+      // incrementing the no-file evidence counter.
+      throw new SpreadsheetCreationPendingError(error, false, recoveryError);
+    }
     if (recoveredId) {
       let verified: { url: string };
       try {
@@ -260,20 +397,31 @@ export async function findOrCreateTeamSpreadsheet(
       }
       return { id: recoveredId, url: verified.url, wasCreated: false };
     }
-    throw error;
+    throw new SpreadsheetCreationPendingError(error, true);
   }
   const id = createdResponse.data.id;
   if (!id) {
-    const recoveredId = await recoverAmbiguousSpreadsheetCreate(
-      drive,
-      registrationRequestId,
-    );
-    if (!recoveredId) {
-      throw new AppError(
-        "aborted",
-        "Spreadsheet creation is still being reconciled. Please retry later.",
-        "transient",
+    let recoveredId: string | undefined;
+    try {
+      recoveredId = await recoverAmbiguousSpreadsheetCreate(
+        drive,
+        registrationRequestId,
       );
+    } catch (recoveryError: unknown) {
+      if (
+        recoveryError instanceof AppError &&
+        recoveryError.category === "internal"
+      ) {
+        throw recoveryError;
+      }
+      throw new SpreadsheetCreationPendingError(
+        recoveryError,
+        false,
+        recoveryError,
+      );
+    }
+    if (!recoveredId) {
+      throw new SpreadsheetCreationPendingError();
     }
     try {
       const verified = await verifyPrivateTeamSpreadsheet(
@@ -305,13 +453,16 @@ export async function renameTeamSpreadsheet(
   teamId: string,
   teamName: string,
 ): Promise<void> {
-  await withBoundedGoogleRetry(() =>
-    drive.files.update({
-      fileId,
-      requestBody: { name: safeSpreadsheetTitle(teamId, teamName) },
-      fields: "id",
-      supportsAllDrives: true,
-    }),
+  await withBoundedGoogleRetry((requestOptions) =>
+    drive.files.update(
+      {
+        fileId,
+        requestBody: { name: safeSpreadsheetTitle(teamId, teamName) },
+        fields: "id",
+        supportsAllDrives: true,
+      },
+      requestOptions,
+    ),
   );
 }
 
@@ -319,7 +470,10 @@ export async function deleteTeamSpreadsheet(
   drive: drive_v3.Drive,
   fileId: string,
 ): Promise<void> {
-  await withBoundedGoogleRetry(() =>
-    drive.files.delete({ fileId, supportsAllDrives: true }),
+  await withBoundedGoogleRetry((requestOptions) =>
+    drive.files.delete(
+      { fileId, supportsAllDrives: true },
+      requestOptions,
+    ),
   );
 }

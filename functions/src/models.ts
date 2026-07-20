@@ -28,8 +28,16 @@ export interface TeamDocument extends EditableTeamData {
   updatedAt: Timestamp;
   revision: number;
   status: "active";
-  sheetId: string;
-  sheetUrl: string;
+  // Firestore is the authoritative registration record. Spreadsheet
+  // provisioning is an independently reconciled side effect, so a newly
+  // committed team may not have a Drive resource yet.
+  sheetId: string | null;
+  sheetUrl: string | null;
+  // These fields are optional for compatibility with teams created before
+  // core-first registration was introduced. A legacy team with a sheetId is
+  // treated as already provisioned.
+  sheetCreateAttemptedAt?: Timestamp | null;
+  sheetCreateNoFileObservationCount?: number;
   sheetSyncStatus: "pending" | "synced" | "failed";
   sheetLastSyncedRevision: number;
   sheetSyncLastAttemptAt: Timestamp | null;

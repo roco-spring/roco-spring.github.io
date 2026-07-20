@@ -6,6 +6,7 @@ import { mkdir, rm, writeFile } from "node:fs/promises";
 import { spawn, spawnSync } from "node:child_process";
 import path from "node:path";
 import process from "node:process";
+import { pathToFileURL } from "node:url";
 import { google } from "googleapis";
 
 const PROJECT_ID = "roco-spring-registration-2026";
@@ -16,11 +17,41 @@ const SCOPES = Object.freeze([
     "https://www.googleapis.com/auth/drive.file",
     "https://www.googleapis.com/auth/gmail.send"
 ]);
+const GOOGLE_OAUTH_TOKEN_URL = "https://oauth2.googleapis.com/token";
+const GOOGLE_REQUEST_TIMEOUT_MS = 8_000;
+const FIREBASE_COMMAND_TIMEOUT_MS = 10 * 60 * 1_000;
+const GOOGLE_REQUEST_OPTIONS = Object.freeze({
+    timeout: GOOGLE_REQUEST_TIMEOUT_MS,
+    retry: false
+});
+const SAFE_PROVIDER_CODES = new Set([
+    "access_denied",
+    "accessNotConfigured",
+    "invalid_client",
+    "invalid_grant",
+    "invalid_request",
+    "invalid_scope",
+    "invalid_token",
+    "permission_denied",
+    "rateLimitExceeded",
+    "resource_exhausted",
+    "serviceDisabled",
+    "temporarily_unavailable",
+    "unauthorized_client",
+    "unavailable",
+    "userRateLimitExceeded"
+]);
 const SECRET_NAMES = Object.freeze({
     clientSecret: "GOOGLE_OAUTH_CLIENT_SECRET",
     refreshToken: "GOOGLE_OAUTH_REFRESH_TOKEN",
     rateLimit: "RATE_LIMIT_HMAC_SECRET"
 });
+const MINIMUM_ACCESS_TOKEN_LIFETIME_SECONDS = 10 * 60;
+// A private organizer folder and one-off preflight marker should never need
+// more than 500 permission/artifact entries. Keep the aggregate request time
+// bounded even if Drive is degraded and every page reaches its timeout.
+const MAX_LIST_PAGES = 5;
+const CLEANUP_VERIFICATION_ATTEMPTS = 5;
 const ROOT = path.resolve(import.meta.dirname, "..");
 const FIREBASE_SCRIPT = path.join(
     ROOT,
@@ -30,6 +61,19 @@ const FIREBASE_SCRIPT = path.join(
     "bin",
     "firebase.js"
 );
+
+// Generated Google clients must never multiply the explicit request bound with
+// hidden transport retries. OAuth token exchange below uses native fetch with
+// the same one-attempt ceiling.
+google.options(GOOGLE_REQUEST_OPTIONS);
+
+// Provider debug output can include request bodies containing OAuth material.
+delete process.env.DEBUG;
+delete process.env.FIREBASE_DEBUG;
+delete process.env.NODE_DEBUG;
+delete process.env.GOOGLE_OAUTH_CLIENT_SECRET;
+delete process.env.GOOGLE_OAUTH_REFRESH_TOKEN;
+delete process.env.GOOGLE_OAUTH_ACCESS_TOKEN;
 
 function sanitizedEnvironment() {
     const environment = { ...process.env };
@@ -55,11 +99,193 @@ class PreflightInvariantError extends Error {
     }
 }
 
+export class OAuthBootstrapError extends Error {
+    constructor(stage, status = null, providerCode = "unclassified") {
+        const details = [
+            `stage=${stage}`,
+            `provider_code=${providerCode}`
+        ];
+        if (status !== null) details.push(`http_status=${status}`);
+        super(`Google OAuth bootstrap failed [${details.join(" ")}].`);
+        this.name = "OAuthBootstrapError";
+        this.stage = stage;
+        this.status = status;
+        this.providerCode = providerCode;
+    }
+}
+
+function normalizeProviderCode(candidate) {
+    if (typeof candidate !== "string") return "unclassified";
+    const normalized = candidate.trim();
+    if (SAFE_PROVIDER_CODES.has(normalized)) return normalized;
+    const lower = normalized.toLowerCase();
+    return SAFE_PROVIDER_CODES.has(lower) ? lower : "unclassified";
+}
+
+function providerCodeFromError(error) {
+    const responseData = error?.response?.data;
+    const bodyError = responseData?.error;
+    const candidates = [
+        typeof bodyError === "string" ? bodyError : null,
+        bodyError?.status,
+        responseData?.status,
+        error?.reason,
+        typeof error?.code === "string" ? error.code : null
+    ];
+    const items = Array.isArray(bodyError?.errors)
+        ? bodyError.errors
+        : Array.isArray(responseData?.errors)
+            ? responseData.errors
+            : [];
+    for (const item of items) candidates.push(item?.reason);
+    for (const candidate of candidates) {
+        const normalized = normalizeProviderCode(candidate);
+        if (normalized !== "unclassified") return normalized;
+    }
+    return "unclassified";
+}
+
+function safeHttpStatus(error) {
+    for (const candidate of [
+        error?.response?.status,
+        error?.status,
+        error?.code
+    ]) {
+        const status = Number(candidate);
+        if (Number.isInteger(status) && status >= 100 && status <= 599) {
+            return status;
+        }
+    }
+    return null;
+}
+
+export async function requestOAuthJson(
+    fetchImplementation,
+    stage,
+    url,
+    options
+) {
+    let response;
+    try {
+        response = await fetchImplementation(url, {
+            ...options,
+            redirect: "error",
+            signal: AbortSignal.timeout(GOOGLE_REQUEST_TIMEOUT_MS)
+        });
+    } catch {
+        throw new OAuthBootstrapError(stage);
+    }
+
+    let data = {};
+    try {
+        data = await response.json();
+    } catch {
+        // Provider bodies are never forwarded; they may contain credential
+        // diagnostics even when the HTTP status itself is safe to report.
+    }
+    if (!response.ok) {
+        throw new OAuthBootstrapError(
+            stage,
+            Number.isInteger(response.status) ? response.status : null,
+            normalizeProviderCode(data?.error)
+        );
+    }
+    return data;
+}
+
+function exactScopes(value) {
+    const scopes = typeof value === "string"
+        ? value.split(/\s+/u).filter(Boolean)
+        : [];
+    const granted = new Set(scopes);
+    if (
+        granted.size !== SCOPES.length
+        || SCOPES.some((scope) => !granted.has(scope))
+    ) {
+        throw new OAuthBootstrapError(
+            "oauth_scopes",
+            null,
+            "invalid_scope"
+        );
+    }
+    return scopes;
+}
+
+function hasUnsafeControlCharacter(value) {
+    return [...value].some((character) => {
+        const codePoint = character.codePointAt(0) ?? 0;
+        return codePoint <= 0x1f || codePoint === 0x7f;
+    });
+}
+
+export async function exchangeAuthorizationCode(
+    fetchImplementation,
+    { clientSecret, code, codeVerifier, redirectUri }
+) {
+    const credentialInputs = [clientSecret, code, codeVerifier, redirectUri];
+    if (
+        credentialInputs.some((value) =>
+            typeof value !== "string"
+            || value.length === 0
+            || value.length > 16_384
+            || /[\r\n\u0000-\u001f\u007f]/u.test(value))
+        || !/^http:\/\/127\.0\.0\.1:\d+$/u.test(redirectUri)
+    ) {
+        throw new OAuthBootstrapError("authorization_code_input");
+    }
+    const token = await requestOAuthJson(
+        fetchImplementation,
+        "authorization_code_exchange",
+        GOOGLE_OAUTH_TOKEN_URL,
+        {
+            method: "POST",
+            headers: { "content-type": "application/x-www-form-urlencoded" },
+            body: new URLSearchParams({
+                client_id: OAUTH_CLIENT_ID,
+                client_secret: clientSecret,
+                code,
+                code_verifier: codeVerifier,
+                grant_type: "authorization_code",
+                redirect_uri: redirectUri
+            })
+        }
+    );
+    const accessToken = typeof token?.access_token === "string"
+        ? token.access_token
+        : "";
+    const refreshToken = typeof token?.refresh_token === "string"
+        ? token.refresh_token
+        : "";
+    const expiresIn = Number(token?.expires_in);
+    if (
+        !accessToken
+        || !refreshToken
+        || hasUnsafeControlCharacter(accessToken)
+        || hasUnsafeControlCharacter(refreshToken)
+        || !Number.isFinite(expiresIn)
+        || expiresIn < MINIMUM_ACCESS_TOKEN_LIFETIME_SECONDS
+    ) {
+        throw new OAuthBootstrapError("authorization_code_exchange");
+    }
+    exactScopes(token?.scope);
+
+    // The generated API client receives only the short-lived access token. It
+    // cannot silently refresh because no client secret or refresh token is set.
+    const oauthClient = new google.auth.OAuth2();
+    oauthClient.setCredentials({
+        access_token: accessToken,
+        expiry_date: Date.now() + expiresIn * 1_000
+    });
+    return { oauthClient, refreshToken };
+}
+
 function runFirebase(args, { capture = false } = {}) {
     const result = spawnSync(process.execPath, [FIREBASE_SCRIPT, ...args], {
         cwd: ROOT,
         encoding: "utf8",
         env: sanitizedEnvironment(),
+        timeout: FIREBASE_COMMAND_TIMEOUT_MS,
+        maxBuffer: 4 * 1024 * 1024,
         stdio: capture ? ["ignore", "pipe", "pipe"] : "inherit"
     });
 
@@ -72,6 +298,30 @@ function runFirebase(args, { capture = false } = {}) {
     }
 
     return capture ? result.stdout : "";
+}
+
+function firebaseSecretExists(name) {
+    const result = spawnSync(process.execPath, [FIREBASE_SCRIPT,
+        "functions:secrets:get",
+        name,
+        "--project",
+        PROJECT_ID,
+        "--json"
+    ], {
+        cwd: ROOT,
+        encoding: "utf8",
+        env: sanitizedEnvironment(),
+        timeout: FIREBASE_COMMAND_TIMEOUT_MS,
+        maxBuffer: 4 * 1024 * 1024,
+        stdio: ["ignore", "pipe", "pipe"]
+    });
+    if (result.error) {
+        fail(`Firebase CLI could not inspect ${name}: ${result.error.message}`);
+    }
+    if (result.status === 0) return true;
+    const detail = `${result.stderr ?? ""}\n${result.stdout ?? ""}`;
+    if (/not found|does not exist|404/iu.test(detail)) return false;
+    fail(`Firebase CLI could not safely inspect ${name}; no secret was changed.`);
 }
 
 function confirmFirebaseAccess() {
@@ -227,7 +477,13 @@ async function receiveAuthorizationCode(clientSecret) {
             if (oauthError || !code) {
                 response.writeHead(400, { "Content-Type": "text/plain; charset=utf-8" });
                 response.end("OAuth approval was not completed. You may close this window.");
-                callbackReject(new Error(`Google OAuth approval failed: ${oauthError || "authorization code missing"}.`));
+                callbackReject(new OAuthBootstrapError(
+                    "authorization",
+                    null,
+                    oauthError
+                        ? normalizeProviderCode(oauthError)
+                        : "invalid_request"
+                ));
                 return;
             }
 
@@ -258,12 +514,17 @@ async function receiveAuthorizationCode(clientSecret) {
         }
 
         const redirectUri = `http://127.0.0.1:${address.port}`;
-        const oauthClient = new google.auth.OAuth2(OAUTH_CLIENT_ID, clientSecret, redirectUri);
-        const { codeVerifier, codeChallenge } = await oauthClient.generateCodeVerifierAsync();
+        const authorizationClient = new google.auth.OAuth2(
+            OAUTH_CLIENT_ID,
+            undefined,
+            redirectUri
+        );
+        const { codeVerifier, codeChallenge } =
+            await authorizationClient.generateCodeVerifierAsync();
         if (!codeChallenge) {
             fail("Could not generate the OAuth PKCE S256 challenge.");
         }
-        const authorizationUrl = oauthClient.generateAuthUrl({
+        const authorizationUrl = authorizationClient.generateAuthUrl({
             access_type: "offline",
             code_challenge: codeChallenge,
             code_challenge_method: "S256",
@@ -284,29 +545,12 @@ async function receiveAuthorizationCode(clientSecret) {
             10 * 60 * 1000
         );
         const code = await callbackPromise;
-        const tokenResponse = await oauthClient.getToken({ code, codeVerifier });
-        const refreshToken = tokenResponse.tokens.refresh_token;
-        const accessToken = tokenResponse.tokens.access_token;
-        if (!refreshToken || !accessToken) {
-            fail("Google did not return the required access and refresh tokens. Revoke the prior app grant if necessary, then run this consent flow again.");
-        }
-
-        let tokenInfo;
-        try {
-            tokenInfo = await oauthClient.getTokenInfo(accessToken);
-        } catch {
-            fail("Google OAuth scopes could not be verified. No token or secret was stored.");
-        }
-        const grantedScopes = new Set(tokenInfo.scopes);
-        if (
-            grantedScopes.size !== SCOPES.length ||
-            SCOPES.some((scope) => !grantedScopes.has(scope))
-        ) {
-            fail("Google did not grant exactly the required Drive-file and Gmail-send scopes. No token or secret was stored.");
-        }
-
-        oauthClient.setCredentials(tokenResponse.tokens);
-        return { oauthClient, refreshToken };
+        return exchangeAuthorizationCode(globalThis.fetch, {
+            clientSecret,
+            code,
+            codeVerifier,
+            redirectUri
+        });
     } finally {
         if (timeout) clearTimeout(timeout);
         if (server.listening) {
@@ -344,57 +588,140 @@ function googleErrorSummary(error) {
     if (error instanceof PreflightInvariantError) {
         return `reason=${error.category}`;
     }
-    const status = error?.response?.status ?? error?.code ?? "unknown";
-    const apiError = error?.response?.data?.error;
-    const reasons = Array.isArray(apiError?.errors)
-        ? apiError.errors.map((entry) => entry?.reason).filter(Boolean).join(",")
-        : "";
-    return `status=${status}${reasons ? ` reason=${reasons}` : ""}`;
+    if (error instanceof OAuthBootstrapError) {
+        return `status=${error.status ?? "unknown"} reason=${error.providerCode}`;
+    }
+    return `status=${safeHttpStatus(error) ?? "unknown"} reason=${providerCodeFromError(error)}`;
 }
 
-async function findPreflightFileIds(drive, marker) {
+export async function findPreflightFileIds(drive, marker) {
     const ids = [];
     let pageToken;
+    const seenPageTokens = new Set();
 
-    do {
-        const response = await drive.files.list({
-            q: [
-                "mimeType = 'application/vnd.google-apps.spreadsheet'",
-                "trashed = false",
-                `'${DRIVE_FOLDER_ID}' in parents`,
-                `appProperties has { key='rocoSpringOAuthPreflight' and value='${marker}' }`
-            ].join(" and "),
-            spaces: "drive",
-            fields: "nextPageToken,files(id)",
-            pageSize: 100,
-            pageToken,
-            supportsAllDrives: true,
-            includeItemsFromAllDrives: true
-        });
+    for (let page = 0; page < MAX_LIST_PAGES; page += 1) {
+        const response = await drive.files.list(
+            {
+                q: [
+                    "mimeType = 'application/vnd.google-apps.spreadsheet'",
+                    "trashed = false",
+                    `'${DRIVE_FOLDER_ID}' in parents`,
+                    `appProperties has { key='rocoSpringOAuthPreflight' and value='${marker}' }`
+                ].join(" and "),
+                spaces: "drive",
+                fields: "nextPageToken,files(id)",
+                pageSize: 100,
+                pageToken,
+                supportsAllDrives: true,
+                includeItemsFromAllDrives: true
+            },
+            GOOGLE_REQUEST_OPTIONS
+        );
         ids.push(...(response.data.files ?? []).map((file) => file.id).filter(Boolean));
         pageToken = response.data.nextPageToken ?? undefined;
-    } while (pageToken);
+        if (!pageToken) return ids;
+        if (seenPageTokens.has(pageToken)) {
+            throw new PreflightInvariantError("repeated_page", "Drive repeated a preflight inventory page.");
+        }
+        seenPageTokens.add(pageToken);
+    }
 
-    return ids;
+    throw new PreflightInvariantError("page_limit", "Drive preflight inventory exceeded its page bound.");
 }
 
 async function deleteAndConfirmPreflightFile(drive, fileId) {
     try {
-        await drive.files.delete({ fileId, supportsAllDrives: true });
+        await drive.files.delete(
+            { fileId, supportsAllDrives: true },
+            GOOGLE_REQUEST_OPTIONS
+        );
     } catch (error) {
-        const status = error?.response?.status ?? error?.code;
-        if (status !== 404) throw error;
+        if (safeHttpStatus(error) !== 404) throw error;
     }
 
     try {
-        await drive.files.get({ fileId, fields: "id", supportsAllDrives: true });
+        await drive.files.get(
+            { fileId, fields: "id", supportsAllDrives: true },
+            GOOGLE_REQUEST_OPTIONS
+        );
         throw new PreflightInvariantError(
             "deletion_not_confirmed",
             "Deleted preflight spreadsheet is still retrievable."
         );
     } catch (error) {
-        const status = error?.response?.status ?? error?.code;
-        if (status !== 404) throw error;
+        if (safeHttpStatus(error) !== 404) throw error;
+    }
+}
+
+export async function cleanupPreflightArtifacts(
+    drive,
+    marker,
+    knownFileIds = [],
+    waitImplementation = (milliseconds) =>
+        new Promise((resolve) => setTimeout(resolve, milliseconds))
+) {
+    const normalizedKnownIds = typeof knownFileIds === "string"
+        ? [knownFileIds]
+        : knownFileIds;
+    const pendingIds = new Set(normalizedKnownIds.filter(Boolean));
+    let observedArtifact = pendingIds.size > 0;
+    let consecutiveEmptyInventories = 0;
+
+    for (
+        let attempt = 0;
+        attempt < CLEANUP_VERIFICATION_ATTEMPTS;
+        attempt += 1
+    ) {
+        let discovered;
+        try {
+            discovered = await findPreflightFileIds(drive, marker);
+        } catch {
+            consecutiveEmptyInventories = 0;
+            discovered = null;
+        }
+        if (discovered) {
+            if (discovered.length > 0) observedArtifact = true;
+            for (const id of discovered) pendingIds.add(id);
+            consecutiveEmptyInventories = discovered.length === 0
+                ? consecutiveEmptyInventories + 1
+                : 0;
+        }
+
+        for (const id of [...pendingIds]) {
+            try {
+                await deleteAndConfirmPreflightFile(drive, id);
+                pendingIds.delete(id);
+            } catch {
+                // Keep the ID for the next bounded cleanup attempt.
+            }
+        }
+        if (
+            pendingIds.size === 0
+            && observedArtifact
+            && consecutiveEmptyInventories >= 2
+        ) return true;
+        if (attempt < CLEANUP_VERIFICATION_ATTEMPTS - 1) {
+            await waitImplementation(250 * 2 ** attempt);
+        }
+    }
+    // When create returned an ambiguous error and no ID was ever observed,
+    // require every bounded inventory poll to be empty. Two fast empty reads
+    // are not enough evidence against a file that is still becoming visible.
+    return pendingIds.size === 0
+        && !observedArtifact
+        && consecutiveEmptyInventories === CLEANUP_VERIFICATION_ATTEMPTS;
+}
+
+export async function verifyOrganizerIdentity(drive) {
+    const response = await drive.about.get(
+        { fields: "user(emailAddress)" },
+        GOOGLE_REQUEST_OPTIONS
+    );
+    if (response.data.user?.emailAddress !== REGISTRATION_SENDER) {
+        throw new PreflightInvariantError(
+            "organizer_account_mismatch",
+            "OAuth was approved by an unexpected Google account."
+        );
     }
 }
 
@@ -408,18 +735,25 @@ async function runDriveSheetsPreflight(oauthClient) {
     let operation = "create spreadsheet in target folder";
 
     try {
-        const created = await drive.files.create({
-            requestBody: {
-                name: preflightTitle,
-                mimeType: "application/vnd.google-apps.spreadsheet",
-                parents: [DRIVE_FOLDER_ID],
-                appProperties: {
-                    rocoSpringOAuthPreflight: preflightMarker
-                }
+        operation = "verify the OAuth organizer account";
+        await verifyOrganizerIdentity(drive);
+
+        operation = "create spreadsheet in target folder";
+        const created = await drive.files.create(
+            {
+                requestBody: {
+                    name: preflightTitle,
+                    mimeType: "application/vnd.google-apps.spreadsheet",
+                    parents: [DRIVE_FOLDER_ID],
+                    appProperties: {
+                        rocoSpringOAuthPreflight: preflightMarker
+                    }
+                },
+                fields: "id,parents,trashed",
+                supportsAllDrives: true
             },
-            fields: "id,parents,trashed",
-            supportsAllDrives: true
-        });
+            GOOGLE_REQUEST_OPTIONS
+        );
         fileId = created.data.id ?? undefined;
         if (!fileId) {
             throw new PreflightInvariantError("missing_file_id", "Drive did not return a file ID for the preflight spreadsheet.");
@@ -429,20 +763,26 @@ async function runDriveSheetsPreflight(oauthClient) {
         }
 
         operation = "write preflight values with Sheets API";
-        await sheets.spreadsheets.values.update({
-            spreadsheetId: fileId,
-            range: "A1:A2",
-            valueInputOption: "RAW",
-            requestBody: {
-                values: [["RoCo-Spring OAuth preflight successful"], [timestamp]]
-            }
-        });
+        await sheets.spreadsheets.values.update(
+            {
+                spreadsheetId: fileId,
+                range: "A1:A2",
+                valueInputOption: "RAW",
+                requestBody: {
+                    values: [["RoCo-Spring OAuth preflight successful"], [timestamp]]
+                }
+            },
+            GOOGLE_REQUEST_OPTIONS
+        );
 
         operation = "read back preflight values with Sheets API";
-        const readBack = await sheets.spreadsheets.values.get({
-            spreadsheetId: fileId,
-            range: "A1:A2"
-        });
+        const readBack = await sheets.spreadsheets.values.get(
+            {
+                spreadsheetId: fileId,
+                range: "A1:A2"
+            },
+            GOOGLE_REQUEST_OPTIONS
+        );
         const values = readBack.data.values ?? [];
         if (values[0]?.[0] !== "RoCo-Spring OAuth preflight successful" || values[1]?.[0] !== timestamp) {
             throw new PreflightInvariantError("readback_mismatch", "Sheets preflight read-back did not match the values written.");
@@ -451,17 +791,39 @@ async function runDriveSheetsPreflight(oauthClient) {
         operation = "verify private Drive permissions";
         const allPermissions = [];
         let pageToken;
-        do {
-            const permissions = await drive.permissions.list({
-                fileId,
-                fields: "nextPageToken,permissions(id,type,role,allowFileDiscovery)",
-                pageSize: 100,
-                pageToken,
-                supportsAllDrives: true
-            });
+        const seenPermissionPageTokens = new Set();
+        for (let page = 0; page < MAX_LIST_PAGES; page += 1) {
+            const permissions = await drive.permissions.list(
+                {
+                    fileId,
+                    fields: "nextPageToken,permissions(id,type,role,allowFileDiscovery)",
+                    pageSize: 100,
+                    pageToken,
+                    supportsAllDrives: true
+                },
+                GOOGLE_REQUEST_OPTIONS
+            );
             allPermissions.push(...(permissions.data.permissions ?? []));
-            pageToken = permissions.data.nextPageToken ?? undefined;
-        } while (pageToken);
+            const nextPageToken = permissions.data.nextPageToken ?? undefined;
+            if (!nextPageToken) {
+                pageToken = undefined;
+                break;
+            }
+            if (seenPermissionPageTokens.has(nextPageToken)) {
+                throw new PreflightInvariantError(
+                    "repeated_permission_page",
+                    "Drive repeated a preflight permission page."
+                );
+            }
+            seenPermissionPageTokens.add(nextPageToken);
+            pageToken = nextPageToken;
+        }
+        if (pageToken) {
+            throw new PreflightInvariantError(
+                "permission_page_limit",
+                "Drive preflight permissions exceeded the page bound."
+            );
+        }
         const publicPermission = allPermissions.find((permission) => (
             permission.type === "anyone" || permission.type === "domain"
         ));
@@ -469,39 +831,27 @@ async function runDriveSheetsPreflight(oauthClient) {
             throw new PreflightInvariantError("public_permission", `Preflight spreadsheet unexpectedly has an unsafe ${publicPermission.type ?? "public"} permission (${publicPermission.role ?? "unknown role"}).`);
         }
 
-        operation = "delete preflight spreadsheet";
-        await deleteAndConfirmPreflightFile(drive, fileId);
-
-        operation = "confirm preflight spreadsheet deletion";
+        operation = "delete and inventory-confirm preflight spreadsheets";
+        const cleanupConfirmed = await cleanupPreflightArtifacts(
+            drive,
+            preflightMarker,
+            fileId
+        );
+        if (!cleanupConfirmed) {
+            throw new PreflightInvariantError(
+                "cleanup_not_confirmed",
+                "Preflight artifact cleanup could not be confirmed."
+            );
+        }
         fileId = undefined;
-        console.log("Live Drive/Sheets preflight passed: exact parent, RAW write/read, private permissions, deletion, and deletion confirmation verified.");
+        console.log("Live Drive/Sheets preflight passed: exact parent, RAW write/read, private permissions, marker-wide deletion, and empty-inventory confirmation verified.");
     } catch (error) {
-        let cleanupIds = fileId ? [fileId] : [];
-
-        if (!fileId) {
-            // Drive create may commit and then return an ambiguous transport error.
-            // Poll the unique appProperty marker before declaring cleanup incomplete.
-            for (let attempt = 0; attempt < 5 && cleanupIds.length === 0; attempt += 1) {
-                try {
-                    cleanupIds = await findPreflightFileIds(drive, preflightMarker);
-                } catch {
-                    break;
-                }
-                if (cleanupIds.length === 0) {
-                    await new Promise((resolve) => setTimeout(resolve, 250 * 2 ** attempt));
-                }
-            }
-        }
-
-        let cleanupFailed = cleanupIds.length === 0 && operation === "create spreadsheet in target folder";
-        for (const cleanupId of new Set(cleanupIds)) {
-            try {
-                await deleteAndConfirmPreflightFile(drive, cleanupId);
-            } catch {
-                cleanupFailed = true;
-            }
-        }
-        if (cleanupFailed) {
+        const cleanupConfirmed = await cleanupPreflightArtifacts(
+            drive,
+            preflightMarker,
+            fileId
+        );
+        if (!cleanupConfirmed) {
             console.error(`Preflight cleanup could not be confirmed. Inspect the exact target folder for '${preflightTitle}' and delete it before retrying.`);
         }
         fail(`Live Google preflight failed during '${operation}' (${googleErrorSummary(error)}). Scopes were not broadened.`);
@@ -512,9 +862,14 @@ async function setFirebaseSecrets(clientSecret, refreshToken) {
     const temporaryDirectory = path.join(ROOT, ".secrets-tmp");
     const values = new Map([
         [SECRET_NAMES.clientSecret, clientSecret],
-        [SECRET_NAMES.refreshToken, refreshToken],
-        [SECRET_NAMES.rateLimit, randomBytes(48).toString("base64url")]
+        [SECRET_NAMES.refreshToken, refreshToken]
     ]);
+    const hasRateLimitSecret = firebaseSecretExists(SECRET_NAMES.rateLimit);
+    if (!hasRateLimitSecret) {
+        values.set(SECRET_NAMES.rateLimit, randomBytes(48).toString("base64url"));
+    } else {
+        console.log("Preserving the independent rate-limit HMAC secret.");
+    }
 
     await mkdir(temporaryDirectory, { mode: 0o700 });
     try {
@@ -538,6 +893,9 @@ async function setFirebaseSecrets(clientSecret, refreshToken) {
         runFirebase(["functions:secrets:get", name, "--project", PROJECT_ID, "--json"], { capture: true });
         console.log(`Verified Secret Manager metadata: ${name}`);
     }
+    if (hasRateLimitSecret) {
+        console.log(`Verified existing Secret Manager metadata: ${SECRET_NAMES.rateLimit}`);
+    }
 }
 
 async function main() {
@@ -551,7 +909,10 @@ async function main() {
     }
 
     const clientSecret = await promptHidden("Fresh OAuth client secret (input hidden): ");
-    if (clientSecret.trim().length < 12 || /[\r\n\u0000-\u001f\u007f]/.test(clientSecret)) {
+    if (
+        clientSecret.trim().length < 12
+        || hasUnsafeControlCharacter(clientSecret)
+    ) {
         fail("The entered client secret is invalid.");
     }
 
@@ -562,7 +923,16 @@ async function main() {
     console.log("OAuth bootstrap complete. Redeploy every function that binds the updated secrets.");
 }
 
-main().catch((error) => {
-    console.error(error instanceof Error ? error.message : "OAuth bootstrap failed.");
-    process.exitCode = 1;
-});
+const isDirectExecution = process.argv[1]
+    && import.meta.url === pathToFileURL(process.argv[1]).href;
+
+if (isDirectExecution) {
+    main().catch((error) => {
+        console.error(
+            error instanceof Error
+                ? error.message
+                : "OAuth bootstrap failed."
+        );
+        process.exitCode = 1;
+    });
+}

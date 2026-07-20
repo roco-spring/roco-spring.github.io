@@ -3,10 +3,17 @@ import type { Auth } from "firebase-admin/auth";
 import type { Firestore } from "firebase-admin/firestore";
 import type { drive_v3, gmail_v1, sheets_v4 } from "googleapis";
 import { describe, expect, it, vi } from "vitest";
-import { DRIVE_FOLDER_ID } from "../src/config.js";
+import {
+  AMBIGUOUS_SHEET_CLEANUP_HORIZON_MS,
+  DRIVE_FOLDER_ID,
+} from "../src/config.js";
 import type { GoogleApiClients } from "../src/google-auth.js";
 import type { TeamDocument, UpdateTeamInput } from "../src/models.js";
-import { getMyTeamOperation, updateMyTeamOperation } from "../src/teams.js";
+import {
+  getMyTeamOperation,
+  synchronizeLatestTeamOperation,
+  updateMyTeamOperation,
+} from "../src/teams.js";
 import { FakeFirestore } from "./helpers/fake-firestore.js";
 
 function team(overrides: Partial<TeamDocument> = {}): TeamDocument {
@@ -65,7 +72,10 @@ function update(overrides: Partial<UpdateTeamInput> = {}): UpdateTeamInput {
   };
 }
 
-function googleMock(options: { failRename?: boolean } = {}) {
+function googleMock(options: {
+  ambiguousCreate?: boolean;
+  failRename?: boolean;
+} = {}) {
   const updateFile = options.failRename
     ? vi.fn().mockRejectedValue(new Error("drive unavailable"))
     : vi.fn().mockResolvedValue({ data: { id: "stored-sheet-id" } });
@@ -75,8 +85,27 @@ function googleMock(options: { failRename?: boolean } = {}) {
     get: vi.fn().mockResolvedValue({ data: { values: [] } }),
     append: vi.fn().mockResolvedValue({ data: {} }),
   };
+  const listFiles = options.ambiguousCreate
+    ? vi
+        .fn()
+        .mockResolvedValueOnce({ data: { files: [] } })
+        .mockResolvedValue({
+          data: { files: [{ id: "stored-sheet-id" }] },
+        })
+    : vi.fn().mockResolvedValue({ data: { files: [] } });
+  const createFile = options.ambiguousCreate
+    ? vi.fn().mockRejectedValue({
+        name: "GaxiosError",
+        response: { status: 503 },
+        config: {},
+      })
+    : vi.fn().mockResolvedValue({
+        data: { id: "stored-sheet-id", parents: [DRIVE_FOLDER_ID] },
+      });
   const drive = {
     files: {
+      list: listFiles,
+      create: createFile,
       update: updateFile,
       get: vi.fn().mockResolvedValue({
         data: {
@@ -109,11 +138,17 @@ function googleMock(options: { failRename?: boolean } = {}) {
   return {
     clients: {
       auth: {} as GoogleApiClients["auth"],
+      oauthScopes: [
+        "https://www.googleapis.com/auth/drive.file",
+        "https://www.googleapis.com/auth/gmail.send",
+      ],
       drive: drive as unknown as drive_v3.Drive,
       sheets: sheets as unknown as sheets_v4.Sheets,
       gmail: {} as gmail_v1.Gmail,
     },
     updateFile,
+    createFile,
+    listFiles,
     values,
   };
 }
@@ -150,38 +185,205 @@ describe("team read and update operations", () => {
     expect(result).not.toHaveProperty("registrationRequestId");
   });
 
-  it("commits an optimistic revision and syncs the same stored spreadsheet", async () => {
+  it("commits an optimistic revision and leaves synchronization to the scheduler", async () => {
     const fake = seededTeam();
     const google = googleMock();
     const result = await updateMyTeamOperation(
       fake as unknown as Firestore,
       matchingAuth(),
-      google.clients,
       "uid-a",
       update(),
     );
-    expect(result.synchronizationStatus).toBe("synced");
+    expect(result.synchronizationStatus).toBe("pending");
     expect(result.team).toMatchObject({
       teamId: "RoCo-1",
       teamName: "Updated Team",
       primaryContactEmail: "owner@example.org",
       revision: 2,
-      sheetSyncStatus: "synced",
+      sheetSyncStatus: "pending",
     });
-    expect(google.updateFile).toHaveBeenCalledWith(
-      expect.objectContaining({ fileId: "stored-sheet-id" }),
-    );
-    for (const call of google.values.update.mock.calls) {
-      expect(call[0]).toEqual(
-        expect.objectContaining({ spreadsheetId: "stored-sheet-id", valueInputOption: "RAW" }),
-      );
-    }
+    expect(google.updateFile).not.toHaveBeenCalled();
+    expect(google.values.update).not.toHaveBeenCalled();
     expect(fake.read("teams/RoCo-1")).toMatchObject({
       teamId: "RoCo-1",
       teamNumber: 1,
       ownerUid: "uid-a",
       primaryContactEmail: "owner@example.org",
       revision: 2,
+      sheetSyncStatus: "pending",
+    });
+  });
+
+  it("provisions and synchronizes a missing spreadsheet from the committed core", async () => {
+    const fake = seededTeam({
+      sheetId: null,
+      sheetUrl: null,
+      sheetCreateAttemptedAt: null,
+      sheetCreateNoFileObservationCount: 0,
+      sheetSyncStatus: "pending",
+      sheetLastSyncedRevision: 0,
+      sheetSyncLastAttemptAt: null,
+    });
+    const google = googleMock();
+
+    await expect(
+      synchronizeLatestTeamOperation(
+        fake as unknown as Firestore,
+        google.clients,
+        "RoCo-1",
+        "Reconciliation",
+      ),
+    ).resolves.toBe("synced");
+
+    expect(google.createFile).toHaveBeenCalledTimes(1);
+    expect(fake.read("teams/RoCo-1")).toMatchObject({
+      sheetId: "stored-sheet-id",
+      sheetUrl: "https://docs.google.com/spreadsheets/d/stored-sheet-id/edit",
+      sheetSyncStatus: "synced",
+      sheetLastSyncedRevision: 1,
+      sheetCreateNoFileObservationCount: 0,
+    });
+  });
+
+  it("recovers an ambiguous spreadsheet create without issuing a duplicate", async () => {
+    const fake = seededTeam({
+      sheetId: null,
+      sheetUrl: null,
+      sheetCreateAttemptedAt: null,
+      sheetCreateNoFileObservationCount: 0,
+      sheetSyncStatus: "pending",
+      sheetLastSyncedRevision: 0,
+      sheetSyncLastAttemptAt: null,
+    });
+    const google = googleMock({ ambiguousCreate: true });
+
+    await expect(
+      synchronizeLatestTeamOperation(
+        fake as unknown as Firestore,
+        google.clients,
+        "RoCo-1",
+        "Reconciliation",
+      ),
+    ).resolves.toBe("synced");
+
+    expect(google.createFile).toHaveBeenCalledTimes(1);
+    expect(google.listFiles).toHaveBeenCalledTimes(2);
+    expect(fake.read("teams/RoCo-1")).toMatchObject({
+      sheetId: "stored-sheet-id",
+      sheetSyncStatus: "synced",
+    });
+  });
+
+  it("retains an ambiguous create fence until bounded no-file evidence clears it", async () => {
+    vi.useFakeTimers();
+    try {
+      const startedAt = new Date("2026-07-20T09:00:00.000Z").getTime();
+      vi.setSystemTime(startedAt);
+      const fake = seededTeam({
+        sheetId: null,
+        sheetUrl: null,
+        sheetCreateAttemptedAt: null,
+        sheetCreateNoFileObservationCount: 0,
+        sheetSyncStatus: "pending",
+        sheetLastSyncedRevision: 0,
+        sheetSyncLastAttemptAt: null,
+      });
+      const google = googleMock();
+      const ambiguousError = {
+        name: "GaxiosError",
+        response: { status: 503 },
+        config: {},
+      };
+      google.createFile.mockRejectedValueOnce(ambiguousError);
+
+      const runSynchronization = async (): Promise<
+        "synced" | "pending" | "failed"
+      > => {
+        const result = synchronizeLatestTeamOperation(
+          fake as unknown as Firestore,
+          google.clients,
+          "RoCo-1",
+          "Reconciliation",
+        );
+        await vi.runAllTimersAsync();
+        return result;
+      };
+
+      await expect(runSynchronization()).resolves.toBe("pending");
+      expect(google.createFile).toHaveBeenCalledTimes(1);
+      expect(fake.read("teams/RoCo-1")).toMatchObject({
+        sheetSyncStatus: "pending",
+        sheetSyncRetryCount: 1,
+        sheetCreateNoFileObservationCount: 1,
+      });
+      expect(
+        fake.read("teams/RoCo-1")?.sheetCreateAttemptedAt,
+      ).toBeInstanceOf(Timestamp);
+
+      vi.setSystemTime(startedAt + 5 * 60 * 1_000);
+      await expect(runSynchronization()).resolves.toBe("pending");
+      expect(google.createFile).toHaveBeenCalledTimes(1);
+      expect(fake.read("teams/RoCo-1")).toMatchObject({
+        sheetCreateNoFileObservationCount: 2,
+      });
+
+      vi.setSystemTime(startedAt + AMBIGUOUS_SHEET_CLEANUP_HORIZON_MS + 1);
+      await expect(runSynchronization()).resolves.toBe("pending");
+      expect(google.createFile).toHaveBeenCalledTimes(1);
+      expect(fake.read("teams/RoCo-1")).toMatchObject({
+        sheetCreateAttemptedAt: null,
+        sheetCreateNoFileObservationCount: 0,
+        sheetSyncRetryCount: 0,
+      });
+
+      vi.setSystemTime(
+        startedAt + AMBIGUOUS_SHEET_CLEANUP_HORIZON_MS + 5 * 60 * 1_000,
+      );
+      await expect(runSynchronization()).resolves.toBe("synced");
+      expect(google.createFile).toHaveBeenCalledTimes(2);
+      expect(fake.read("teams/RoCo-1")).toMatchObject({
+        sheetId: "stored-sheet-id",
+        sheetSyncStatus: "synced",
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("clears the create fence immediately after a definitive 4xx rejection", async () => {
+    const fake = seededTeam({
+      sheetId: null,
+      sheetUrl: null,
+      sheetCreateAttemptedAt: null,
+      sheetCreateNoFileObservationCount: 0,
+      sheetSyncStatus: "pending",
+      sheetLastSyncedRevision: 0,
+      sheetSyncLastAttemptAt: null,
+    });
+    const google = googleMock();
+    google.createFile.mockRejectedValue({
+      name: "GaxiosError",
+      response: { status: 400 },
+      config: {},
+    });
+
+    await expect(
+      synchronizeLatestTeamOperation(
+        fake as unknown as Firestore,
+        google.clients,
+        "RoCo-1",
+        "Reconciliation",
+      ),
+    ).resolves.toBe("failed");
+
+    expect(google.listFiles).toHaveBeenCalledTimes(1);
+    expect(google.createFile).toHaveBeenCalledTimes(1);
+    expect(fake.read("teams/RoCo-1")).toMatchObject({
+      sheetCreateAttemptedAt: null,
+      sheetCreateNoFileObservationCount: 0,
+      sheetSyncRetryCount: 1,
+      sheetSyncStatus: "failed",
+      sheetSyncSafeErrorCategory: "external_permanent",
     });
   });
 
@@ -192,7 +394,6 @@ describe("team read and update operations", () => {
       updateMyTeamOperation(
         fake as unknown as Firestore,
         matchingAuth(),
-        google.clients,
         "uid-a",
         update({ expectedRevision: 99 }),
       ),
@@ -207,49 +408,37 @@ describe("team read and update operations", () => {
       updateMyTeamOperation(
         fake as unknown as Firestore,
         matchingAuth(),
-        googleMock().clients,
         "uid-a",
         update(),
       ),
     ).rejects.toMatchObject({ code: "permission-denied" });
   });
 
-  it("keeps the Firestore update but reports a terminal synchronization failure", async () => {
+  it("does not expose a Google failure path after the Firestore commit", async () => {
     const fake = seededTeam();
+    const google = googleMock({ failRename: true });
     const result = await updateMyTeamOperation(
       fake as unknown as Firestore,
       matchingAuth(),
-      googleMock({ failRename: true }).clients,
       "uid-a",
       update(),
     );
-    expect(result.synchronizationStatus).toBe("failed");
-    expect(result.team.sheetSyncStatus).toBe("failed");
+    expect(result.synchronizationStatus).toBe("pending");
+    expect(result.team.sheetSyncStatus).toBe("pending");
+    expect(google.updateFile).not.toHaveBeenCalled();
     expect(fake.read("teams/RoCo-1")).toMatchObject({
       teamName: "Updated Team",
       revision: 2,
-      sheetSyncStatus: "failed",
+      sheetSyncStatus: "pending",
     });
   });
 
-  it("returns the committed revision as pending when the post-commit sync lease fails", async () => {
+  it("returns the committed revision as pending", async () => {
     const fake = seededTeam();
-    const originalRunTransaction = fake.runTransaction.bind(fake);
-    let transactionCount = 0;
-    vi.spyOn(fake, "runTransaction").mockImplementation(async (callback) => {
-      transactionCount += 1;
-      if (transactionCount === 2) {
-        throw Object.assign(new Error("Firestore temporarily unavailable"), {
-          code: "unavailable",
-        });
-      }
-      return originalRunTransaction(callback);
-    });
 
     const result = await updateMyTeamOperation(
       fake as unknown as Firestore,
       matchingAuth(),
-      googleMock().clients,
       "uid-a",
       update(),
     );
@@ -269,12 +458,36 @@ describe("team read and update operations", () => {
     });
   });
 
+  it("requires no Google client initialization", async () => {
+    const fake = seededTeam();
+    const getGoogle = vi.fn().mockRejectedValue(
+      new Error("sanitized OAuth failure"),
+    );
+
+    const result = await updateMyTeamOperation(
+      fake as unknown as Firestore,
+      matchingAuth(),
+      "uid-a",
+      update(),
+    );
+
+    expect(getGoogle).not.toHaveBeenCalled();
+    expect(result).toMatchObject({
+      synchronizationStatus: "pending",
+      team: { teamName: "Updated Team", revision: 2 },
+    });
+    expect(fake.read("teams/RoCo-1")).toMatchObject({
+      teamName: "Updated Team",
+      revision: 2,
+      sheetSyncStatus: "pending",
+    });
+  });
+
   it("requires the immutable primary contact to remain a member", async () => {
     await expect(
       updateMyTeamOperation(
         seededTeam() as unknown as Firestore,
         matchingAuth(),
-        googleMock().clients,
         "uid-a",
         update({
           members: [

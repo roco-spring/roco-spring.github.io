@@ -12,9 +12,20 @@ import { httpsCallable } from "https://www.gstatic.com/firebasejs/12.16.0/fireba
 import { auth, authPersistenceReady, functions } from "./firebase-config.js";
 import { TRACKS, isValidEmail, normalizeEmail, validateTeamInput } from "./team-validation.js";
 
-const callRegisterTeam = httpsCallable(functions, "registerTeam", { timeout: 180000 });
+// The callable performs only Firebase Auth and Firestore work. Google side
+// effects run asynchronously, so a multi-minute browser wait is never useful.
+const REGISTER_TEAM_TIMEOUT_MS = 75000;
+const REGISTRATION_ATTEMPT_STORAGE_KEY = "roco.registrationAttempt.v1";
+const REGISTRATION_FINGERPRINT_PATTERN = /^[0-9a-f]{64}$/u;
+const IDEMPOTENCY_KEY_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;
+const REGISTRATION_TEAM_ID_PATTERN = /^RoCo-[1-9]\d*$/u;
+const REGISTRATION_EMAIL_STATUSES = new Set(["sent", "pending", "failed"]);
+
+const callRegisterTeam = httpsCallable(functions, "registerTeam", {
+    timeout: REGISTER_TEAM_TIMEOUT_MS
+});
 const callGetMyTeam = httpsCallable(functions, "getMyTeam", { timeout: 60000 });
-const callUpdateMyTeam = httpsCallable(functions, "updateMyTeam", { timeout: 180000 });
+const callUpdateMyTeam = httpsCallable(functions, "updateMyTeam", { timeout: 75000 });
 const callCompleteInitialPasswordChange = httpsCallable(
     functions,
     "completeInitialPasswordChange",
@@ -86,7 +97,7 @@ const MEMBER_FIELDS = Object.freeze([
 ]);
 
 let currentTeam = null;
-let registrationAttempt = null;
+let registrationAttempt = readStoredRegistrationAttempt();
 let authenticationSequence = 0;
 let signedOutMessage = "";
 let signedOutMessageState = "success";
@@ -542,7 +553,10 @@ async function handleRegistration(event) {
         return;
     }
 
-    if (typeof crypto.randomUUID !== "function") {
+    if (
+        typeof crypto.randomUUID !== "function"
+        || typeof crypto.subtle?.digest !== "function"
+    ) {
         setStatus(
             elements.registrationStatus,
             "This browser cannot create a secure registration request. Please use an up-to-date browser.",
@@ -555,43 +569,26 @@ async function handleRegistration(event) {
         ...validation.data,
         registrantConfirmed: input.submitterIsMember === true
     };
-    const fingerprint = JSON.stringify(requestPayload);
-
-    if (!registrationAttempt || registrationAttempt.fingerprint !== fingerprint) {
-        registrationAttempt = {
-            fingerprint,
-            idempotencyKey: crypto.randomUUID()
-        };
-    }
 
     setFormBusy(elements.registrationForm, true);
     setStatus(
         elements.registrationStatus,
-        "Creating the secure team account, organizer record, and confirmation email…",
+        "Creating the secure team account and organizer record…",
         "loading"
     );
 
     try {
+        const attempt = await getOrCreateRegistrationAttempt(requestPayload);
         const result = await callRegisterTeam({
             ...requestPayload,
-            idempotencyKey: registrationAttempt.idempotencyKey
+            idempotencyKey: attempt.idempotencyKey
         });
-        const response = isPlainObject(result.data) ? result.data : {};
-        const teamId = typeof response.teamId === "string" && /^RoCo-[1-9]\d*$/u.test(response.teamId)
-            ? response.teamId
-            : "";
-        const emailStatus = safeStatusValue(response.registrationEmailStatus ?? response.emailStatus);
-        const successfulMessage = teamId
-            ? `Registration completed for ${teamId}. Check the primary contact email for the temporary password and sign-in instructions.`
-            : "Registration completed. Check the primary contact email for the temporary password and sign-in instructions.";
-        const pendingMessage = teamId
-            ? `${teamId} was created. Confirmation-email delivery is still pending and will be retried securely.`
-            : "The team was created. Confirmation-email delivery is still pending and will be retried securely.";
-        const failedMessage = teamId
-            ? `${teamId} was created, but confirmation-email delivery needs organizer attention. Contact roco-spring-org@googlegroups.com.`
-            : "The team was created, but confirmation-email delivery needs organizer attention. Contact roco-spring-org@googlegroups.com.";
+        const { teamId, emailStatus } = parseRegistrationResult(result.data);
+        const successfulMessage = `Registration completed for ${teamId}. Check the primary contact email for the temporary password and sign-in instructions.`;
+        const pendingMessage = `${teamId} was created. Confirmation-email delivery is still pending and will be retried securely.`;
+        const failedMessage = `${teamId} was created, but confirmation-email delivery needs organizer attention. Contact roco-spring-org@googlegroups.com.`;
 
-        registrationAttempt = null;
+        clearRegistrationAttempt();
         elements.registrationForm.reset();
         resetMemberEditor(registrationMemberEditor);
         clearFieldErrors(elements.registrationForm);
@@ -603,17 +600,118 @@ async function handleRegistration(event) {
             emailStatus === "failed" ? failedMessage : emailStatus === "pending" ? pendingMessage : successfulMessage,
             ["pending", "failed"].includes(emailStatus) ? "warning" : "success"
         );
-        setRegistrationSpamNotice(emailStatus === "sent");
+        // A pending email will be delivered asynchronously by the managed
+        // reconciler, so the recipient still needs the spam-folder reminder.
+        setRegistrationSpamNotice(emailStatus !== "failed");
         elements.loginEmail.focus();
     } catch (error) {
         if (errorCode(error) === "functions/failed-precondition") {
             // A failed saga/idempotency record is terminal; a deliberate retry needs a fresh key.
-            registrationAttempt = null;
+            clearRegistrationAttempt();
         }
         setStatus(elements.registrationStatus, safeErrorMessage(error, "registration"), "error");
     } finally {
         setFormBusy(elements.registrationForm, false);
     }
+}
+
+function parseRegistrationResult(value) {
+    const response = isPlainObject(value) ? value : null;
+    const teamId = typeof response?.teamId === "string" ? response.teamId : "";
+    const rawEmailStatus = response?.registrationEmailStatus ?? response?.emailStatus;
+    const emailStatus = typeof rawEmailStatus === "string" ? rawEmailStatus : "";
+
+    if (
+        !REGISTRATION_TEAM_ID_PATTERN.test(teamId)
+        || !REGISTRATION_EMAIL_STATUSES.has(emailStatus)
+    ) {
+        const error = new Error("The registration service returned an invalid response.");
+        error.code = "registration/invalid-response";
+        throw error;
+    }
+
+    return { teamId, emailStatus };
+}
+
+async function getOrCreateRegistrationAttempt(requestPayload) {
+    const fingerprint = await sha256Fingerprint(JSON.stringify(requestPayload));
+    const storedAttempt = registrationAttempt ?? readStoredRegistrationAttempt();
+
+    if (storedAttempt?.fingerprint === fingerprint) {
+        registrationAttempt = storedAttempt;
+        return storedAttempt;
+    }
+
+    const idempotencyKey = crypto.randomUUID();
+    if (!IDEMPOTENCY_KEY_PATTERN.test(idempotencyKey)) {
+        throw new Error("The browser generated an invalid registration request identifier.");
+    }
+
+    registrationAttempt = { fingerprint, idempotencyKey };
+    persistRegistrationAttempt(registrationAttempt);
+    return registrationAttempt;
+}
+
+async function sha256Fingerprint(value) {
+    const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));
+    return [...new Uint8Array(digest)]
+        .map((byte) => byte.toString(16).padStart(2, "0"))
+        .join("");
+}
+
+function readStoredRegistrationAttempt() {
+    try {
+        const serializedAttempt = sessionStorage.getItem(REGISTRATION_ATTEMPT_STORAGE_KEY);
+        if (!serializedAttempt) return null;
+
+        const attempt = JSON.parse(serializedAttempt);
+        const hasExactShape = isPlainObject(attempt)
+            && Object.keys(attempt).length === 2
+            && typeof attempt.fingerprint === "string"
+            && REGISTRATION_FINGERPRINT_PATTERN.test(attempt.fingerprint)
+            && typeof attempt.idempotencyKey === "string"
+            && IDEMPOTENCY_KEY_PATTERN.test(attempt.idempotencyKey);
+
+        if (!hasExactShape) {
+            removeStoredRegistrationAttempt();
+            return null;
+        }
+
+        return {
+            fingerprint: attempt.fingerprint,
+            idempotencyKey: attempt.idempotencyKey
+        };
+    } catch {
+        removeStoredRegistrationAttempt();
+        return null;
+    }
+}
+
+function persistRegistrationAttempt(attempt) {
+    try {
+        sessionStorage.setItem(
+            REGISTRATION_ATTEMPT_STORAGE_KEY,
+            JSON.stringify({
+                fingerprint: attempt.fingerprint,
+                idempotencyKey: attempt.idempotencyKey
+            })
+        );
+    } catch {
+        // The in-memory attempt still protects retries made before a page reload.
+    }
+}
+
+function removeStoredRegistrationAttempt() {
+    try {
+        sessionStorage.removeItem(REGISTRATION_ATTEMPT_STORAGE_KEY);
+    } catch {
+        // Storage can be unavailable in restrictive browser contexts.
+    }
+}
+
+function clearRegistrationAttempt() {
+    registrationAttempt = null;
+    removeStoredRegistrationAttempt();
 }
 
 async function handleLogin(event) {
@@ -1266,6 +1364,9 @@ function safeErrorMessage(error, context) {
     }
 
     if (context === "registration") {
+        if (code === "registration/invalid-response") {
+            return "The registration service returned an incomplete response. Your form and saved request identifier have been kept; retry with the same details to check the result without creating a duplicate team. If this continues, contact roco-spring-org@googlegroups.com.";
+        }
         if (["functions/unauthenticated", "functions/permission-denied"].includes(code)) {
             return "Security verification could not be completed. Refresh the page and try again.";
         }
@@ -1277,6 +1378,9 @@ function safeErrorMessage(error, context) {
         }
         if (code === "functions/invalid-argument") {
             return "The registration was rejected because one or more fields are invalid. Review the form and try again.";
+        }
+        if (code === "functions/aborted") {
+            return "This registration is already being processed. Wait a moment, then retry with the same details; the saved request identifier will prevent a duplicate team.";
         }
         if (["functions/internal", "functions/not-found"].includes(code)) {
             return "The registration service is temporarily unavailable. Try again shortly; repeating the same request will not create a duplicate team. If this continues, contact roco-spring-org@googlegroups.com.";
