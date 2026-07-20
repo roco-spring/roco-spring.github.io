@@ -93,7 +93,7 @@ These commands may run on this editing node, but none remains running or partici
 
 - [ ] Scheduled dependency health logs `healthy`; no arbitrary participant Sheet is used as a global queue canary.
 - [ ] Cloud Monitoring alert for `registrationDependencyHealth/status=unhealthy` is enabled and its organizer notification channel is verified.
-- [ ] Alerts cover sustained `registerTeam` 5xx/deadline rates, Scheduler attempt failures, and durable reconciliation resources logged with `status=failed`.
+- [ ] Alerts cover sustained 5xx/deadline rates on all four public callables, Scheduler attempt failures, and durable reconciliation resources logged with `status=failed`.
 - [ ] The exact `roco-spring-org@googlegroups.com` enabled/verified channel and all four required policies pass `npm run production:runtime:verify`; no local watcher or cron job is counted as monitoring.
 - [ ] A controlled test incident reaches the organizer's inbox; configuration read-back alone is not reported as proof of notification delivery.
 - [ ] No pending/failed email, Sheet, cleanup, or incomplete saga remains unexplained after two reconciler intervals.

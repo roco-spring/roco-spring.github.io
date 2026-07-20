@@ -1,6 +1,6 @@
 export const REGION = "europe-west3" as const;
 export const PROJECT_ID = "roco-spring-registration-2026" as const;
-export const DRIVE_FOLDER_ID = "17UXoH2ldTuSFyhaxOknu6IvGxFbr7QYU" as const;
+export const DRIVE_FOLDER_ID = "1gZwIgAcwrtHZN2vW4XttTq5fFA-kU4Y4" as const;
 export const GOOGLE_OAUTH_CLIENT_ID =
   "149052181991-dn69v7pid5o7fi89dtnusbklnbnncnho.apps.googleusercontent.com" as const;
 export const EMAIL_SENDER = "shashanksagnihotri@gmail.com" as const;

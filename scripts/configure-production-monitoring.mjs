@@ -229,6 +229,7 @@ export async function loadAdcCredentials({
 function validateTokenPayload(payload) {
     if (typeof payload?.access_token !== "string" ||
         payload.access_token.length < 20 ||
+        /[\r\n\u0000-\u001f\u007f]/u.test(payload.access_token) ||
         (payload.token_type !== undefined &&
             String(payload.token_type).toLowerCase() !== "bearer")) {
         throw new ProductionMonitoringError("adc_token");
@@ -335,7 +336,8 @@ export async function obtainAdcAccessToken(
 }
 
 export function createCloudApiClient(accessToken, fetchImplementation = fetch) {
-    if (typeof accessToken !== "string" || accessToken.length < 20) {
+    if (typeof accessToken !== "string" || accessToken.length < 20 ||
+        /[\r\n\u0000-\u001f\u007f]/u.test(accessToken)) {
         throw new ProductionMonitoringError("adc_token");
     }
 
@@ -353,7 +355,12 @@ export function createCloudApiClient(accessToken, fetchImplementation = fetch) {
         });
     }
 
-    async function listPaginated(stage, initialUrl, collectionKey) {
+    async function listPaginated(
+        stage,
+        initialUrl,
+        collectionKey,
+        { rejectUnreachable = false } = {},
+    ) {
         const resources = [];
         const tokens = new Set();
         let pageToken = null;
@@ -365,6 +372,16 @@ export function createCloudApiClient(accessToken, fetchImplementation = fetch) {
             if (payload[collectionKey] !== undefined &&
                 !Array.isArray(payload[collectionKey])) {
                 throw new ProductionMonitoringError(stage);
+            }
+            if (rejectUnreachable &&
+                ((payload.unreachable !== undefined &&
+                    !Array.isArray(payload.unreachable)) ||
+                    payload.unreachable?.length > 0)) {
+                throw new ProductionMonitoringError(
+                    stage,
+                    null,
+                    "UNAVAILABLE",
+                );
             }
             resources.push(...(payload[collectionKey] ?? []));
             if (!payload.nextPageToken) return resources;
@@ -381,8 +398,9 @@ export function createCloudApiClient(accessToken, fetchImplementation = fetch) {
     return Object.freeze({
         listFunctions: () => listPaginated(
             "functions_list",
-            `${FUNCTIONS_ORIGIN}/v2/projects/${PROJECT_ID}/locations/${REGION}/functions`,
+            `${FUNCTIONS_ORIGIN}/v2/projects/${PROJECT_ID}/locations/-/functions`,
             "functions",
+            { rejectUnreachable: true },
         ),
         listSchedulerJobs: () => listPaginated(
             "scheduler_list",
@@ -573,6 +591,7 @@ export function verifyRunIamConfiguration(
             "roles/run.invoker",
             { unconditionalOnly: true },
         );
+        const allInvokerMembers = bindingMembers(policy, "roles/run.invoker");
 
         if (PUBLIC_CALLABLE_FUNCTIONS.includes(id)) {
             if (!unconditionalInvokers.includes("allUsers") ||
@@ -580,7 +599,10 @@ export function verifyRunIamConfiguration(
                 throw new ProductionMonitoringError("run_iam_callable");
             }
         } else if (anyBroadPrincipal ||
-            !unconditionalInvokers.includes(schedulerMember)) {
+            allInvokerMembers.length !== 1 ||
+            allInvokerMembers[0] !== schedulerMember ||
+            unconditionalInvokers.length !== 1 ||
+            unconditionalInvokers[0] !== schedulerMember) {
             throw new ProductionMonitoringError("run_iam_scheduler");
         }
     }
@@ -639,10 +661,13 @@ export function selectAndValidateSchedulerJob(
         throw new ProductionMonitoringError("scheduler_configuration");
     }
     const lastAttemptMs = Date.parse(job.lastAttemptTime ?? "");
+    const hasStatus = typeof job.status === "object" &&
+        job.status !== null && !Array.isArray(job.status);
     const statusCode = Number(job.status?.code ?? 0);
     if (!Number.isFinite(lastAttemptMs) ||
         lastAttemptMs > now + 60_000 ||
         now - lastAttemptMs > 15 * 60_000 ||
+        !hasStatus ||
         !Number.isInteger(statusCode) || statusCode !== 0) {
         throw new ProductionMonitoringError("scheduler_execution");
     }
@@ -739,37 +764,43 @@ export function buildDesiredPolicies(channelName, schedulerJob = SCHEDULER_JOB_I
         alertStrategy: logAlertStrategy(),
     };
 
+    const callableServices = Object.freeze([
+        "registerteam",
+        "getmyteam",
+        "updatemyteam",
+        "completeinitialpasswordchange",
+    ]);
     const callable = {
         ...basePolicy(
-            "registerteam_5xx",
-            "RoCo registration: registerTeam sustained 5xx",
-            "The remote `registerTeam` Cloud Run service has sustained 5xx responses, including request deadlines. Inspect sanitized Cloud Run and Function logs for the deployed revision; preserve idempotency records and committed teams during recovery.",
+            "callables_5xx",
+            "RoCo registration: callable sustained 5xx",
+            "A remote registration callable has sustained 5xx responses, including request deadlines. Inspect sanitized Cloud Run and Function logs for the deployed revision; preserve idempotency records and committed teams during recovery.",
             channelName,
         ),
-        conditions: [{
-            displayName: "registerTeam 5xx rate remains above zero for 5 minutes",
+        conditions: callableServices.map((serviceName) => ({
+            displayName: `${serviceName} 5xx rate remains above zero for 3 minutes`,
             conditionThreshold: {
                 filter: [
                     'metric.type="run.googleapis.com/request_count"',
                     'resource.type="cloud_run_revision"',
                     `resource.label."location"="${REGION}"`,
-                    'resource.label."service_name"="registerteam"',
+                    `resource.label."service_name"="${serviceName}"`,
                     'metric.label."response_code_class"="5xx"',
                 ].join(" AND "),
                 aggregations: [{
-                    alignmentPeriod: "300s",
+                    alignmentPeriod: "60s",
                     perSeriesAligner: "ALIGN_RATE",
                     crossSeriesReducer: "REDUCE_SUM",
                 }],
                 comparison: "COMPARISON_GT",
-                // 0.001 requests/second is below one request per five-minute
-                // alignment window, while avoiding proto3's omitted zero value.
+                // 0.001 requests/second remains below one request per minute,
+                // while avoiding proto3's omitted zero-value ambiguity.
                 thresholdValue: 0.001,
-                duration: "300s",
+                duration: "180s",
                 trigger: { count: 1 },
                 evaluationMissingData: "EVALUATION_MISSING_DATA_INACTIVE",
             },
-        }],
+        })),
         alertStrategy: metricAlertStrategy(),
     };
 
@@ -788,7 +819,7 @@ export function buildDesiredPolicies(channelName, schedulerJob = SCHEDULER_JOB_I
                     `resource.labels.project_id="${PROJECT_ID}"`,
                     `resource.labels.location="${REGION}"`,
                     `resource.labels.job_id="${schedulerJob}"`,
-                    'jsonPayload.@type="type.googleapis.com/google.cloud.scheduler.logging.AttemptFinished"',
+                    'jsonPayload."@type"="type.googleapis.com/google.cloud.scheduler.logging.AttemptFinished"',
                     "severity>=ERROR",
                 ].join("\n"),
             },

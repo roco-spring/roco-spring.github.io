@@ -11,7 +11,7 @@ This runbook is the production source of truth for the RoCo-Spring registration 
 | Functions / Firestore region | `europe-west3` |
 | Website | `https://roco-spring.github.io/` |
 | Registration page | `https://roco-spring.github.io/team-registration.html` |
-| Private Drive folder | `17UXoH2ldTuSFyhaxOknu6IvGxFbr7QYU` |
+| Private Drive folder | `1gZwIgAcwrtHZN2vW4XttTq5fFA-kU4Y4` |
 | OAuth client ID | `149052181991-dn69v7pid5o7fi89dtnusbklnbnncnho.apps.googleusercontent.com` |
 | Sender | `shashanksagnihotri@gmail.com` |
 | Reply-To | `roco-spring-org@googlegroups.com` |
@@ -153,7 +153,7 @@ npm run monitoring:configure
 The command finishes all read-only Function, IAM, Scheduler, and channel checks before its first possible write. It creates missing managed policies, updates only policies bearing the exact RoCo management labels, refuses to take over a conflicting unmanaged policy, reads all four policies back, and is a no-op on a second healthy run. Its canonical enabled policies are:
 
 1. `RoCo registration: Google dependency unhealthy`, a log match for `cloud_run_revision`, `europe-west3`, service `reconcileregistrations`, `operation="registrationDependencyHealth"`, `status="unhealthy"`, and `severity>=ERROR`.
-2. `RoCo registration: registerTeam sustained 5xx`, a metric threshold over `run.googleapis.com/request_count` scoped to `registerteam` and response class `5xx`. It uses `ALIGN_RATE` over 300 seconds and must remain above `0.001` requests/second for 300 seconds. Cloud Run request deadlines are HTTP 504, so they are included.
+2. `RoCo registration: callable sustained 5xx`, four metric conditions over `run.googleapis.com/request_count`, one for each public callable service, scoped to response class `5xx`. Each uses `ALIGN_RATE` over 60 seconds and must remain above `0.001` requests/second for 180 seconds. Cloud Run request deadlines are HTTP 504, so they are included.
 3. `RoCo registration: reconciler Scheduler failure`, a log match scoped to the exact project, region, job ID `firebase-schedule-reconcileRegistrations-europe-west3`, `AttemptFinished`, and `severity>=ERROR`.
 4. `RoCo registration: reconciliation resource requires recovery`, a log match for `operation="reconcileRegistrations"`, `status="failed"`, and `severity>=ERROR` on the reconciler service. This covers terminal email, Sheet, and failed-registration cleanup resources without putting participant data into the filter.
 

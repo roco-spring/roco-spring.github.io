@@ -20,7 +20,8 @@ import {
 } from "../scripts/verify-google-integration-health.mjs";
 
 const PROJECT_ID = "roco-spring-registration-2026";
-const FOLDER_ID = "17UXoH2ldTuSFyhaxOknu6IvGxFbr7QYU";
+const PROJECT_NUMBER = "149052181991";
+const FOLDER_ID = "1gZwIgAcwrtHZN2vW4XttTq5fFA-kU4Y4";
 const CLIENT_SECRET_KEY = "GOOGLE_OAUTH_CLIENT_SECRET";
 const REFRESH_TOKEN_KEY = "GOOGLE_OAUTH_REFRESH_TOKEN";
 const RATE_LIMIT_SECRET_KEY = "RATE_LIMIT_HMAC_SECRET";
@@ -188,12 +189,17 @@ test("secret-source argument is mandatory and limited to explicit release modes"
 
 test("latest selection ignores disabled and malformed versions", () => {
     const parent = `projects/${PROJECT_ID}/secrets/${CLIENT_SECRET_KEY}`;
+    const numericParent = `projects/${PROJECT_NUMBER}/secrets/${CLIENT_SECRET_KEY}`;
     assert.equal(selectLatestEnabledVersion(parent, [
         { name: `${parent}/versions/99`, state: "DISABLED" },
         { name: `${parent}/versions/not-a-number`, state: "ENABLED" },
         { name: `${parent}/versions/7`, state: "ENABLED" },
-        { name: `${parent}/versions/12`, state: "ENABLED" }
-    ]), `${parent}/versions/12`);
+        { name: `${numericParent}/versions/12`, state: "ENABLED" },
+        {
+            name: `projects/another-project/secrets/${CLIENT_SECRET_KEY}/versions/99`,
+            state: "ENABLED"
+        }
+    ]), `${numericParent}/versions/12`);
 });
 
 test("bound mode requires the exact split numeric secret architecture", async () => {

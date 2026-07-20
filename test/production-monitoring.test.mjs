@@ -229,6 +229,19 @@ test("authorized-user ADC refresh uses one bounded native token request", async 
     assert.ok(calls[0].options.signal instanceof AbortSignal);
     assert.equal(calls[0].options.method, "POST");
     assert.equal(calls[0].options.body.get("grant_type"), "refresh_token");
+
+    await assert.rejects(
+        obtainAdcAccessToken({
+            type: "authorized_user",
+            client_id: "adc-client-id",
+            [adcClientSecretField]: "adc-client-secret",
+            [adcRefreshTokenField]: "adc-refresh-token",
+        }, async () => jsonResponse({
+            [accessTokenField]: "unsafe-access-token-with-newline\nvalue",
+            token_type: "Bearer",
+        })),
+        expectStage("adc_token"),
+    );
 });
 
 test("credential-broker ADC types fail closed instead of hiding network retries", async () => {
@@ -325,6 +338,34 @@ test("repeated Cloud API page tokens fail closed", async () => {
     await assert.rejects(api.listAlertPolicies(), expectStage("alert_policies_list"));
 });
 
+test("Function inventory reads every region and rejects unreachable regions", async () => {
+    const calls = [];
+    const api = createCloudApiClient(
+        "test-access-token-with-safe-length",
+        async (url) => {
+            calls.push(new URL(url));
+            return jsonResponse({ functions: remoteFunctions(), unreachable: [] });
+        },
+    );
+    assert.equal((await api.listFunctions()).length, EXPECTED_FUNCTIONS.length);
+    assert.equal(
+        calls[0].pathname,
+        `/v2/projects/${PROJECT_ID}/locations/-/functions`,
+    );
+
+    const unreachableApi = createCloudApiClient(
+        "test-access-token-with-safe-length",
+        async () => jsonResponse({
+            functions: remoteFunctions(),
+            unreachable: ["europe-west1"],
+        }),
+    );
+    await assert.rejects(
+        unreachableApi.listFunctions(),
+        expectStage("functions_list"),
+    );
+});
+
 test("remote Function inventory is exact, active Node.js 22, and managed HTTPS", () => {
     const byId = verifyRemoteFunctionInventory(remoteFunctions());
     assert.equal(byId.size, 5);
@@ -396,6 +437,7 @@ test("Scheduler verifier accepts only the exact enabled remote five-minute job",
     for (const changed of [
         { lastAttemptTime: new Date(Date.now() - 16 * 60_000).toISOString() },
         { status: { code: 13 } },
+        { status: null },
     ]) {
         assert.throws(
             () => selectAndValidateSchedulerJob(
@@ -563,6 +605,26 @@ test("conditional or foreign Scheduler invoker grants fail closed", () => {
         ),
         expectStage("run_iam_scheduler"),
     );
+
+    const extraInvoker = new Map(policies);
+    extraInvoker.set("reconcileRegistrations", {
+        bindings: [{
+            role: "roles/run.invoker",
+            members: [
+                `serviceAccount:${PROJECT_NUMBER}-compute@developer.gserviceaccount.com`,
+                `serviceAccount:foreign@${PROJECT_ID}.iam.gserviceaccount.com`,
+            ],
+        }],
+    });
+    assert.throws(
+        () => verifyRunIamConfiguration(
+            functionsById,
+            services,
+            extraInvoker,
+            schedulerJob(),
+        ),
+        expectStage("run_iam_scheduler"),
+    );
 });
 
 test("notification selection requires the exact enabled and verified email channel", () => {
@@ -609,7 +671,7 @@ test("desired policies exactly scope dependency, callable, Scheduler, and termin
         policies.map((policy) => policy.userLabels.policy_key),
         [
             "dependency_health",
-            "registerteam_5xx",
+            "callables_5xx",
             "scheduler_failure",
             "reconciliation_failed",
         ],
@@ -630,18 +692,34 @@ test("desired policies exactly scope dependency, callable, Scheduler, and termin
         { period: "300s" },
     );
 
-    const threshold = policies[1].conditions[0].conditionThreshold;
-    assert.match(threshold.filter, /run\.googleapis\.com\/request_count/u);
-    assert.match(threshold.filter, /service_name"="registerteam"/u);
-    assert.match(threshold.filter, /response_code_class"="5xx"/u);
-    assert.equal(threshold.duration, "300s");
-    assert.equal(threshold.aggregations[0].alignmentPeriod, "300s");
-    assert.ok(threshold.thresholdValue > 0 && threshold.thresholdValue < 1 / 300);
+    assert.equal(policies[1].conditions.length, 4);
+    const callableServices = [
+        "registerteam",
+        "getmyteam",
+        "updatemyteam",
+        "completeinitialpasswordchange",
+    ];
+    policies[1].conditions.forEach((condition, index) => {
+        const threshold = condition.conditionThreshold;
+        assert.match(threshold.filter, /run\.googleapis\.com\/request_count/u);
+        assert.match(
+            threshold.filter,
+            new RegExp(`service_name"="${callableServices[index]}"`, "u"),
+        );
+        assert.match(threshold.filter, /response_code_class"="5xx"/u);
+        assert.equal(threshold.duration, "180s");
+        assert.equal(threshold.aggregations[0].alignmentPeriod, "60s");
+        assert.ok(
+            threshold.thresholdValue > 0 &&
+            threshold.thresholdValue < 1 / 60,
+        );
+    });
 
     const schedulerFilter =
         policies[2].conditions[0].conditionMatchedLog.filter;
     assert.match(schedulerFilter, new RegExp(SCHEDULER_JOB_ID, "u"));
     assert.match(schedulerFilter, /AttemptFinished/u);
+    assert.match(schedulerFilter, /jsonPayload\."@type"=/u);
     assert.match(schedulerFilter, /severity>=ERROR/u);
 
     const reconciliationFilter =
@@ -805,7 +883,7 @@ test("apply workflow reads every prerequisite, mutates idempotently, then reads 
         "channels:list",
         "policies:list",
         "policy:create:dependency_health",
-        "policy:create:registerteam_5xx",
+        "policy:create:callables_5xx",
         "policy:create:scheduler_failure",
         "policy:create:reconciliation_failed",
         "policies:list",

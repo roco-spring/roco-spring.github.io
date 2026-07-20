@@ -14,7 +14,7 @@ const FUNCTION_SECRET_REQUIREMENTS = Object.freeze({
         "GOOGLE_OAUTH_REFRESH_TOKEN"
     ])
 });
-const DRIVE_FOLDER_ID = "17UXoH2ldTuSFyhaxOknu6IvGxFbr7QYU";
+const DRIVE_FOLDER_ID = "1gZwIgAcwrtHZN2vW4XttTq5fFA-kU4Y4";
 const GOOGLE_OAUTH_CLIENT_ID =
     "149052181991-dn69v7pid5o7fi89dtnusbklnbnncnho.apps.googleusercontent.com";
 const REGISTRATION_SENDER = "shashanksagnihotri@gmail.com";
@@ -184,19 +184,25 @@ export async function requestOAuthJson(
     return data;
 }
 
-function versionNumber(resourceName) {
-    const match = /\/versions\/(\d+)$/u.exec(resourceName ?? "");
-    return match ? BigInt(match[1]) : null;
-}
-
 export function selectLatestEnabledVersion(secretResource, versions) {
+    const expected = new RegExp(
+        `^projects/(?:${PROJECT_ID}|${PROJECT_NUMBER})/secrets/([A-Za-z0-9_-]+)$`,
+        "u",
+    ).exec(secretResource ?? "");
+    if (!expected) {
+        throw new GoogleIntegrationHealthError("secret_version", null, "not_found");
+    }
+    const expectedSecret = expected[1];
     let selected = null;
     let selectedNumber = null;
     for (const version of versions) {
         if (version?.state !== "ENABLED") continue;
-        if (!version?.name?.startsWith(`${secretResource}/versions/`)) continue;
-        const number = versionNumber(version.name);
-        if (number === null) continue;
+        const match = new RegExp(
+            `^projects/(?:${PROJECT_ID}|${PROJECT_NUMBER})/secrets/${expectedSecret}/versions/([1-9]\\d*)$`,
+            "u",
+        ).exec(version?.name ?? "");
+        if (!match) continue;
+        const number = BigInt(match[1]);
         if (selectedNumber === null || number > selectedNumber) {
             selected = version.name;
             selectedNumber = number;
