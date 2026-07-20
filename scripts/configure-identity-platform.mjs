@@ -31,6 +31,13 @@ const {
 const { requireAuth } = require("firebase-tools/lib/requireAuth.js");
 const { Client } = require("firebase-tools/lib/apiv2.js");
 
+function quotaRequestOptions() {
+    // Firebase's low-level API client reads ADC for authentication, but it does
+    // not propagate ADC's quota_project_id. Identity Toolkit requires the
+    // consumer project explicitly when user ADC is used.
+    return { headers: { "x-goog-user-project": PROJECT_ID } };
+}
+
 function isProductionSafe(config) {
     return config?.client?.permissions?.disabledUserSignup === true
         && config?.client?.permissions?.disabledUserDeletion === true
@@ -61,7 +68,7 @@ async function main() {
         apiVersion: "admin/v2"
     });
     const projectPath = `/projects/${PROJECT_ID}/config`;
-    const before = (await client.get(projectPath)).body;
+    const before = (await client.get(projectPath, quotaRequestOptions())).body;
 
     if (!isProductionSafe(before)) {
         await client.patch(
@@ -82,11 +89,12 @@ async function main() {
                         passwordRequired: true
                     }
                 }
-            }
+            },
+            quotaRequestOptions()
         );
     }
 
-    const verified = (await client.get(projectPath)).body;
+    const verified = (await client.get(projectPath, quotaRequestOptions())).body;
 
     if (!isProductionSafe(verified)) {
         throw new Error("Identity Platform configuration read-back did not match the required production policy.");
