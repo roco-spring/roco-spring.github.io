@@ -76,6 +76,15 @@ test("the devkit is the published GitHub resource and support destinations are a
     assert.match(index, /Starter kit codebase:[\s\S]{0,180}hmorimitsu\/roco-spring-devkit/u);
     assert.doesNotMatch(index, /roco-spring\/roco-spring\.github\.io/u);
     assert.match(participate, /https:\/\/github\.com\/hmorimitsu\/roco-spring-devkit/u);
+    const stepFour = participate.match(
+        /<li class="step-card">[\s\S]*?<div class="step-number" aria-hidden="true">4<\/div>[\s\S]*?<\/li>/u
+    )?.[0] ?? "";
+    assert.match(stepFour, /<h3>Install starting kit<\/h3>/u);
+    assert.match(
+        stepFour,
+        /class="button starter-kit" href="https:\/\/github\.com\/hmorimitsu\/roco-spring-devkit"[\s\S]*?target="_blank" rel="noopener noreferrer"/u
+    );
+    assert.match(stepFour, /class="button-icon"[\s\S]*?Starter kit \(codebase\)/u);
     for (const html of [participate, faq]) {
         assert.match(html, /https:\/\/github\.com\/roco-spring\/roco-spring\.github\.io\/issues/u);
         assert.match(html, /https:\/\/github\.com\/roco-spring\/roco-spring\.github\.io\/issues\/new\/choose/u);
@@ -100,6 +109,18 @@ test("registration page includes the exact introduction and required controls", 
     assert.match(html, /No fixed<\/strong> member limit/u);
     assert.doesNotMatch(html, /10 (?:members maximum|max)|up to 10 members|teammates up to 10/u);
     assert.match(html, /I confirm that the person submitting this registration is one of the team members listed below\.|I confirm that the person submitting this registration is one of the team members listed above\./u);
+});
+
+test("registration page includes a concise regional Google-services access notice", async () => {
+    const html = (await source("team-registration.html")).replace(/\s+/gu, " ");
+    assert.match(
+        html,
+        /class="portal-region-notice" role="note">\s*<strong>Regional access notice:<\/strong> If Google services are blocked or unavailable in your region, registration and sign-in may not work\. Where permitted, we recommend using a trusted VPN; this has worked smoothly in our testing\.\s*<\/p>/u
+    );
+    assert.ok(
+        html.indexOf("Team registration and account")
+        < html.indexOf("Regional access notice:")
+    );
 });
 
 test("registration success includes an initially hidden spam-folder reminder", async () => {

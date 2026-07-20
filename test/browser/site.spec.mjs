@@ -47,6 +47,11 @@ test("registration portal starts with three slots, validates partial members, an
   expect(response?.ok()).toBe(true);
   await expect(page.locator("header.site-header .brand")).toHaveText("RoCo-Spring");
   await expect(page.locator("#public-auth")).toBeVisible({ timeout: 15_000 });
+  await expect(page.locator(".portal-region-notice")).toBeVisible();
+  await expect(page.locator(".portal-region-notice")).toHaveAttribute("role", "note");
+  await expect(page.locator(".portal-region-notice")).toContainText(
+    "If Google services are blocked or unavailable in your region"
+  );
   await expect(page.locator("#registration-members .member-slot")).toHaveCount(3);
   await expect(page.locator("#registration-members legend").first()).toContainText("Team member 1");
   await expect(page.locator("#registration-members legend").nth(2)).toContainText("Team member 3");
@@ -74,6 +79,23 @@ test("registration portal starts with three slots, validates partial members, an
   await expect(page.locator("#login-tab-panel")).toBeVisible();
   await expect(page.locator("#register-tab-panel")).toBeHidden();
   expect(pageErrors).toEqual([]);
+});
+
+test("Participate Step 4 contains the homepage-style starter-kit button", async ({ page }) => {
+  await page.goto("/participate.html");
+  const stepFour = page.locator(".step-card").filter({
+    has: page.getByRole("heading", { name: "Install starting kit", exact: true })
+  });
+  const starterKit = stepFour.getByRole("link", { name: "Starter kit (codebase)", exact: true });
+  await expect(stepFour).toHaveCount(1);
+  await expect(starterKit).toBeVisible();
+  await expect(starterKit).toHaveAttribute(
+    "href",
+    "https://github.com/hmorimitsu/roco-spring-devkit"
+  );
+  await expect(starterKit).toHaveAttribute("target", "_blank");
+  await expect(starterKit).toHaveAttribute("rel", "noopener noreferrer");
+  await expect(starterKit.locator(".button-icon")).toHaveCount(1);
 });
 
 test("team members can be added beyond ten without losing entered values", async ({ page }) => {

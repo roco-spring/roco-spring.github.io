@@ -964,6 +964,12 @@ td {
     font-size: 0.98rem;
 }
 
+.step-actions {
+    display: flex;
+    flex-wrap: wrap;
+    margin-top: 16px;
+}
+
 .steps {
     margin: 0;
     padding: 32px 32px 32px 56px;
@@ -1297,6 +1303,25 @@ details p {
     margin: 12px 0 0;
     color: var(--muted);
     font-size: 1.03rem;
+}
+
+.portal-region-notice {
+    max-width: 670px;
+    margin: 15px 0 0;
+    padding: 11px 14px;
+    border: 1px solid rgba(183, 128, 26, 0.24);
+    border-left: 4px solid #d7a028;
+    border-radius: 12px;
+    color: #684b13;
+    background: linear-gradient(135deg, rgba(255, 250, 231, 0.96), rgba(255, 244, 211, 0.8));
+    box-shadow: 0 8px 20px rgba(111, 79, 22, 0.06);
+    font-size: 0.89rem;
+    line-height: 1.5;
+}
+
+.portal-region-notice strong {
+    color: #533a09;
+    font-weight: 850;
 }
 
 .portal-mark {

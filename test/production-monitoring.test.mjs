@@ -1101,10 +1101,9 @@ test("release wiring configures monitoring before the canonical read-only gate",
 });
 
 test("runbook keeps monitoring remote, canonical, and free of Sheet canaries", async () => {
-    const [readme, runbook, checklist, script] = await Promise.all([
+    const [readme, runbook, script] = await Promise.all([
         readFile(path.join(ROOT, "README.md"), "utf8"),
         readFile(path.join(ROOT, "SETUP_TEAM_REGISTRATION.md"), "utf8"),
-        readFile(path.join(ROOT, "DEPLOYMENT_CHECKLIST.md"), "utf8"),
         readFile(
             path.join(ROOT, "scripts/configure-production-monitoring.mjs"),
             "utf8",
@@ -1115,11 +1114,9 @@ test("runbook keeps monitoring remote, canonical, and free of Sheet canaries", a
     assert.match(runbook, /All four deliver/u);
     assert.match(runbook, /extra enabled or paused Scheduler job targets the reconciler/u);
     assert.match(runbook, /stale\/keyless RoCo-managed alert policy/u);
-    assert.match(checklist, /exact four-policy managed inventory/u);
-    assert.match(checklist, /no stale managed key/u);
-    assert.match(checklist, /no second enabled or paused Scheduler job/u);
+    assert.match(readme, /exact four-key remote Cloud Monitoring policy inventory/u);
     assert.doesNotMatch(
-        `${runbook}\n${checklist}`,
+        `${readme}\n${runbook}`,
         /(?:reads|available) (?:an? )?managed[- ]Sheet/u,
     );
     assert.doesNotMatch(script, /\bGoogleAuth\b|from\s+["']googleapis["']/u);
