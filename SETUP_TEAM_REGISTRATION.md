@@ -100,16 +100,17 @@ npm test
 npm run build
 npm run lint
 npm run security:scan
+npm run security:audit
 git diff --check
 ```
 
-The production release command requires a clean committed source tree. It validates the latest OAuth secret pair before deployment, then verifies the intended least-privilege secret split afterward: numeric OAuth bindings only on `reconcileRegistrations`, a numeric rate-limit HMAC binding only on `registerTeam`, and no secret binding on `updateMyTeam`:
+The production release command fetches `origin/main` and requires a clean committed `main` that tracks the exact RoCo GitHub origin with the fetched remote commit as an ancestor. After local and read-only cloud gates pass, it performs a non-force push, fetches again, and requires `HEAD` to equal `origin/main`. It then waits for same-SHA GitHub CI and Pages success and compares every reviewed direct executable/layout dependency of the homepage, Tasks & Data page, and registration page to the immutable blobs in that exact commit. It refetches and revalidates the clean exact source after publication and again immediately before deploying Firebase. After deployment it verifies the intended least-privilege split: numeric OAuth bindings only on `reconcileRegistrations`, a numeric rate-limit HMAC binding only on `registerTeam`, and no secret binding on `getMyTeam`, `updateMyTeam`, or `completeInitialPasswordChange`:
 
 ```bash
 npm run deploy:production
 ```
 
-The chain also verifies Identity Platform controls, secret metadata, Firestore rules/indexes, callable CORS/auth/App Check guards, an ephemeral App Check debug-token lifecycle, and the remote Function/Scheduler/Monitoring control plane. It does not claim inbox delivery or notification delivery without controlled real tests.
+The chain also verifies Identity Platform controls, secret metadata, Firestore rules/indexes, callable CORS/auth/App Check guards, an ephemeral App Check debug-token lifecycle, and the remote Function/Scheduler/Monitoring control plane. Two marker-bound temporary Auth users non-mutatingly prove App Check enforcement on the authenticated callables and are verified absent by both UID and email before the gate passes. It does not claim inbox delivery or notification delivery without controlled real tests.
 
 ## Controlled production end-to-end test
 
@@ -151,7 +152,7 @@ After the channel is verified, run the idempotent configuration command:
 npm run monitoring:configure
 ```
 
-The command finishes all read-only Function, IAM, Scheduler, and channel checks before its first possible write. It creates missing managed policies, updates only policies bearing the exact RoCo management labels, refuses to take over a conflicting unmanaged policy, reads all four policies back, and is a no-op on a second healthy run. Its canonical enabled policies are:
+The command finishes all read-only Function, IAM, Scheduler, and channel checks before its first possible write. It fails closed if any extra enabled or paused Scheduler job targets the reconciler, or if any stale/keyless RoCo-managed alert policy falls outside the exact four-key inventory; these require explicit operator review and are never silently deleted. It creates missing managed policies, updates only policies bearing the exact RoCo management labels, refuses to take over a conflicting unmanaged policy, reads all four policies back, and is a no-op on a second healthy run. Its canonical enabled policies are:
 
 1. `RoCo registration: Google dependency unhealthy`, a log match for `cloud_run_revision`, `europe-west3`, service `reconcileregistrations`, `operation="registrationDependencyHealth"`, `status="unhealthy"`, and `severity>=ERROR`.
 2. `RoCo registration: callable sustained 5xx`, four metric conditions over `run.googleapis.com/request_count`, one for each public callable service, scoped to response class `5xx`. Each uses `ALIGN_RATE` over 60 seconds and must remain above `0.001` requests/second for 180 seconds. Cloud Run request deadlines are HTTP 504, so they are included.

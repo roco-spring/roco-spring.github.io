@@ -301,25 +301,34 @@ test("Cloud API pagination is complete, exact-project, and authenticated", async
     const api = createCloudApiClient(
         "test-access-token-with-safe-length",
         async (url, options) => {
-            calls.push({ url: new URL(url), options });
-            if (calls.length === 1) {
+            const parsed = new URL(url);
+            calls.push({ url: parsed, options });
+            if (parsed.pathname.endsWith(`/projects/${PROJECT_ID}/locations`)) {
                 return jsonResponse({
-                    jobs: [{ name: "first" }],
+                    locations: [
+                        { name: `projects/${PROJECT_ID}/locations/${REGION}` },
+                        { name: `projects/${PROJECT_ID}/locations/us-central1` },
+                    ],
+                });
+            }
+            if (parsed.pathname.includes(`/locations/${REGION}/jobs`)) {
+                return jsonResponse({ jobs: [{ name: "first" }] });
+            }
+            if (!parsed.searchParams.has("pageToken")) {
+                return jsonResponse({
+                    jobs: [{ name: "second" }],
                     nextPageToken: "opaque-next-page",
                 });
             }
-            return jsonResponse({ jobs: [{ name: "second" }] });
+            return jsonResponse({ jobs: [{ name: "third" }] });
         },
     );
     const jobs = await api.listSchedulerJobs();
-    assert.deepEqual(jobs.map(({ name }) => name), ["first", "second"]);
-    assert.equal(calls.length, 2);
+    assert.deepEqual(jobs.map(({ name }) => name), ["first", "second", "third"]);
+    assert.equal(calls.length, 4);
     for (const { url, options } of calls) {
         assert.equal(url.origin, "https://cloudscheduler.googleapis.com");
-        assert.equal(
-            url.pathname,
-            `/v1/projects/${PROJECT_ID}/locations/${REGION}/jobs`,
-        );
+        assert.match(url.pathname, new RegExp(`^/v1/projects/${PROJECT_ID}/locations`, "u"));
         assert.equal(options.headers["x-goog-user-project"], PROJECT_ID);
         assert.equal(
             options.headers.authorization,
@@ -327,7 +336,20 @@ test("Cloud API pagination is complete, exact-project, and authenticated", async
         );
         assert.equal(options.redirect, "error");
     }
-    assert.equal(calls[1].url.searchParams.get("pageToken"), "opaque-next-page");
+    assert.equal(calls[3].url.searchParams.get("pageToken"), "opaque-next-page");
+});
+
+test("Scheduler discovery fails closed on malformed or empty project location inventories", async () => {
+    for (const locations of [[], [{ name: "projects/another-project/locations/us-central1" }]]) {
+        const api = createCloudApiClient(
+            "test-access-token-with-safe-length",
+            async () => jsonResponse({ locations }),
+        );
+        await assert.rejects(
+            api.listSchedulerJobs(),
+            expectStage("scheduler_locations_list"),
+        );
+    }
 });
 
 test("repeated Cloud API page tokens fail closed", async () => {
@@ -447,6 +469,47 @@ test("Scheduler verifier accepts only the exact enabled remote five-minute job",
             expectStage("scheduler_execution"),
         );
     }
+});
+
+test("Scheduler verifier rejects any extra active or paused reconciler target", () => {
+    for (const duplicateTarget of [
+        "https://reconcileregistrations-example-ew.a.run.app/?retry=1",
+        "https://reconcileregistrations-example-ew.a.run.app//#retry",
+        `https://${REGION}-${PROJECT_ID}.cloudfunctions.net/reconcileRegistrations/?retry=1#again`,
+    ]) {
+        for (const state of ["ENABLED", "PAUSED"]) {
+            const duplicate = schedulerJob({
+                name: `projects/${PROJECT_ID}/locations/us-central1/jobs/stale-reconciler`,
+                state,
+                httpTarget: {
+                    ...schedulerJob().httpTarget,
+                    uri: duplicateTarget,
+                },
+            });
+            assert.throws(
+                () => selectAndValidateSchedulerJob(
+                    [schedulerJob(), duplicate],
+                    verifiedFunctions(),
+                ),
+                expectStage("scheduler_duplicate_target"),
+            );
+        }
+    }
+
+    const unrelated = schedulerJob({
+        name: `projects/${PROJECT_ID}/locations/${REGION}/jobs/unrelated`,
+        httpTarget: {
+            ...schedulerJob().httpTarget,
+            uri: "https://unrelated-example-ew.a.run.app/",
+        },
+    });
+    assert.equal(
+        selectAndValidateSchedulerJob(
+            [schedulerJob(), unrelated],
+            verifiedFunctions(),
+        ).state,
+        "ENABLED",
+    );
 });
 
 test("Scheduler verifier rejects local, foreign, unauthenticated, or redirected targets", () => {
@@ -814,6 +877,46 @@ test("unmanaged display-name drift and managed collisions fail closed", () => {
     );
 });
 
+test("stale or keyless RoCo-managed policies fail closed in both modes", () => {
+    const desired = buildDesiredPolicies(CHANNEL_NAME, SCHEDULER_JOB_ID);
+    for (const staleKey of ["registerteam_5xx", undefined]) {
+        const stale = {
+            ...structuredClone(desired[1]),
+            name: `projects/${PROJECT_ID}/alertPolicies/stale`,
+            displayName: "RoCo registration: obsolete managed policy",
+            userLabels: {
+                ...desired[1].userLabels,
+                ...(staleKey === undefined
+                    ? { policy_key: undefined }
+                    : { policy_key: staleKey }),
+            },
+        };
+        for (const mode of ["apply", "verify"]) {
+            assert.throws(
+                () => planPolicyChanges([stale], desired, mode),
+                expectStage("alert_policy_stale_managed"),
+            );
+        }
+    }
+});
+
+test("desired policy inventory rejects empty or duplicate managed keys", () => {
+    const desired = buildDesiredPolicies(CHANNEL_NAME, SCHEDULER_JOB_ID);
+    const missingKey = structuredClone(desired);
+    missingKey[0].userLabels.policy_key = "";
+    assert.throws(
+        () => planPolicyChanges([], missingKey, "apply"),
+        expectStage("alert_policy_plan"),
+    );
+
+    const duplicateKey = structuredClone(desired);
+    duplicateKey[1].userLabels.policy_key = duplicateKey[0].userLabels.policy_key;
+    assert.throws(
+        () => planPolicyChanges([], duplicateKey, "verify"),
+        expectStage("alert_policy_plan"),
+    );
+});
+
 test("apply workflow reads every prerequisite, mutates idempotently, then reads back", async () => {
     const calls = [];
     const policies = [];
@@ -1010,7 +1113,11 @@ test("runbook keeps monitoring remote, canonical, and free of Sheet canaries", a
     assert.match(readme, /entirely remote/u);
     assert.match(runbook, new RegExp(ORGANIZER_NOTIFICATION_ADDRESS, "u"));
     assert.match(runbook, /All four deliver/u);
-    assert.match(checklist, /all four required policies/u);
+    assert.match(runbook, /extra enabled or paused Scheduler job targets the reconciler/u);
+    assert.match(runbook, /stale\/keyless RoCo-managed alert policy/u);
+    assert.match(checklist, /exact four-policy managed inventory/u);
+    assert.match(checklist, /no stale managed key/u);
+    assert.match(checklist, /no second enabled or paused Scheduler job/u);
     assert.doesNotMatch(
         `${runbook}\n${checklist}`,
         /(?:reads|available) (?:an? )?managed[- ]Sheet/u,

@@ -10,7 +10,7 @@ Record command output, timestamps, deployed revision names, and test team IDs in
 - [ ] Production has no dependency on a local server, reverse tunnel, mounted file, cluster cron, terminal session, or continuously running workstation/cluster process.
 - [ ] Public resource links mention the intended starter kit only.
 - [ ] No member-count maximum was reintroduced in frontend or backend validation.
-- [ ] A release commit exists and `npm run release:source` reports its exact SHA from a clean tree.
+- [ ] A release commit exists and the pre-push source gate reports its exact SHA from a clean `main` that tracks the exact RoCo GitHub `origin/main`; the freshly fetched `origin/main` is an ancestor, so the push is fast-forward safe.
 
 ## 2. One-time release gates
 
@@ -23,6 +23,7 @@ These commands may run on this editing node, but none remains running or partici
 - [ ] TypeScript build passes.
 - [ ] ESLint passes.
 - [ ] Credential/password security scan passes.
+- [ ] `npm run security:audit` reports zero production dependency vulnerabilities in both the root release-tooling tree and the independently locked, deployed `functions/` tree; dev-only findings are reviewed separately and no high/critical finding is accepted silently.
 - [ ] Locked dependency files contain no unexpected production dependency change.
 
 ## 3. Firebase and Identity Platform
@@ -44,6 +45,7 @@ These commands may run on this editing node, but none remains running or partici
 - [ ] App Check enforcement is enabled for all callable Functions.
 - [ ] Credential-free production probes return callable `401 UNAUTHENTICATED`, never 2xx/404/redirect/HTML.
 - [ ] Ephemeral CI debug token crosses the validation boundary, is deleted in `finally`, deletion reads back as 404, and inventory contains no leftover token.
+- [ ] Marker-bound `@example.invalid` Auth users prove valid-before / missing-App-Check / valid-after behavior for `updateMyTeam` and `completeInitialPasswordChange`; both UID and email absence are verified after cleanup, and no team, Firestore record, Sheet, or email is created.
 - [ ] Normal-provider browser metrics show legitimate production traffic is accepted; no production debug bypass exists.
 
 ## 5. Google OAuth and private resources
@@ -63,18 +65,19 @@ These commands may run on this editing node, but none remains running or partici
 ## 6. Firebase deployment
 
 - [ ] Predeployment latest-secret health passed before mutation.
+- [ ] Same-SHA GitHub CI and Pages succeeded; every reviewed direct executable/layout dependency of the homepage, Tasks & Data page, and registration page matches its immutable Git blob byte-for-byte. A final fetch/source gate after publication, plus another clean exact-SHA gate immediately before Firebase deployment, prevents stale remote or locally modified source from being deployed.
 - [ ] Rules, indexes, and all intended Functions deployed without hidden retry/deadline warnings.
 - [ ] Function inventory and regions match source; obsolete revisions receive no traffic.
 - [ ] Deployed Node runtime is 22 and timeout/memory/max-instance values match source.
-- [ ] Reconciler schedule is every five minutes and its Scheduler job is enabled.
+- [ ] Reconciler schedule is every five minutes and its Scheduler job is enabled; no second enabled or paused Scheduler job targets either the reconciler Run URI or its Cloud Functions alias.
 - [ ] Exactly four callable Cloud Run services grant `allUsers` `roles/run.invoker`; `reconcileRegistrations` does not, retains its IAM invoker check, and grants invocation to the exact Scheduler OIDC service account.
 - [ ] The Scheduler job and Functions continue to run with the release machine disconnected; no local cron or process is registered as an operational dependency.
-- [ ] `npm run monitoring:configure` idempotently creates or repairs the four managed alert policies only after finding the existing enabled, `VERIFIED` organizer email channel.
+- [ ] `npm run monitoring:configure` idempotently creates or repairs the exact four managed alert-policy keys only after finding the existing enabled, `VERIFIED` organizer email channel; stale/keyless RoCo-managed policies fail closed for operator review rather than being silently accepted or deleted.
 - [ ] `npm run production:runtime:verify` proves the exact active second-generation Node.js 22 Function inventory, Cloud Run IAM boundary, exact remote OIDC Scheduler target, a successful invocation within the preceding 15 minutes, organizer channel, and alert definitions; the read-only command may exit afterward.
-- [ ] `npm run google:health:bound` proves numeric OAuth bindings exist only on `reconcileRegistrations`, validates the numeric HMAC-only `registerTeam` binding and secret-free `updateMyTeam`, and refreshes the exact reconciler OAuth versions successfully.
+- [ ] `npm run google:health:bound` proves the exact five-Function secret layout: numeric HMAC only on `registerTeam`; no secrets on `getMyTeam`, `updateMyTeam`, or `completeInitialPasswordChange`; and exactly two numeric OAuth bindings on `reconcileRegistrations`. It refreshes those exact reconciler OAuth versions successfully.
 - [ ] `npm run function-secrets:configure` has removed any stale secret environment variables retained from an older Firebase revision and passed its exact five-Function read-back.
 - [ ] Backend CORS/guard smoke passes for all callables.
-- [ ] Deterministic App Check CI smoke passes and cleanup is verified.
+- [ ] Deterministic App Check CI smoke passes for all four callables, and both debug-token and temporary-Auth-user cleanup are verified absent.
 
 ## 7. Controlled production E2E
 
@@ -95,7 +98,7 @@ These commands may run on this editing node, but none remains running or partici
 - [ ] Scheduled dependency health logs `healthy`; no arbitrary participant Sheet is used as a global queue canary.
 - [ ] Cloud Monitoring alert for `registrationDependencyHealth/status=unhealthy` is enabled and its organizer notification channel is verified.
 - [ ] Alerts cover sustained 5xx/deadline rates on all four public callables, Scheduler attempt failures, and durable reconciliation resources logged with `status=failed`.
-- [ ] The exact `roco-spring-org@googlegroups.com` enabled/verified channel and all four required policies pass `npm run production:runtime:verify`; no local watcher or cron job is counted as monitoring.
+- [ ] The exact `roco-spring-org@googlegroups.com` enabled/verified channel, the exact four-policy managed inventory with no stale managed key, and the single reconciler Scheduler target pass `npm run production:runtime:verify`; no local watcher or cron job is counted as monitoring.
 - [ ] A controlled test incident reaches the organizer's inbox; configuration read-back alone is not reported as proof of notification delivery.
 - [ ] No pending/failed email, Sheet, cleanup, or incomplete saga remains unexplained after two reconciler intervals.
 - [ ] Targeted incident-consumed rate-limit buckets are reset only when justified.
@@ -104,8 +107,10 @@ These commands may run on this editing node, but none remains running or partici
 ## 9. GitHub Pages and publication
 
 - [ ] Reviewed release commit is pushed non-force to the intended branch.
+- [ ] A post-push fetch proves local `HEAD` exactly equals `origin/main` before any cloud mutation.
 - [ ] GitHub Actions verification succeeds for the pushed SHA.
 - [ ] GitHub Pages deployment succeeds for the same SHA.
+- [ ] The release gate downloads the reviewed critical public pages and their direct executable/layout assets with cache busting and verifies they match the exact commit's immutable Git blobs byte-for-byte before Firebase deployment starts.
 - [ ] Production pages return 200 over HTTPS and show the new release, not a cached placeholder.
 - [ ] Registration assets load without console errors, failed requests, mixed content, or stale hashes.
 - [ ] Navigation, responsive layout, shared chrome, flow background, starter-kit links, citations, and registration UI are visually checked on desktop and mobile.

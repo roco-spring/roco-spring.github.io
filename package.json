@@ -12,13 +12,20 @@
     "test:browser": "playwright test",
     "lint": "npm --prefix functions run lint",
     "security:scan": "node scripts/security-scan.mjs",
+    "security:audit:root": "npm audit --omit=dev",
+    "security:audit:functions": "npm --prefix functions audit --omit=dev",
+    "security:audit": "npm run security:audit:root && npm run security:audit:functions",
     "oauth:bootstrap": "node scripts/bootstrap-google-oauth.mjs",
     "secrets:verify": "node scripts/verify-secret-metadata.mjs",
     "google:health:latest": "node scripts/verify-google-integration-health.mjs --secret-source=latest",
     "google:health:bound": "node scripts/verify-google-integration-health.mjs --secret-source=bound",
     "function-secrets:configure": "node scripts/configure-function-secrets.mjs --apply",
     "identity:configure": "node scripts/configure-identity-platform.mjs",
+    "release:fetch": "git fetch --quiet --no-tags origin +refs/heads/main:refs/remotes/origin/main",
+    "release:source:prepush": "node scripts/verify-release-source.mjs --allow-local-ahead",
     "release:source": "node scripts/verify-release-source.mjs",
+    "release:push": "git push --porcelain origin HEAD:refs/heads/main",
+    "release:publication": "node scripts/verify-release-publication.mjs",
     "backend:smoke": "node scripts/verify-production-callables.mjs",
     "backend:appcheck-smoke": "node scripts/verify-live-app-check.mjs",
     "backend:appcheck-ci-smoke": "node scripts/verify-app-check-ci.mjs",
@@ -28,7 +35,7 @@
     "preemulators": "npm run build",
     "emulators": "node scripts/firebase-safe.mjs emulators:start --only auth,firestore,functions --project roco-spring-registration-2026",
     "deploy:firebase": "node scripts/firebase-safe.mjs deploy --only firestore:rules,firestore:indexes,functions --project roco-spring-registration-2026",
-    "deploy:production": "npm run release:source && npm test && npm run build && npm run lint && npm run security:scan && npm run release:source && npm run identity:configure && npm run secrets:verify && npm run google:health:latest && npm run deploy:firebase && npm run function-secrets:configure && npm run google:health:bound && npm run backend:smoke && npm run backend:appcheck-ci-smoke && npm run monitoring:configure && npm run production:runtime:verify"
+    "deploy:production": "npm run release:fetch && npm run release:source:prepush && npm test && npm run build && npm run lint && npm run security:scan && npm run security:audit && npm run release:fetch && npm run release:source:prepush && npm run secrets:verify && npm run google:health:latest && npm run release:push && npm run release:fetch && npm run release:source && npm run release:publication && npm run release:fetch && npm run release:source && npm run identity:configure && npm run release:fetch && npm run release:source && npm run deploy:firebase && npm run function-secrets:configure && npm run google:health:bound && npm run backend:smoke && npm run backend:appcheck-ci-smoke && npm run monitoring:configure && npm run production:runtime:verify"
   },
   "engines": {
     "node": ">=22"
@@ -40,6 +47,7 @@
     "@firebase/rules-unit-testing": "5.0.1",
     "@playwright/test": "1.61.1",
     "firebase": "12.16.0",
+    "firebase-admin": "13.10.0",
     "firebase-tools": "15.23.0"
   }
 }

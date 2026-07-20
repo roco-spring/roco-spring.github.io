@@ -81,7 +81,11 @@ function deployedFunctionResource(
             }
         };
     }
-    if (functionName === "updateMyTeam") {
+    if ([
+        "getMyTeam",
+        "updateMyTeam",
+        "completeInitialPasswordChange"
+    ].includes(functionName)) {
         return { serviceConfig: { secretEnvironmentVariables: [] } };
     }
     const configured = functionResource(clientVersion, refreshVersion);
@@ -228,7 +232,9 @@ test("bound mode requires the exact split numeric secret architecture", async ()
     assert.equal(versionLists, 0);
     assert.deepEqual(inspectedFunctions, [
         "registerTeam",
+        "getMyTeam",
         "updateMyTeam",
+        "completeInitialPasswordChange",
         "reconcileRegistrations"
     ]);
 });
@@ -259,7 +265,12 @@ test("bound mode rejects latest aliases and a nonnumeric rate-limit binding", as
 });
 
 test("bound mode rejects OAuth secret bindings on public callables", async () => {
-    for (const publicFunction of ["registerTeam", "updateMyTeam"]) {
+    for (const publicFunction of [
+        "registerTeam",
+        "getMyTeam",
+        "updateMyTeam",
+        "completeInitialPasswordChange"
+    ]) {
         await assert.rejects(
             resolveSecretVersionNames("bound", {
                 secretManager: {},
@@ -569,11 +580,14 @@ test("production deploy chain runs latest before deploy and bound after deploy",
         "node scripts/verify-google-integration-health.mjs --secret-source=bound"
     );
     const chain = packageConfig.scripts["deploy:production"];
+    const secrets = chain.indexOf("secrets:verify");
     const latest = chain.indexOf("google:health:latest");
+    const identity = chain.indexOf("identity:configure");
     const deploy = chain.indexOf("deploy:firebase");
     const bound = chain.indexOf("google:health:bound");
     const smoke = chain.indexOf("backend:smoke");
-    assert.ok(latest >= 0 && latest < deploy);
+    assert.ok(secrets >= 0 && secrets < latest);
+    assert.ok(latest < identity && identity < deploy);
     assert.ok(deploy < bound && bound < smoke);
 });
 

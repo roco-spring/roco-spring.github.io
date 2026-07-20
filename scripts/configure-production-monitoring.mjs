@@ -17,6 +17,8 @@ export const SCHEDULER_JOB_ID =
 
 const REQUEST_TIMEOUT_MS = 8_000;
 const MAX_LIST_PAGES = 50;
+const MAX_SCHEDULER_LOCATIONS = 100;
+const SCHEDULER_LOCATION_CONCURRENCY = 8;
 const MAX_ADC_BYTES = 256 * 1024;
 const TOKEN_URL = "https://oauth2.googleapis.com/token";
 const CLOUD_PLATFORM_SCOPE =
@@ -395,6 +397,43 @@ export function createCloudApiClient(accessToken, fetchImplementation = fetch) {
         throw new ProductionMonitoringError(stage, null, "RESOURCE_EXHAUSTED");
     }
 
+    async function listAllSchedulerJobs() {
+        const locations = await listPaginated(
+            "scheduler_locations_list",
+            `${SCHEDULER_ORIGIN}/v1/projects/${PROJECT_ID}/locations`,
+            "locations",
+        );
+        if (locations.length === 0 || locations.length > MAX_SCHEDULER_LOCATIONS) {
+            throw new ProductionMonitoringError("scheduler_locations_list");
+        }
+        const locationNames = locations.map((location) => location?.name);
+        const locationPattern = new RegExp(
+            `^projects/${PROJECT_ID}/locations/[a-z0-9-]+$`,
+            "u",
+        );
+        if (locationNames.some((name) => !locationPattern.test(name ?? "")) ||
+            new Set(locationNames).size !== locationNames.length) {
+            throw new ProductionMonitoringError("scheduler_locations_list");
+        }
+
+        const jobs = [];
+        for (let offset = 0; offset < locationNames.length;
+            offset += SCHEDULER_LOCATION_CONCURRENCY) {
+            const batch = locationNames.slice(
+                offset,
+                offset + SCHEDULER_LOCATION_CONCURRENCY,
+            );
+            const results = await Promise.all(batch.map((locationName) =>
+                listPaginated(
+                    "scheduler_list",
+                    `${SCHEDULER_ORIGIN}/v1/${locationName}/jobs`,
+                    "jobs",
+                )));
+            for (const result of results) jobs.push(...result);
+        }
+        return jobs;
+    }
+
     return Object.freeze({
         listFunctions: () => listPaginated(
             "functions_list",
@@ -402,11 +441,7 @@ export function createCloudApiClient(accessToken, fetchImplementation = fetch) {
             "functions",
             { rejectUnreachable: true },
         ),
-        listSchedulerJobs: () => listPaginated(
-            "scheduler_list",
-            `${SCHEDULER_ORIGIN}/v1/${SCHEDULER_PARENT}/jobs`,
-            "jobs",
-        ),
+        listSchedulerJobs: listAllSchedulerJobs,
         getRunService: (name) => {
             assertRunServiceName(name);
             return request(
@@ -495,6 +530,23 @@ function parseManagedFunctionUri(value, stage) {
 
 function normalizedTarget(value) {
     return value.toString().replace(/\/+$/u, "");
+}
+
+function normalizedSchedulerCollisionTarget(value) {
+    let uri;
+    try {
+        uri = new URL(value);
+    } catch {
+        return null;
+    }
+    const safeHost = uri.hostname.endsWith(".run.app") ||
+        uri.hostname.endsWith(".cloudfunctions.net");
+    if (uri.protocol !== "https:" || !safeHost || uri.username ||
+        uri.password || uri.port) {
+        return null;
+    }
+    const pathname = uri.pathname.replace(/\/+$/u, "") || "/";
+    return `${uri.origin}${pathname}`;
 }
 
 export function verifyRemoteFunctionInventory(functions) {
@@ -645,6 +697,21 @@ export function selectAndValidateSchedulerJob(
         throw new ProductionMonitoringError("scheduler_target");
     }
     const expectedName = `${SCHEDULER_PARENT}/jobs/${SCHEDULER_JOB_ID}`;
+    const reconcilerFunction = functionsById.get("reconcileRegistrations");
+    const reconcilerTargets = new Set([
+        reconcilerFunction?.serviceConfig?.uri,
+        `https://${REGION}-${PROJECT_ID}.cloudfunctions.net/reconcileRegistrations`,
+    ].map(normalizedSchedulerCollisionTarget).filter(Boolean));
+    if (jobs.some((candidate) => candidate?.name !== expectedName &&
+        reconcilerTargets.has(normalizedSchedulerCollisionTarget(
+            candidate?.httpTarget?.uri,
+        )))) {
+        throw new ProductionMonitoringError(
+            "scheduler_duplicate_target",
+            null,
+            "FAILED_PRECONDITION",
+        );
+    }
     const matches = jobs.filter((job) => job?.name === expectedName);
     if (matches.length !== 1) {
         throw new ProductionMonitoringError(
@@ -673,7 +740,7 @@ export function selectAndValidateSchedulerJob(
     }
     validateRemoteSchedulerTarget(
         job,
-        functionsById.get("reconcileRegistrations"),
+        reconcilerFunction,
     );
     return job;
 }
@@ -893,6 +960,25 @@ export function planPolicyChanges(existingPolicies, desiredPolicies, mode) {
     if (!Array.isArray(existingPolicies) || !Array.isArray(desiredPolicies) ||
         (mode !== "verify" && mode !== "apply")) {
         throw new ProductionMonitoringError("alert_policy_plan");
+    }
+    const desiredKeys = desiredPolicies.map((policy) =>
+        policy?.userLabels?.policy_key);
+    if (desiredKeys.some((key) => typeof key !== "string" || key.length === 0) ||
+        new Set(desiredKeys).size !== desiredKeys.length) {
+        throw new ProductionMonitoringError("alert_policy_plan");
+    }
+    const desiredKeySet = new Set(desiredKeys);
+    const staleManaged = existingPolicies.filter((policy) =>
+        policy?.userLabels?.managed_by === POLICY_LABELS.managed_by &&
+        policy?.userLabels?.component === POLICY_LABELS.component &&
+        !desiredKeySet.has(policy?.userLabels?.policy_key));
+    if (staleManaged.length > 0) {
+        throw new ProductionMonitoringError(
+            "alert_policy_stale_managed",
+            null,
+            "FAILED_PRECONDITION",
+            "A stale RoCo-managed alert policy exists outside the exact reviewed policy-key inventory. Review and remove the obsolete managed policy in Cloud Monitoring before rerunning; this workflow will not silently delete alerting coverage.",
+        );
     }
     const plan = [];
     for (const desired of desiredPolicies) {

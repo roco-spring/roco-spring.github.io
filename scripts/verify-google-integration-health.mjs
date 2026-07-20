@@ -8,7 +8,9 @@ const PROJECT_NUMBER = "149052181991";
 const REGION = "europe-west3";
 const FUNCTION_SECRET_REQUIREMENTS = Object.freeze({
     registerTeam: Object.freeze(["RATE_LIMIT_HMAC_SECRET"]),
+    getMyTeam: Object.freeze([]),
     updateMyTeam: Object.freeze([]),
+    completeInitialPasswordChange: Object.freeze([]),
     reconcileRegistrations: Object.freeze([
         "GOOGLE_OAUTH_CLIENT_SECRET",
         "GOOGLE_OAUTH_REFRESH_TOKEN"

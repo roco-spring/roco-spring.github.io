@@ -50,6 +50,7 @@ npm test
 npm run build
 npm run lint
 npm run security:scan
+npm run security:audit
 ```
 
 After the documented OAuth preflight and Secret Manager setup, deploy the backend with:
@@ -58,6 +59,6 @@ After the documented OAuth preflight and Secret Manager setup, deploy the backen
 npm run deploy:production
 ```
 
-The release chain idempotently configures four remote Cloud Monitoring alerts only after it finds the enabled, verified organizer email channel, then verifies the exact Function inventory, Cloud Run IAM boundary, five-minute Scheduler target/recent success, and alert definitions. These are one-time operator commands; after they exit, GitHub Pages, Firebase, and Google Cloud continue running without this node.
+The release chain first proves it is deploying a clean, committed `main` from the exact RoCo GitHub origin with freshly fetched `origin/main` as an ancestor and audits both locked dependency trees. After all local and read-only cloud gates pass, it pushes non-force, requires `HEAD` to equal the refetched `origin/main`, and waits for same-SHA GitHub CI, Pages deployment, and byte-identical direct public dependencies read from immutable Git blobs. It refetches and revalidates the clean exact source after that wait and once more immediately before Firebase deployment. It idempotently configures the exact four-key remote Cloud Monitoring policy inventory only after finding the enabled, verified organizer email channel, rejects stale managed policies or duplicate reconciler Scheduler targets in any Scheduler region, and verifies Function inventory, Cloud Run IAM, five-minute Scheduler health, secret boundaries, and App Check enforcement. These are one-time operator commands; after they exit, GitHub Pages, Firebase, and Google Cloud continue running without this node.
 
 Passwords, OAuth secrets and refresh tokens, service-account credentials, App Check debug tokens, and the rate-limit HMAC secret are never stored in this public repository.
