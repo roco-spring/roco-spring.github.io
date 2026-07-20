@@ -151,8 +151,11 @@ test("login query mode and keyboard tab behavior are accessible", async ({ page 
   await expect(page.locator("#register-tab-panel")).toBeVisible();
 });
 
-test("registration page remains within the viewport on mobile and desktop", async ({ page }) => {
-  for (const viewport of [{ width: 390, height: 844 }, { width: 1280, height: 900 }]) {
+for (const { label, viewport } of [
+  { label: "mobile", viewport: { width: 390, height: 844 } },
+  { label: "desktop", viewport: { width: 1280, height: 900 } }
+]) {
+  test(`registration page remains within the ${label} viewport`, async ({ page }) => {
     await page.setViewportSize(viewport);
     await page.goto("/team-registration.html");
     await expect(page.locator("#public-auth")).toBeVisible({ timeout: 15_000 });
@@ -165,8 +168,8 @@ test("registration page remains within the viewport on mobile and desktop", asyn
       scrollWidth: document.documentElement.scrollWidth
     }));
     expect(dimensions.scrollWidth).toBeLessThanOrEqual(dimensions.clientWidth + 1);
-  }
-});
+  });
+}
 
 test("mobile navigation toggles with an accessible state", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
