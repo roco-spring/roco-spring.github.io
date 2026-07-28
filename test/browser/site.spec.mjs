@@ -98,6 +98,61 @@ test("Participate Step 4 contains the homepage-style starter-kit button", async 
   await expect(starterKit.locator(".button-icon")).toHaveCount(1);
 });
 
+test("OpenReview submission buttons are consistent, accessible, and officially branded", async ({ page }) => {
+  const placements = [
+    { path: "/index.html", scope: ".hero-actions" },
+    {
+      path: "/participate.html",
+      scope: ".step-card:has(.step-number:text-is('9'))"
+    },
+    { path: "/evaluation.html", scope: "#call-for-papers" }
+  ];
+  const expectedUrl = "https://openreview.net/group?id=NeurIPS.cc/2026/Workshop/RoCo-Spring";
+
+  for (const placement of placements) {
+    await page.goto(placement.path);
+    const button = page.locator(placement.scope)
+      .getByRole("link", { name: "OpenReview Submission", exact: true });
+    await expect(button).toHaveCount(1);
+    await expect(button).toBeVisible();
+    await expect(button).toHaveAttribute("href", expectedUrl);
+    await expect(button).toHaveAttribute("target", "_blank");
+    await expect(button).toHaveAttribute("rel", "noopener noreferrer");
+
+    const appearance = await button.evaluate((element) => {
+      const buttonStyle = getComputedStyle(element);
+      const wordmarkStyle = getComputedStyle(element.querySelector(".openreview-wordmark"));
+      return {
+        background: buttonStyle.backgroundColor,
+        height: element.getBoundingClientRect().height,
+        wordmarkFamily: wordmarkStyle.fontFamily,
+        wordmarkWeight: wordmarkStyle.fontWeight
+      };
+    });
+    expect(appearance.background).toBe("rgb(140, 27, 19)");
+    expect(appearance.height).toBeGreaterThanOrEqual(44);
+    expect(appearance.wordmarkFamily).toContain("Noto Sans");
+    expect(appearance.wordmarkWeight).toBe("700");
+
+    await button.focus();
+    await expect(button).toBeFocused();
+    expect(await button.evaluate((element) => getComputedStyle(element).outlineStyle)).toBe("solid");
+  }
+});
+
+test("OpenReview submission buttons wrap without mobile overflow", async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 800 });
+  for (const path of ["/index.html", "/participate.html", "/evaluation.html"]) {
+    await page.goto(path);
+    await expect(page.getByRole("link", { name: "OpenReview Submission", exact: true })).toBeVisible();
+    const widths = await page.evaluate(() => ({
+      client: document.documentElement.clientWidth,
+      scroll: document.documentElement.scrollWidth
+    }));
+    expect(widths.scroll).toBeLessThanOrEqual(widths.client);
+  }
+});
+
 test("team members can be added beyond ten without losing entered values", async ({ page }) => {
   await page.goto("/team-registration.html");
   await expect(page.locator("#public-auth")).toBeVisible({ timeout: 15_000 });

@@ -99,6 +99,44 @@ test("the devkit is the published GitHub resource and support destinations are a
     assert.doesNotMatch(activeFaq, /Discussion forum:[\s\S]{0,120}Coming soon/u);
 });
 
+test("OpenReview submission calls to action are branded, safe, and present at all paper entry points", async () => {
+    const openReviewUrl = "https://openreview.net/group?id=NeurIPS.cc/2026/Workshop/RoCo-Spring";
+    const index = await source("index.html");
+    const participate = await source("participate.html");
+    const evaluation = await source("evaluation.html");
+    const style = await source("assets/style.css");
+
+    const homeActions = index.match(/<div class="hero-actions">[\s\S]*?<\/div>/u)?.[0] ?? "";
+    const stepNine = participate.match(
+        /<li class="step-card">[\s\S]*?<div class="step-number" aria-hidden="true">9<\/div>[\s\S]*?<\/li>/u
+    )?.[0] ?? "";
+    const callForPapers = evaluation.match(
+        /<section class="section" id="call-for-papers">[\s\S]*?<\/section>/u
+    )?.[0] ?? "";
+
+    for (const [location, html] of [
+        ["home hero", homeActions],
+        ["Participate Step 9", stepNine],
+        ["Call for Papers", callForPapers]
+    ]) {
+        assert.match(html, /class="button openreview"/u, location);
+        assert.ok(html.includes(`href="${openReviewUrl}"`), location);
+        assert.match(html, /target="_blank" rel="noopener noreferrer"/u, location);
+        assert.match(
+            html,
+            /<span class="openreview-wordmark">OpenReview<\/span>\s*<span>Submission<\/span>/u,
+            location
+        );
+    }
+
+    assert.match(evaluation, /<div class="eyebrow">Call for Papers<\/div>/u);
+    assert.match(evaluation, /<h3 id="reproducibility">Reproducibility package<\/h3>/u);
+    assert.match(style, /\.button\.openreview\s*\{[\s\S]*?background: #8c1b13;/u);
+    assert.match(style, /\.button\.openreview:hover\s*\{[\s\S]*?background: #7d1803;/u);
+    assert.match(style, /\.openreview-wordmark\s*\{[\s\S]*?font-family: "Noto Sans", sans-serif;/u);
+    await assert.doesNotReject(access(path.join(ROOT, "assets/fonts/noto-sans-latin.woff2")));
+});
+
 test("registration page includes the exact introduction and required controls", async () => {
     const html = (await source("team-registration.html")).replace(/\s+/gu, " ");
     assert.ok(html.includes("Register a team for the RoCo-Spring challenge. The person completing this registration must be one of the team members listed below. At least one competition track and one team member are required."));

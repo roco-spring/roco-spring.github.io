@@ -15,12 +15,14 @@ import {
 
 const COMMIT = "a".repeat(40);
 const REQUIRED_PUBLICATION_FILES = Object.freeze([
+    "evaluation.html",
     "index.html",
     "participate.html",
     "tasks-data.html",
     "team-registration.html",
     "assets/citations.js",
     "assets/firebase-config.js",
+    "assets/fonts/noto-sans-latin.woff2",
     "assets/flow.js",
     "assets/lightbox.js",
     "assets/site-chrome.html",

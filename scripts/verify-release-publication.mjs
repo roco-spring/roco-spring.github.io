@@ -16,12 +16,14 @@ const DEFAULT_MAX_ATTEMPTS = 40;
 const DEFAULT_POLL_DELAY_MS = 15_000;
 const EXPECTED_CHECKS = Object.freeze(["verify", "deploy"]);
 const PUBLISHED_FILES = Object.freeze([
+    "evaluation.html",
     "index.html",
     "participate.html",
     "tasks-data.html",
     "team-registration.html",
     "assets/citations.js",
     "assets/firebase-config.js",
+    "assets/fonts/noto-sans-latin.woff2",
     "assets/flow.js",
     "assets/lightbox.js",
     "assets/site-chrome.html",
