@@ -153,6 +153,59 @@ test("OpenReview submission buttons wrap without mobile overflow", async ({ page
   }
 });
 
+test("buttons pop, participation CTAs glow, and navigation tabs animate on hover", async ({ page }) => {
+  await page.goto("/index.html");
+  await expect(page.locator("header.site-header .brand")).toHaveText("RoCo-Spring");
+
+  const participate = page.locator(".hero-actions .participate-cta");
+  expect(await participate.evaluate((element) =>
+    getComputedStyle(element, "::before").opacity
+  )).toBe("0");
+
+  await participate.hover();
+  await expect.poll(() => participate.evaluate((element) =>
+    getComputedStyle(element, "::before").opacity
+  )).toBe("1");
+  const participateHover = await participate.evaluate((element) => ({
+    animationName: getComputedStyle(element, "::before").animationName,
+    background: getComputedStyle(element, "::before").backgroundImage,
+    transform: getComputedStyle(element).transform
+  }));
+  expect(participateHover.animationName).toBe("participate-ring-flow");
+  expect(participateHover.background).toContain("linear-gradient");
+  expect(participateHover.transform).not.toBe("none");
+
+  const evaluation = page.getByRole("link", { name: "Evaluation", exact: true }).last();
+  const evaluationShadow = await evaluation.evaluate((element) => getComputedStyle(element).boxShadow);
+  await evaluation.hover();
+  await expect.poll(() => evaluation.evaluate((element) =>
+    getComputedStyle(element).transform
+  )).not.toBe("none");
+  expect(await evaluation.evaluate((element) => getComputedStyle(element).boxShadow))
+    .not.toBe(evaluationShadow);
+
+  const tasksTab = page.locator('.nav a[href="tasks-data.html"]');
+  expect(await tasksTab.evaluate((element) =>
+    getComputedStyle(element, "::after").opacity
+  )).toBe("0");
+  await tasksTab.hover();
+  await expect.poll(() => tasksTab.evaluate((element) =>
+    getComputedStyle(element, "::after").opacity
+  )).toBe("1");
+  expect(await tasksTab.evaluate((element) => getComputedStyle(element).transform))
+    .not.toBe("none");
+
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.reload();
+  const reducedParticipate = page.locator(".hero-actions .participate-cta");
+  await reducedParticipate.hover();
+  expect(await reducedParticipate.evaluate((element) =>
+    getComputedStyle(element, "::before").animationName
+  )).toBe("none");
+  expect(await reducedParticipate.evaluate((element) => getComputedStyle(element).transform))
+    .toBe("none");
+});
+
 test("team members can be added beyond ten without losing entered values", async ({ page }) => {
   await page.goto("/team-registration.html");
   await expect(page.locator("#public-auth")).toBeVisible({ timeout: 15_000 });
@@ -247,6 +300,49 @@ for (const { label, viewport } of [
     expect(dimensions.scrollWidth).toBeLessThanOrEqual(dimensions.clientWidth + 1);
   });
 }
+
+test("homepage portraits and funding logos stay compact at desktop and mobile sizes", async ({ page }) => {
+  for (const viewport of [
+    { width: 1280, height: 900 },
+    { width: 390, height: 844 },
+    { width: 320, height: 740 }
+  ]) {
+    await page.setViewportSize(viewport);
+    await page.goto("/index.html");
+
+    const portraits = page.locator(".keynote-photo");
+    await expect(portraits).toHaveCount(2);
+    for (const portrait of await portraits.all()) {
+      const box = await portrait.boundingBox();
+      expect(box).not.toBeNull();
+      expect(box.width).toBeLessThanOrEqual(72);
+      expect(box.height).toBeLessThanOrEqual(72);
+      expect(Math.abs(box.width - box.height)).toBeLessThanOrEqual(1);
+    }
+
+    const logoImages = page.locator("#sponsors img");
+    await logoImages.first().scrollIntoViewIfNeeded();
+    await expect(logoImages).toHaveCount(5);
+    await expect
+      .poll(() => logoImages.evaluateAll((images) =>
+        images.every((image) => image.complete && image.naturalWidth > 0)
+      ))
+      .toBe(true);
+
+    for (const logo of await logoImages.all()) {
+      const box = await logo.boundingBox();
+      expect(box).not.toBeNull();
+      expect(box.width).toBeLessThanOrEqual(220);
+      expect(box.height).toBeLessThanOrEqual(48);
+    }
+
+    const dimensions = await page.evaluate(() => ({
+      clientWidth: document.documentElement.clientWidth,
+      scrollWidth: document.documentElement.scrollWidth
+    }));
+    expect(dimensions.scrollWidth).toBeLessThanOrEqual(dimensions.clientWidth + 1);
+  }
+});
 
 test("mobile navigation toggles with an accessible state", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });

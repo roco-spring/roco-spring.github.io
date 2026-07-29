@@ -174,11 +174,33 @@ test("generic primary and secondary buttons have polished interaction states", a
     const style = await source("assets/style.css");
 
     assert.match(style, /\.button:focus-visible\s*\{[\s\S]*?outline: 3px solid/u);
+    assert.match(
+        style,
+        /\.button:hover:not\(:disabled\):not\(\[aria-disabled="true"\]\)\s*\{[\s\S]*?transform: translateY\(-3px\) scale\(1\.025\);/u
+    );
     assert.match(style, /\.button\.primary\s*\{[\s\S]*?box-shadow:/u);
-    assert.match(style, /\.button\.primary:hover[\s\S]*?transform: translateY\(-2px\);/u);
+    assert.match(style, /\.button\.primary:hover[\s\S]*?box-shadow:/u);
     assert.match(style, /\.button\.secondary\s*\{[\s\S]*?box-shadow:/u);
-    assert.match(style, /\.button\.secondary:hover[\s\S]*?transform: translateY\(-2px\);/u);
+    assert.match(style, /\.button\.secondary:hover[\s\S]*?box-shadow:/u);
     assert.match(style, /\.button\.compact\s*\{[\s\S]*?min-height: 40px;/u);
+});
+
+test("participation calls to action have a rainbow invitation ring and navigation tabs animate", async () => {
+    const index = await source("index.html");
+    const participate = await source("participate.html");
+    const registration = await source("team-registration.html");
+    const chrome = await source("assets/site-chrome.html");
+    const style = await source("assets/style.css");
+
+    assert.match(index, /class="button primary participate-cta" href="participate\.html"/u);
+    assert.match(participate, /class="button primary compact participate-cta"/u);
+    assert.match(registration, /class="button primary form-submit participate-cta"/u);
+    assert.match(chrome, /<nav id="site-nav" class="nav"/u);
+    assert.match(style, /\.button\.participate-cta::before\s*\{[\s\S]*?linear-gradient/u);
+    assert.match(style, /\.button\.participate-cta:hover[\s\S]*?::before[\s\S]*?participate-ring-flow/u);
+    assert.match(style, /@keyframes participate-ring-flow/u);
+    assert.match(style, /\.nav a::after\s*\{[\s\S]*?transform: scaleX\(0\.2\);/u);
+    assert.match(style, /\.nav a:hover::after[\s\S]*?transform: scaleX\(1\);/u);
 });
 
 test("OpenReview submission calls to action are branded, safe, and present at all paper entry points", async () => {
@@ -214,7 +236,7 @@ test("OpenReview submission calls to action are branded, safe, and present at al
     assert.match(evaluation, /<div class="eyebrow">Call for Papers<\/div>/u);
     assert.match(evaluation, /<h3 id="reproducibility">Reproducibility package<\/h3>/u);
     assert.match(style, /\.button\.openreview\s*\{[\s\S]*?background: #8c1b13;/u);
-    assert.match(style, /\.button\.openreview:hover\s*\{[\s\S]*?background: #7d1803;/u);
+    assert.match(style, /\.button\.openreview:hover[^{]*\{[\s\S]*?background: #7d1803;/u);
     assert.match(style, /\.openreview-wordmark\s*\{[\s\S]*?font-family: "Noto Sans", sans-serif;/u);
     await assert.doesNotReject(access(path.join(ROOT, "assets/fonts/noto-sans-latin.woff2")));
 });

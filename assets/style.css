@@ -95,20 +95,61 @@ code {
 }
 
 .nav a {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    padding: 3px 1px 5px;
     color: rgba(255, 255, 255, 0.82);
     text-decoration: none;
     font-size: 0.92rem;
     white-space: nowrap;
+    transition: color 0.2s ease, text-shadow 0.2s ease, transform 0.2s ease;
 }
 
-.nav a:hover {
+.nav a::after {
+    position: absolute;
+    right: 0;
+    bottom: 1px;
+    left: 0;
+    height: 2px;
+    border-radius: 999px;
+    background: linear-gradient(90deg, var(--accent), var(--accent-2));
+    box-shadow: 0 0 0 rgba(0, 212, 255, 0);
+    content: "";
+    opacity: 0;
+    transform: scaleX(0.2);
+    transform-origin: center;
+    transition: box-shadow 0.2s ease, opacity 0.2s ease, transform 0.2s ease;
+}
+
+.nav a:hover,
+.nav a:focus-visible {
     color: white;
+    text-shadow: 0 0 16px rgba(125, 224, 255, 0.34);
+    transform: translateY(-1px);
+}
+
+.nav a:hover::after,
+.nav a:focus-visible::after {
+    box-shadow: 0 0 10px rgba(0, 212, 255, 0.42);
+    opacity: 1;
+    transform: scaleX(1);
+}
+
+.nav a:focus-visible {
+    border-radius: 4px;
+    outline: 2px solid rgba(0, 212, 255, 0.76);
+    outline-offset: -2px;
 }
 
 .nav a[aria-current="page"] {
     color: white;
     font-weight: 800;
-    box-shadow: inset 0 -2px 0 var(--accent-2);
+}
+
+.nav a[aria-current="page"]::after {
+    opacity: 1;
+    transform: scaleX(1);
 }
 
 .nav-toggle {
@@ -320,12 +361,17 @@ p {
     cursor: pointer;
     -webkit-tap-highlight-color: transparent;
     transition: transform 0.18s ease, box-shadow 0.18s ease, background 0.18s ease,
-        border-color 0.18s ease, color 0.18s ease;
+        border-color 0.18s ease, color 0.18s ease, filter 0.18s ease;
 }
 
 .button:focus-visible {
     outline: 3px solid rgba(0, 125, 180, 0.78);
     outline-offset: 3px;
+}
+
+.button:hover:not(:disabled):not([aria-disabled="true"]) {
+    filter: brightness(1.025) saturate(1.08);
+    transform: translateY(-3px) scale(1.025);
 }
 
 .button.primary {
@@ -338,8 +384,7 @@ p {
 .button.primary:hover:not(:disabled):not([aria-disabled="true"]) {
     border-color: rgba(34, 55, 195, 0.9);
     background: linear-gradient(135deg, #6d88ff 0%, #263fdc 100%);
-    box-shadow: 0 15px 34px rgba(48, 71, 232, 0.4), 0 0 0 1px rgba(0, 212, 255, 0.16);
-    transform: translateY(-2px);
+    box-shadow: 0 18px 38px rgba(48, 71, 232, 0.44), 0 0 0 1px rgba(0, 212, 255, 0.2);
 }
 
 .button.secondary {
@@ -353,14 +398,65 @@ p {
     color: #172c9e;
     border-color: rgba(93, 124, 255, 0.48);
     background: linear-gradient(135deg, #ffffff 0%, #cfddff 100%);
-    box-shadow: 0 14px 30px rgba(58, 78, 194, 0.22), 0 0 0 1px rgba(0, 212, 255, 0.12);
-    transform: translateY(-2px);
+    box-shadow: 0 17px 34px rgba(58, 78, 194, 0.26), 0 0 0 1px rgba(0, 212, 255, 0.17);
+}
+
+.button.participate-cta {
+    position: relative;
+    isolation: isolate;
+}
+
+.button.participate-cta::before {
+    position: absolute;
+    z-index: 2;
+    inset: -2px;
+    padding: 2px;
+    border-radius: inherit;
+    background: linear-gradient(90deg,
+            #ff4f91,
+            #ff9f43,
+            #f7e85b,
+            #38d996,
+            #30c8ff,
+            #7b7cff,
+            #d65bff,
+            #ff4f91);
+    background-size: 240% 100%;
+    content: "";
+    filter: drop-shadow(0 0 0 rgba(0, 212, 255, 0));
+    opacity: 0;
+    pointer-events: none;
+    transition: filter 0.2s ease, opacity 0.2s ease;
+    -webkit-mask:
+        linear-gradient(#000 0 0) content-box,
+        linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+}
+
+.button.participate-cta:hover:not(:disabled):not([aria-disabled="true"])::before,
+.button.participate-cta:focus-visible:not(:disabled):not([aria-disabled="true"])::before {
+    animation: participate-ring-flow 2.4s linear infinite;
+    filter: drop-shadow(0 0 5px rgba(0, 212, 255, 0.5));
+    opacity: 1;
+}
+
+.button.participate-cta:hover:not(:disabled):not([aria-disabled="true"]) {
+    box-shadow:
+        0 18px 40px rgba(48, 71, 232, 0.44),
+        0 0 20px rgba(0, 212, 255, 0.2);
+}
+
+@keyframes participate-ring-flow {
+    to {
+        background-position: 240% 0;
+    }
 }
 
 .button.primary:active:not(:disabled):not([aria-disabled="true"]),
 .button.secondary:active:not(:disabled):not([aria-disabled="true"]),
-.button.starter-kit:active,
-.button.openreview:active {
+.button.starter-kit:active:not(:disabled):not([aria-disabled="true"]),
+.button.openreview:active:not(:disabled):not([aria-disabled="true"]) {
     box-shadow: 0 6px 16px rgba(30, 46, 112, 0.2);
     transform: translateY(0);
 }
@@ -374,10 +470,9 @@ p {
     transition: transform 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
 }
 
-.button.starter-kit:hover {
-    transform: translateY(-2px);
+.button.starter-kit:hover:not(:disabled):not([aria-disabled="true"]) {
     background: linear-gradient(135deg, #0b1020 0%, #1b294d 58%, #14396f 100%);
-    box-shadow: 0 15px 34px rgba(12, 21, 44, 0.34), 0 0 0 1px rgba(0, 212, 255, 0.18);
+    box-shadow: 0 18px 38px rgba(12, 21, 44, 0.38), 0 0 0 1px rgba(0, 212, 255, 0.22);
 }
 
 .button.starter-kit:focus-visible {
@@ -395,10 +490,9 @@ p {
     transition: transform 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
 }
 
-.button.openreview:hover {
-    transform: translateY(-2px);
+.button.openreview:hover:not(:disabled):not([aria-disabled="true"]) {
     background: #7d1803;
-    box-shadow: 0 15px 34px rgba(92, 18, 13, 0.36), 0 0 0 1px rgba(140, 27, 19, 0.2);
+    box-shadow: 0 18px 38px rgba(92, 18, 13, 0.4), 0 0 0 1px rgba(140, 27, 19, 0.24);
 }
 
 .button.openreview:focus-visible {
@@ -799,40 +893,47 @@ p {
 }
 
 .keynote-card {
-    padding: 0;
-    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    padding: 24px;
     background:
         radial-gradient(circle at 100% 0, rgba(0, 212, 255, 0.08), transparent 34%),
         var(--panel-strong);
     box-shadow: 0 16px 38px rgba(21, 34, 76, 0.11);
 }
 
+.keynote-profile {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
 .keynote-photo-link {
     position: relative;
     display: block;
+    width: 72px;
+    height: 72px;
+    flex: 0 0 72px;
+    border: 3px solid white;
+    border-radius: 50%;
     overflow: hidden;
     background: #eaf0fb;
-}
-
-.keynote-photo-link::after {
-    position: absolute;
-    inset: auto 0 0;
-    height: 36%;
-    background: linear-gradient(transparent, rgba(7, 15, 38, 0.22));
-    pointer-events: none;
-    content: "";
+    box-shadow: 0 5px 16px rgba(27, 42, 82, 0.18);
+    transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
 }
 
 .keynote-photo-link:focus-visible {
     z-index: 1;
-    outline: 4px solid rgba(0, 125, 180, 0.78);
-    outline-offset: -4px;
+    outline: 3px solid rgba(0, 125, 180, 0.78);
+    outline-offset: 3px;
 }
 
 .keynote-photo {
     display: block;
     width: 100%;
-    aspect-ratio: 16 / 9;
+    height: 100%;
+    aspect-ratio: 1;
     object-fit: cover;
     transition: transform 0.28s ease, filter 0.28s ease;
 }
@@ -842,52 +943,62 @@ p {
 }
 
 .keynote-photo--fatih {
-    object-fit: contain;
-    object-position: 50% 50%;
+    object-position: 50% 38%;
     background: linear-gradient(#ffffff 0%, #f8f8f8 48%, #b9b9b9 100%);
+}
+
+.keynote-photo-link:hover {
+    border-color: rgba(0, 169, 206, 0.42);
+    box-shadow: 0 8px 20px rgba(27, 74, 105, 0.24);
+    transform: translateY(-2px);
 }
 
 .keynote-photo-link:hover .keynote-photo {
     filter: saturate(1.04) contrast(1.02);
-    transform: scale(1.025);
+    transform: scale(1.04);
 }
 
 .keynote-content {
-    padding: 26px;
+    padding: 0;
 }
 
-.keynote-content h3 {
+.keynote-identity {
+    min-width: 0;
+}
+
+.keynote-identity h3 {
     margin-bottom: 9px;
-    font-size: 1.48rem;
+    font-size: 1.35rem;
 }
 
-.keynote-content h3 a {
+.keynote-identity h3 a {
     color: var(--text);
     text-decoration-color: rgba(93, 124, 255, 0.36);
     text-decoration-thickness: 2px;
     text-underline-offset: 4px;
 }
 
-.keynote-content h3 a:hover,
-.keynote-content h3 a:focus-visible {
+.keynote-identity h3 a:hover,
+.keynote-identity h3 a:focus-visible {
     color: #2437a6;
     text-decoration-color: var(--accent);
 }
 
-.keynote-content h3 a:focus-visible {
+.keynote-identity h3 a:focus-visible {
     border-radius: 4px;
     outline: 3px solid rgba(0, 125, 180, 0.7);
     outline-offset: 4px;
 }
 
 .keynote-affiliation {
-    margin: -4px 0 14px;
+    margin: -4px 0 0;
     color: var(--muted);
     font-weight: 700;
+    line-height: 1.4;
 }
 
-.keynote-content p:last-child {
-    margin-bottom: 0;
+.keynote-content p {
+    margin: 0;
 }
 
 .citation-ref {
@@ -1223,10 +1334,10 @@ td {
 
 .sponsor-feature {
     display: grid;
-    grid-template-columns: minmax(250px, 0.82fr) minmax(0, 1.18fr);
+    grid-template-columns: minmax(180px, 220px) minmax(0, 1fr);
     align-items: center;
-    gap: clamp(28px, 5vw, 58px);
-    padding: clamp(30px, 5vw, 54px);
+    gap: clamp(24px, 4vw, 42px);
+    padding: clamp(26px, 4vw, 38px);
     border-bottom: 1px solid var(--line);
     background:
         radial-gradient(circle at 2% 15%, rgba(0, 212, 255, 0.18), transparent 32%),
@@ -1235,14 +1346,15 @@ td {
 
 .sponsor-feature-logo {
     display: flex;
-    min-height: 174px;
+    width: 100%;
+    height: 92px;
     align-items: center;
     justify-content: center;
-    padding: 30px;
+    padding: 18px;
     border: 1px solid rgba(21, 131, 153, 0.18);
-    border-radius: 24px;
+    border-radius: 16px;
     background: rgba(255, 255, 255, 0.86);
-    box-shadow: 0 18px 42px rgba(27, 82, 113, 0.13), inset 0 1px 0 white;
+    box-shadow: 0 10px 26px rgba(27, 82, 113, 0.1), inset 0 1px 0 white;
     transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
 }
 
@@ -1259,8 +1371,10 @@ td {
 
 .sponsor-feature-logo img {
     display: block;
-    width: min(100%, 390px);
-    height: auto;
+    width: 100%;
+    max-width: 190px;
+    height: 46px;
+    object-fit: contain;
 }
 
 .support-kicker {
@@ -1306,7 +1420,7 @@ td {
 }
 
 .acknowledgements-card {
-    padding: clamp(30px, 5vw, 54px);
+    padding: clamp(28px, 4vw, 38px);
     background:
         radial-gradient(circle at 100% 100%, rgba(93, 124, 255, 0.08), transparent 30%),
         white;
@@ -1314,7 +1428,7 @@ td {
 
 .acknowledgements-copy {
     max-width: 1010px;
-    margin-bottom: 30px;
+    margin-bottom: 24px;
     color: var(--muted);
     font-size: 1rem;
     line-height: 1.78;
@@ -1327,20 +1441,21 @@ td {
 }
 
 .funder-logo-card {
+    --logo-width: 160px;
     display: flex;
     min-width: 0;
-    min-height: 142px;
+    min-height: 108px;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 14px;
-    padding: 22px 18px 17px;
+    gap: 9px;
+    padding: 16px 14px 13px;
     border: 1px solid rgba(38, 55, 98, 0.12);
-    border-radius: 18px;
+    border-radius: 14px;
     color: var(--muted);
     background: linear-gradient(145deg, #ffffff, #f4f7fd);
-    box-shadow: 0 9px 24px rgba(28, 42, 80, 0.07);
-    font-size: 0.76rem;
+    box-shadow: 0 6px 18px rgba(28, 42, 80, 0.06);
+    font-size: 0.7rem;
     font-weight: 800;
     line-height: 1.25;
     text-align: center;
@@ -1363,14 +1478,30 @@ td {
 
 .funder-logo-card img {
     display: block;
-    width: 100%;
-    max-width: 210px;
-    height: 56px;
+    width: var(--logo-width);
+    max-width: 100%;
+    height: 48px;
     object-fit: contain;
 }
 
+.funder-logo-card--dfg {
+    --logo-width: 150px;
+}
+
+.funder-logo-card--l2s {
+    --logo-width: 174px;
+}
+
+.funder-logo-card--sfb {
+    --logo-width: 158px;
+}
+
+.funder-logo-card--imprs {
+    --logo-width: 140px;
+}
+
 .funder-logo-card span {
-    min-height: 1.9em;
+    min-height: 1.25em;
 }
 
 .organizer-grid {
@@ -1465,6 +1596,12 @@ details p {
     margin: 0 0 6px;
 }
 
+@media (max-width: 1100px) {
+    .funder-logo-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
 @media (max-width: 1000px) {
 
     .card-grid.four,
@@ -1487,9 +1624,6 @@ details p {
         grid-template-columns: 1fr;
     }
 
-    .funder-logo-grid {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
 }
 
 @media (max-width: 900px) {
@@ -1502,11 +1636,11 @@ details p {
     }
 
     .sponsor-feature {
-        grid-template-columns: 1fr;
+        grid-template-columns: minmax(160px, 190px) minmax(0, 1fr);
     }
 
     .sponsor-feature-logo {
-        min-height: 150px;
+        height: 86px;
     }
 }
 
@@ -1837,6 +1971,13 @@ details p {
 .auth-tab:hover:not([aria-selected="true"]) {
     color: #2d3f8f;
     background: rgba(255, 255, 255, 0.5);
+    box-shadow: 0 7px 16px rgba(45, 63, 143, 0.1);
+    transform: translateY(-1px);
+}
+
+.auth-tab:hover[aria-selected="true"] {
+    box-shadow: 0 13px 28px rgba(55, 76, 187, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.28);
+    transform: translateY(-1px);
 }
 
 .auth-tab[aria-selected="true"] {
@@ -2241,8 +2382,7 @@ details p {
 
 .member-add-button:hover:not(:disabled) {
     background: white;
-    box-shadow: 0 11px 26px rgba(0, 212, 255, 0.22);
-    transform: translateY(-1px);
+    box-shadow: 0 14px 30px rgba(0, 212, 255, 0.27);
 }
 
 .member-slots {
@@ -2349,7 +2489,8 @@ details p {
     font-weight: 800;
     text-decoration: none;
     cursor: pointer;
-    transition: color 0.16s ease, background 0.16s ease;
+    transition: color 0.16s ease, background 0.16s ease, box-shadow 0.16s ease,
+        transform 0.16s ease;
 }
 
 .clear-member-button:hover,
@@ -2357,6 +2498,8 @@ details p {
 .member-remove-button:hover {
     color: #6f1f2e;
     background: rgba(184, 54, 75, 0.13);
+    box-shadow: 0 7px 15px rgba(111, 31, 46, 0.1);
+    transform: translateY(-1px);
 }
 
 .form-actions {
@@ -2532,8 +2675,8 @@ details p {
 
 .registration-page .form-submit:hover:not(:disabled),
 .registration-page .registration-submit-row .button.primary:hover:not(:disabled) {
-    box-shadow: 0 13px 31px rgba(0, 212, 255, 0.28);
-    transform: translateY(-1px);
+    box-shadow: 0 16px 34px rgba(0, 212, 255, 0.32);
+    transform: translateY(-3px) scale(1.02);
 }
 
 .edit-action-panel {
@@ -2707,12 +2850,15 @@ details p {
     text-decoration: none;
     text-underline-offset: 3px;
     cursor: pointer;
+    transition: color 0.16s ease, text-shadow 0.16s ease, transform 0.16s ease;
 }
 
 .text-button:hover {
     color: #1d2f9a;
     text-decoration: underline;
     text-underline-offset: 3px;
+    text-shadow: 0 5px 14px rgba(52, 75, 192, 0.16);
+    transform: translateY(-1px);
 }
 
 .account-gate {
@@ -3127,9 +3273,16 @@ details p {
     }
 
     .button,
+    .button.starter-kit,
+    .button.openreview,
+    .button.participate-cta::before,
+    .nav a,
+    .nav a::after,
     .status-grid a.status-card,
     .dataset-preview,
     .nav-toggle,
+    .nav-toggle-bar,
+    .keynote-photo-link,
     .keynote-photo,
     .sponsor-feature-logo,
     .funder-logo-card,
@@ -3137,16 +3290,34 @@ details p {
         transition: none;
     }
 
-    .button:hover,
+    .button:hover:not(:disabled):not([aria-disabled="true"]),
+    .nav a:hover,
+    .nav a:focus-visible,
+    .auth-tab:hover,
+    .member-add-button:hover:not(:disabled),
+    .clear-member-button:hover,
+    .remove-member-button:hover,
+    .member-remove-button:hover,
+    .text-button:hover,
+    .registration-page .form-submit:hover:not(:disabled),
+    .registration-page .registration-submit-row .button.primary:hover:not(:disabled),
     .status-grid a.status-card:hover,
     .status-grid a.status-card:focus-visible,
     .dataset-preview:hover,
     .nav-toggle:hover,
+    .keynote-photo-link:hover,
     .keynote-photo-link:hover .keynote-photo,
     .sponsor-feature-logo:hover,
     .funder-logo-card:hover,
-    .image-lightbox-close:hover {
+    .image-lightbox-close:hover,
+    .checkbox-grid .track-option:hover,
+    .member-slot:focus-within {
         transform: none;
+    }
+
+    .button.participate-cta:hover:not(:disabled):not([aria-disabled="true"])::before,
+    .button.participate-cta:focus-visible:not(:disabled):not([aria-disabled="true"])::before {
+        animation: none;
     }
 
     .portal-loading::before {
@@ -3160,10 +3331,15 @@ details p {
     }
 
     .auth-tab,
+    .clear-member-button,
+    .remove-member-button,
+    .member-remove-button,
+    .text-button,
     .form-section,
     .form-field input,
     .checkbox-grid .track-option,
     .track-option-check,
+    .track-option-check::after,
     .member-slot,
     .registration-page .button {
         scroll-behavior: auto;
@@ -3273,12 +3449,19 @@ details p {
         min-height: 44px;
     }
 
-    .keynote-photo {
-        aspect-ratio: 16 / 10;
+    .keynote-card {
+        gap: 16px;
+        padding: 21px;
     }
 
-    .keynote-content {
-        padding: 22px;
+    .keynote-profile {
+        gap: 14px;
+    }
+
+    .keynote-photo-link {
+        width: 64px;
+        height: 64px;
+        flex-basis: 64px;
     }
 
     .sponsor-feature,
@@ -3286,9 +3469,15 @@ details p {
         padding: 24px;
     }
 
+    .sponsor-feature {
+        grid-template-columns: 1fr;
+        gap: 20px;
+    }
+
     .sponsor-feature-logo {
-        min-height: 124px;
-        padding: 22px;
+        width: min(100%, 220px);
+        height: 82px;
+        padding: 16px;
     }
 
     .funder-logo-grid {
@@ -3296,14 +3485,30 @@ details p {
     }
 
     .funder-logo-card {
-        min-height: 126px;
-        gap: 10px;
-        padding: 16px 10px 13px;
-        font-size: 0.7rem;
+        min-height: 104px;
+        gap: 8px;
+        padding: 13px 10px 11px;
+        font-size: 0.68rem;
     }
 
     .funder-logo-card img {
-        height: 46px;
+        height: 44px;
+    }
+
+    .funder-logo-card--dfg {
+        --logo-width: 140px;
+    }
+
+    .funder-logo-card--l2s {
+        --logo-width: 160px;
+    }
+
+    .funder-logo-card--sfb {
+        --logo-width: 145px;
+    }
+
+    .funder-logo-card--imprs {
+        --logo-width: 130px;
     }
 
     .flowbench-resource {
@@ -3362,5 +3567,25 @@ details p {
         max-width: 100%;
         padding-inline: 14px;
         font-size: 0.94rem;
+    }
+}
+
+@media (max-width: 360px) {
+    #sponsors .section-heading h2 {
+        font-size: 1.72rem;
+        overflow-wrap: anywhere;
+    }
+
+    .acknowledgements-card h3 {
+        font-size: 1.4rem;
+        overflow-wrap: anywhere;
+    }
+
+    .funder-logo-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .funder-logo-card {
+        min-height: 96px;
     }
 }
