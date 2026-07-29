@@ -99,6 +99,88 @@ test("the devkit is the published GitHub resource and support destinations are a
     assert.doesNotMatch(activeFaq, /Discussion forum:[\s\S]{0,120}Coming soon/u);
 });
 
+test("homepage includes the requested sponsor and project-specific acknowledgements", async () => {
+    const index = await source("index.html");
+    const chrome = await source("assets/site-chrome.html");
+    const normalized = index
+        .replace(/<[^>]+>/gu, " ")
+        .replace(/\s+/gu, " ")
+        .replace(/\s+([.,])/gu, "$1")
+        .trim();
+
+    assert.match(index, /<section class="section support-section" id="sponsors">/u);
+    assert.match(chrome, /href="index\.html#sponsors">Sponsors<\/a>/u);
+    assert.ok(normalized.includes(
+        "This event is supported by the SFB-TRR 161 Quantitative Methods for Visual Computing."
+    ));
+    assert.ok(normalized.includes(
+        "Shashank Agnihotri and Margret Keuper acknowledge funding by the DFG Research Unit 5336 – Learning to Sense (L2S)."
+    ));
+    assert.ok(normalized.includes(
+        "Margret Keuper acknowledges funding by BMFTR project TrackOpt (01IS24074A-D)."
+    ));
+    assert.ok(normalized.includes(
+        "Andres Bruhn and Victor Oei acknowledge funding by the Deutsche Forschungsgemeinschaft (DFG, German Research Foundation) – Project-ID 251654672 – TRR 161: Quantitative Methods for Visual Computing (B04, A07)."
+    ));
+    assert.ok(normalized.includes(
+        "Katrin Bauer and Andres Bruhn acknowledge funding by the Deutsche Forschungsgemeinschaft (DFG, German Research Foundation) – Project-ID 533085500 – Robust Optical Flow."
+    ));
+    assert.ok(normalized.includes(
+        "Katrin Bauer and Victor Oei acknowledge support from the International Max Planck Research School for Intelligent Systems (IMPRS-IS)."
+    ));
+
+    for (const asset of [
+        "img/logos/dfg.png",
+        "img/logos/l2s.svg",
+        "img/logos/sfb-trr161.png",
+        "img/logos/imprs-is.png"
+    ]) {
+        assert.ok(index.includes(`src="${asset}"`), asset);
+        await assert.doesNotReject(access(path.join(ROOT, asset)), asset);
+    }
+    assert.match(index, /href="https:\/\/www\.sfbtrr161\.de\/"[\s\S]{0,220}SFB-TRR 161/u);
+});
+
+test("keynote speaker names and portraits link to their verified homepages", async () => {
+    const index = await source("index.html");
+
+    for (const speaker of [
+        {
+            name: "Jia Deng",
+            homepage: "https://www.cs.princeton.edu/~jiadeng/",
+            portrait: "img/speakers/jia-deng.webp"
+        },
+        {
+            name: "Fatih Porikli",
+            homepage: "https://www.porikli.com/",
+            portrait: "img/speakers/fatih-porikli.webp"
+        }
+    ]) {
+        assert.ok(index.includes(`href="${speaker.homepage}"`), speaker.name);
+        assert.ok(index.includes(`src="${speaker.portrait}"`), speaker.name);
+        assert.match(
+            index,
+            new RegExp(
+                `<a href="${speaker.homepage.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}"[^>]*>${speaker.name}<\\/a>`,
+                "u"
+            ),
+            speaker.name
+        );
+        await assert.doesNotReject(access(path.join(ROOT, speaker.portrait)), speaker.portrait);
+    }
+});
+
+test("generic primary and secondary buttons have polished interaction states", async () => {
+    const style = await source("assets/style.css");
+
+    assert.match(style, /\.button:focus-visible\s*\{[\s\S]*?outline: 3px solid/u);
+    assert.match(style, /\.button\.primary\s*\{[\s\S]*?box-shadow:/u);
+    assert.match(style, /\.button\.primary:hover[\s\S]*?transform: translateY\(-2px\);/u);
+    assert.match(style, /\.button\.secondary\s*\{[\s\S]*?box-shadow:/u);
+    assert.match(style, /\.button\.secondary:hover[\s\S]*?transform: translateY\(-2px\);/u);
+    assert.match(style, /\.button\.compact\s*\{[\s\S]*?min-height: 40px;/u);
+});
+
 test("OpenReview submission calls to action are branded, safe, and present at all paper entry points", async () => {
     const openReviewUrl = "https://openreview.net/group?id=NeurIPS.cc/2026/Workshop/RoCo-Spring";
     const index = await source("index.html");

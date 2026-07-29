@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 560 150" role="img" aria-labelledby="title description">
+  <title id="title">L2S — Learning to Sense</title>
+  <desc id="description">Typographic project badge for DFG Research Unit 5336</desc>
+  <defs>
+    <linearGradient id="badge" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#5d7cff"/>
+      <stop offset="1" stop-color="#00a9ce"/>
+    </linearGradient>
+  </defs>
+  <rect x="5" y="17" width="116" height="116" rx="30" fill="url(#badge)"/>
+  <circle cx="63" cy="75" r="13" fill="#fff"/>
+  <path d="M38 60c14-14 36-14 50 0M28 47c19-20 51-20 70 0M38 90c14 14 36 14 50 0M28 103c19 20 51 20 70 0"
+        fill="none" stroke="#fff" stroke-linecap="round" stroke-width="6" opacity=".9"/>
+  <text x="145" y="78" fill="#172033" font-family="Arial, Helvetica, sans-serif" font-size="62"
+        font-weight="800" letter-spacing="-3">L2S</text>
+  <text x="147" y="108" fill="#3150bf" font-family="Arial, Helvetica, sans-serif" font-size="22"
+        font-weight="700" letter-spacing=".6">LEARNING TO SENSE</text>
+  <text x="148" y="130" fill="#68748b" font-family="Arial, Helvetica, sans-serif" font-size="13"
+        font-weight="700" letter-spacing="1.35">DFG RESEARCH UNIT 5336</text>
+</svg>
