@@ -21,8 +21,8 @@
             <div class="eyebrow">Leaderboard</div>
             <h1>Rankings, Metrics &amp; Submissions</h1>
             <p class="page-intro">
-                Verified methods will be ranked by the RbS-Score, which balances clean Spring performance and
-                corrupted RobustSpring performance with equal weight.
+                Matched public methods receive provisional RbS-Score ranks balancing clean Spring performance
+                and the official additive RobustSpring proxy with equal weight.
             </p>
         </section>
 
@@ -32,7 +32,7 @@
                     <div class="eyebrow">Current Standings</div>
                     <h2>RoCo-Spring Leaderboard</h2>
                     <p>
-                        Lower RbS-Scores rank higher. Registered teams without a verified benchmark result
+                        Lower RbS-Scores rank higher. Registered teams without a matched public benchmark result
                         appear after scored teams in alphabetical order.
                     </p>
                 </div>
@@ -51,20 +51,25 @@
                         <time data-leaderboard-updated>Loading…</time>
                     </p>
                     <p class="leaderboard-source" data-leaderboard-source>
-                        Organizer-published roster snapshot
+                        Organizer-published live snapshot
                     </p>
                 </div>
             </div>
 
             <p class="leaderboard-refresh-note" id="leaderboard-refresh-note">
-                Refresh reloads the latest organizer-published roster snapshot; it does not query Spring or
-                trigger a benchmark sync.
+                Refresh requests the latest registered-team roster and public Spring/RobustSpring results.
+                Successful results are cached briefly to protect the benchmark service.
             </p>
             <p class="leaderboard-integrity-note" role="note">
-                Only organizer-verified results are ranked. No current public benchmark entry exposes a validated
-                RoCo-Spring team ID, so scores remain blank instead of being inferred from method names.
+                The organizer-approved matcher uses an exact RoCo team ID first, then a unique normalized team-name
+                substring. Private or unmatched benchmark entries remain pending instead of being assigned arbitrarily.
+                Automatic matches are provisional: ranked and award-eligible entries must use the same method,
+                checkpoint, inference settings, and clean outputs in both uploads, subject to organizer verification.
+                The public benchmark cannot prove that cross-upload identity. “Spring Submission Time” is the original
+                Spring result time; a separate RobustSpring upload time is not exposed publicly.
             </p>
-            <p class="visually-hidden" role="status" aria-live="polite" data-leaderboard-refresh-status></p>
+            <p class="leaderboard-refresh-status" role="status" aria-live="polite" aria-atomic="true"
+                data-leaderboard-refresh-status></p>
 
             <div class="leaderboard-loading" data-leaderboard-root data-mode="full" aria-live="polite">
                 Loading published standings…
@@ -85,16 +90,17 @@
 
             <div class="metric-card content-card">
                 <p class="metric-integrity-note" role="note">
-                    <strong>Scoring integrity note:</strong> the formula below defines the RobustSpring term as
-                    error against ground truth on corrupted inputs. The current public RobustSpring tables expose
-                    clean-to-corrupted prediction deltas instead. Because those quantities are not interchangeable,
-                    public delta values are not substituted into the RbS-Score.
+                    <strong>Official 2026 scoring convention:</strong> the public RobustSpring tables report
+                    clean-to-corrupted prediction disagreement, &Delta;. For this challenge, the organizers define
+                    the additive proxy E<sub>R,proxy</sub> = E<sub>S</sub> + &Delta;. This operational proxy is used
+                    consistently for baselines and submissions; it is not presented as an exact corrupted-input
+                    ground-truth measurement.
                 </p>
                 <p>
                     Each quantitative task will be ranked using the
                     <strong>Robustness-balanced Spring Score (RbS-Score)</strong>.
                     The score combines a method's accuracy on the clean Spring benchmark (S)
-                    with its accuracy on the corrupted RobustSpring benchmark (R).
+                    with its additive RobustSpring proxy (R,proxy).
                     Both components receive equal weight, and <strong>lower is better</strong>.
                 </p>
 
@@ -104,7 +110,7 @@
                     E<sub>S</sub><sup>t</sup>(m) / B<sub>S</sub><sup>t</sup>
                     +
                     0.5 ·
-                    E<sub>R</sub><sup>t</sup>(m) / B<sub>R</sub><sup>t</sup>
+                    E<sub>R,proxy</sub><sup>t</sup>(m) / B<sub>R,proxy</sub><sup>t</sup>
                 </div>
 
                 <ul>
@@ -112,40 +118,134 @@
                         <strong>m:</strong> the evaluated method.
                     </li>
                     <li>
-                        <strong>t:</strong> the quantitative task, such as optical flow,
-                        stereo, or scene flow.
+                        <strong>t:</strong> the quantitative task, such as Optical Flow,
+                        Stereo Matching, or Scene Flow.
                     </li>
                     <li>
                         <strong>E<sub>S</sub><sup>t</sup>(m):</strong>
                         the method's endpoint-error-style metric on the clean Spring data.
                     </li>
                     <li>
-                        <strong>E<sub>R</sub><sup>t</sup>(m):</strong>
-                        the same error metric evaluated on RobustSpring,
-                        averaged over all included corruption types.
+                        <strong>E<sub>R,proxy</sub><sup>t</sup>(m):</strong>
+                        the clean Spring error plus the matching RobustSpring prediction disagreement.
                     </li>
                     <li>
                         <strong>
                             B<sub>S</sub><sup>t</sup>,
-                            B<sub>R</sub><sup>t</sup>:
+                            B<sub>R,proxy</sub><sup>t</sup>:
                         </strong>
-                        task-specific baseline errors that must be fixed before score
-                        publication.
+                        fixed task-specific medians from the qualifying Spring-team submissions below.
                     </li>
                 </ul>
 
                 <p>
-                    Consequently, the B<sub>R</sub> constants and RbS-Scores remain pending
-                    organizer-approved corrupted-input ground-truth measurements.
+                    Each clean baseline is the median of the published clean metrics. Each RobustSpring proxy
+                    baseline is the median of the <em>per-method</em> sums E<sub>S</sub> + &Delta;; it is not the
+                    sum of two independently rounded medians.
                 </p>
+
+                <h3>Fixed 2026 Baselines</h3>
+
+                <div class="baseline-table-wrap" role="region" aria-label="Task baseline table" tabindex="0">
+                    <table class="baseline-table">
+                        <thead>
+                            <tr>
+                                <th scope="col">Task</th>
+                                <th scope="col">Common Methods</th>
+                                <th scope="col">B<sub>S</sub></th>
+                                <th scope="col">Median &Delta;</th>
+                                <th scope="col">B<sub>R,proxy</sub></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <th scope="row">Optical Flow · EPE</th>
+                                <td>8</td>
+                                <td>0.9925</td>
+                                <td>4.160</td>
+                                <td>6.030</td>
+                            </tr>
+                            <tr>
+                                <th scope="row">Stereo Matching · Abs</th>
+                                <td>4</td>
+                                <td>3.4545</td>
+                                <td>16.180</td>
+                                <td>18.4505</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <p class="baseline-sources">
+                    Official tables:
+                    <a href="https://spring-benchmark.org/opticalflow?display=accuracy" target="_blank"
+                        rel="noopener noreferrer">Optical Flow accuracy</a>,
+                    <a href="https://spring-benchmark.org/opticalflow?display=robustness" target="_blank"
+                        rel="noopener noreferrer">Optical Flow robustness</a>,
+                    <a href="https://spring-benchmark.org/stereo?display=accuracy" target="_blank"
+                        rel="noopener noreferrer">Stereo Matching accuracy</a>, and
+                    <a href="https://spring-benchmark.org/stereo?display=robustness" target="_blank"
+                        rel="noopener noreferrer">Stereo Matching robustness</a>.
+                </p>
+
+                <details class="baseline-methods">
+                    <summary>Show every scalar baseline calculation</summary>
+                    <p><strong>Optical Flow</strong></p>
+                    <div class="baseline-table-wrap" role="region"
+                        aria-label="Optical Flow per-method baseline calculations" tabindex="0">
+                        <table class="baseline-table baseline-table--methods">
+                            <thead>
+                                <tr>
+                                    <th scope="col">Method</th>
+                                    <th scope="col">E<sub>S</sub></th>
+                                    <th scope="col">&Delta;</th>
+                                    <th scope="col">E<sub>S</sub> + &Delta;</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr><th scope="row"><a href="https://spring-benchmark.org/51/" target="_blank" rel="noopener noreferrer">MS-RAFT+</a></th><td>0.643</td><td>3.620</td><td>4.263</td></tr>
+                                <tr><th scope="row"><a href="https://spring-benchmark.org/54/" target="_blank" rel="noopener noreferrer">FlowFormer</a></th><td>0.723</td><td>3.770</td><td>4.493</td></tr>
+                                <tr><th scope="row"><a href="https://spring-benchmark.org/56/" target="_blank" rel="noopener noreferrer">FlowNet2</a></th><td>1.040</td><td>7.010</td><td>8.050</td></tr>
+                                <tr><th scope="row"><a href="https://spring-benchmark.org/52/" target="_blank" rel="noopener noreferrer">RAFT</a></th><td>1.476</td><td>5.640</td><td>7.116</td></tr>
+                                <tr><th scope="row"><a href="https://spring-benchmark.org/53/" target="_blank" rel="noopener noreferrer">GMA</a></th><td>0.914</td><td>4.030</td><td>4.944</td></tr>
+                                <tr><th scope="row"><a href="https://spring-benchmark.org/58/" target="_blank" rel="noopener noreferrer">GMFlow</a></th><td>0.945</td><td>2.980</td><td>3.925</td></tr>
+                                <tr><th scope="row"><a href="https://spring-benchmark.org/55/" target="_blank" rel="noopener noreferrer">SPyNet</a></th><td>4.162</td><td>4.290</td><td>8.452</td></tr>
+                                <tr><th scope="row"><a href="https://spring-benchmark.org/57/" target="_blank" rel="noopener noreferrer">PWCNet</a></th><td>2.288</td><td>7.250</td><td>9.538</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <p><strong>Stereo Matching</strong> · like-for-like Scene Flow/FlyingThings checkpoints</p>
+                    <div class="baseline-table-wrap" role="region"
+                        aria-label="Stereo Matching per-method baseline calculations" tabindex="0">
+                        <table class="baseline-table baseline-table--methods">
+                            <thead>
+                                <tr>
+                                    <th scope="col">Method</th>
+                                    <th scope="col">E<sub>S</sub></th>
+                                    <th scope="col">&Delta;</th>
+                                    <th scope="col">E<sub>S</sub> + &Delta;</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr><th scope="row"><a href="https://spring-benchmark.org/66/" target="_blank" rel="noopener noreferrer">RAFT-Stereo</a></th><td>3.025</td><td>16.570</td><td>19.595</td></tr>
+                                <tr><th scope="row"><a href="https://spring-benchmark.org/68/" target="_blank" rel="noopener noreferrer">ACVNet</a></th><td>1.516</td><td>15.790</td><td>17.306</td></tr>
+                                <tr><th scope="row"><a href="https://spring-benchmark.org/60/" target="_blank" rel="noopener noreferrer">LEAStereo</a></th><td>3.884</td><td>21.900</td><td>25.784</td></tr>
+                                <tr><th scope="row"><a href="https://spring-benchmark.org/59/" target="_blank" rel="noopener noreferrer">GANet</a></th><td>4.594</td><td>12.110</td><td>16.704</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <p>Every listed method occurs in both benchmark papers, has finite values in both official
+                        views, and is marked “submitted by Spring team” by the benchmark. Additional task
+                        projections and checkpoint variants are not mixed into the paper-to-paper baseline set.</p>
+                </details>
 
                 <h3>Task-Specific Error Metrics</h3>
 
                 <p>
-                    For the proposed RoCo-Spring score, the same task-specific error definition
-                    would be used for Spring and RobustSpring. The RobustSpring term would measure
-                    prediction accuracy on corrupted inputs rather than only the change between
-                    clean and corrupted predictions.
+                    The same task-specific clean metric is paired with its matching RobustSpring
+                    disagreement. The official additive convention is applied component by component.
                 </p>
 
                 <ul>
@@ -163,7 +263,7 @@
                         <strong>Scene Flow:</strong>
                         a balanced combination of the errors for reference-frame disparity
                         <em>d</em><sub>1</sub>, target-frame disparity
-                        <em>d</em><sub>2</sub>, and optical flow. Each component is normalized
+                        <em>d</em><sub>2</sub>, and Optical Flow. Each component is normalized
                         by its own baseline error before the three components are averaged:
                         <div class="formula" aria-label="Scene-flow RbS-Score formula">
                             RbS-Score<sub>SF</sub>(m) =
@@ -181,22 +281,102 @@
                             0.5 ·
                             [
                             (
-                            Abs<sub>d1,R</sub>(m) / B<sub>d1,R</sub>
+                            Abs<sub>d1,R,proxy</sub>(m) / B<sub>d1,R,proxy</sub>
                             +
-                            Abs<sub>d2,R</sub>(m) / B<sub>d2,R</sub>
+                            Abs<sub>d2,R,proxy</sub>(m) / B<sub>d2,R,proxy</sub>
                             +
-                            EPE<sub>flow,R</sub>(m) / B<sub>flow,R</sub>
+                            EPE<sub>flow,R,proxy</sub>(m) / B<sub>flow,R,proxy</sub>
                             ) / 3
                             ]
                         </div>
                     </li>
                 </ul>
 
+                <div class="baseline-table-wrap" role="region" aria-label="Scene Flow component baseline table"
+                    tabindex="0">
+                    <table class="baseline-table">
+                        <thead>
+                            <tr>
+                                <th scope="col">Scene Flow Component</th>
+                                <th scope="col">B<sub>S</sub></th>
+                                <th scope="col">Median &Delta;</th>
+                                <th scope="col">B<sub>R,proxy</sub></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <th scope="row">d<sub>1</sub> · Abs</th>
+                                <td>7.466</td>
+                                <td>17.005</td>
+                                <td>24.471</td>
+                            </tr>
+                            <tr>
+                                <th scope="row">d<sub>2</sub> · Abs</th>
+                                <td>7.5935</td>
+                                <td>0.215</td>
+                                <td>7.8085</td>
+                            </tr>
+                            <tr>
+                                <th scope="row">Flow · EPE</th>
+                                <td>2.527</td>
+                                <td>4.210</td>
+                                <td>6.737</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <p class="baseline-sources">
+                    The Scene Flow medians use the two common paper methods, M-FUSE (K) and RAFT-3D (K).
+                    All three clean components come from each method's public Scene Flow result page, matching
+                    the convention used to score a participant submission. Each component is paired with the
+                    disagreement in the same public robustness row. See the official
+                    <a href="https://spring-benchmark.org/sceneflow?display=accuracy" target="_blank"
+                        rel="noopener noreferrer">Scene Flow accuracy table</a>,
+                    <a href="https://spring-benchmark.org/sceneflow?display=robustness" target="_blank"
+                        rel="noopener noreferrer">Scene Flow robustness table</a> and the
+                    <a href="https://arxiv.org/abs/2505.09368" target="_blank"
+                        rel="noopener noreferrer">RobustSpring paper</a>.
+                </p>
+
+                <details class="baseline-methods">
+                    <summary>Show every Scene Flow component calculation</summary>
+                    <div class="baseline-table-wrap" role="region"
+                        aria-label="Scene Flow per-method component calculations" tabindex="0">
+                        <table class="baseline-table baseline-table--scene-methods">
+                            <thead>
+                                <tr>
+                                    <th scope="col">Method</th>
+                                    <th scope="col">Clean d<sub>1</sub></th>
+                                    <th scope="col">Clean d<sub>2</sub></th>
+                                    <th scope="col">Clean Flow</th>
+                                    <th scope="col">&Delta;d<sub>1</sub></th>
+                                    <th scope="col">&Delta;d<sub>2</sub></th>
+                                    <th scope="col">&Delta;Flow</th>
+                                    <th scope="col">Proxy d<sub>1</sub></th>
+                                    <th scope="col">Proxy d<sub>2</sub></th>
+                                    <th scope="col">Proxy Flow</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr><th scope="row"><a href="https://spring-benchmark.org/64/" target="_blank" rel="noopener noreferrer">M-FUSE (K)</a></th><td>7.890</td><td>8.076</td><td>2.526</td><td>21.900</td><td>0.290</td><td>3.390</td><td>29.790</td><td>8.366</td><td>5.916</td></tr>
+                                <tr><th scope="row"><a href="https://spring-benchmark.org/71/" target="_blank" rel="noopener noreferrer">RAFT-3D (K)</a></th><td>7.042</td><td>7.111</td><td>2.528</td><td>12.110</td><td>0.140</td><td>5.030</td><td>19.152</td><td>7.251</td><td>7.558</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </details>
+
                 <p>
-                    Once the baselines are fixed, a score of <strong>1.0</strong> will indicate
+                    A score of <strong>1.0</strong> indicates
                     that a method matches them on average. Scores below 1.0 will indicate better
                     normalized performance, while scores above 1.0 will indicate worse normalized
                     performance.
+                </p>
+
+                <p>
+                    The <strong>Cross-Task score</strong> is the arithmetic mean of a team's Optical Flow,
+                    Stereo Matching, and Scene Flow RbS-Scores. It is published only after the team has a
+                    valid result in all three quantitative tasks.
                 </p>
 
                 <h3>Tie-Breaking</h3>
@@ -206,10 +386,11 @@
                     following order:
                 </p>
 
-                <ol>
-                    <li>Lower normalized RobustSpring term</li>
-                    <li>Lower normalized Spring term</li>
-                </ol>
+                    <ol>
+                        <li>Lower normalized RobustSpring term</li>
+                        <li>Lower normalized Spring term</li>
+                        <li>Lower organizer-issued numeric team ID as the deterministic final key</li>
+                    </ol>
             </div>
         </section>
 
@@ -243,7 +424,7 @@
                 </p>
                 <p>
                     Papers will be reviewed by the organizers and additional external reviewers with expertise in
-                    optical flow, stereo, scene flow, robustness, and benchmark design. Acceptance will depend on
+                    Optical Flow, Stereo Matching, Scene Flow, robustness, and benchmark design. Acceptance will depend on
                     technical soundness, clarity, reproducibility, and relevance to robust dense correspondence, not
                     only on leaderboard rank.
                     All accepted papers will be forwarded for the official PMLR volume of NeurIPS workshop proceedings.
@@ -300,6 +481,7 @@
 
     <script src="assets/flow.js"></script>
     <script src="assets/leaderboard.js"></script>
+    <script type="module" src="assets/leaderboard-live.js"></script>
 </body>
 
 </html>

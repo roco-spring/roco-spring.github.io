@@ -9,31 +9,33 @@
             key: "optical-flow",
             label: "Optical Flow",
             springLabel: "Spring EPE",
-            robustLabel: "RobustSpring EPE"
+            robustLabel: "RobustSpring Proxy EPE"
         },
         {
             key: "stereo-matching",
             label: "Stereo Matching",
             springLabel: "Spring Abs",
-            robustLabel: "RobustSpring Abs"
+            robustLabel: "RobustSpring Proxy Abs"
         },
         {
             key: "scene-flow",
             label: "Scene Flow",
-            springLabel: "Spring Metric",
-            robustLabel: "RobustSpring Metric"
+            springLabel: "Spring Aggregate",
+            robustLabel: "RobustSpring Proxy Aggregate"
         },
         {
             key: "cross-task",
             label: "Cross-Task",
             springLabel: "Spring Aggregate",
-            robustLabel: "RobustSpring Aggregate"
+            robustLabel: "RobustSpring Proxy Aggregate"
         }
     ];
 
     let currentSnapshot = null;
     let selectedTrack = tracks[0].key;
     let loadSnapshot = loadPublishedSnapshot;
+    let refreshGeneration = 0;
+    let initialRefreshPromise;
 
     function element(tagName, className, textContent) {
         const node = document.createElement(tagName);
@@ -55,7 +57,13 @@
             score: isFiniteNumber(result.score) ? result.score : null,
             springMetric: result.springMetric ?? null,
             robustSpringMetric: result.robustSpringMetric ?? null,
-            submittedAt: result.submittedAt ?? null
+            springTerm: result.springTerm ?? null,
+            robustSpringTerm: result.robustSpringTerm ?? null,
+            submittedAt: result.submittedAt ?? null,
+            benchmarkMethod: typeof result.benchmarkMethod === "string" ? result.benchmarkMethod : null,
+            benchmarkUrl: typeof result.benchmarkUrl === "string" ? result.benchmarkUrl : null,
+            springComponents: result.springComponents ?? null,
+            robustSpringComponents: result.robustSpringComponents ?? null
         };
     }
 
@@ -85,12 +93,15 @@
             const scoreDifference = left.score - right.score;
             if (scoreDifference !== 0) return scoreDifference;
 
-            const robustDifference = numericDifference(left.robustSpringMetric, right.robustSpringMetric);
+            const robustDifference = numericDifference(left.robustSpringTerm, right.robustSpringTerm);
             if (robustDifference !== 0) return robustDifference;
 
-            const springDifference = numericDifference(left.springMetric, right.springMetric);
+            const springDifference = numericDifference(left.springTerm, right.springTerm);
             if (springDifference !== 0) return springDifference;
-            return compareTeamIdentity(left, right);
+            // The backend uses the numeric organizer-issued team ID as its
+            // deterministic final key. Keeping the renderer identical makes
+            // displayed ranks and rank-change arrows agree on exact ties.
+            return left.teamId.localeCompare(right.teamId, undefined, { numeric: true });
         });
 
         let scoredRank = 0;
@@ -139,6 +150,23 @@
         }).format(date);
     }
 
+    function safeBenchmarkUrl(value) {
+        if (!value) return null;
+        try {
+            const url = new URL(value);
+            return url.origin === "https://spring-benchmark.org" ? url.href : null;
+        } catch {
+            return null;
+        }
+    }
+
+    function componentTitle(label, components) {
+        if (!components || typeof components !== "object") return null;
+        const { d1, d2, flow } = components;
+        if (![d1, d2, flow].every(isFiniteNumber)) return null;
+        return `${label}: d1 ${formatNumber(d1, 3)} · d2 ${formatNumber(d2, 3)} · flow ${formatNumber(flow, 3)}`;
+    }
+
     function buildRankChange(change) {
         const node = element("span", "rank-change");
         if (change > 0) {
@@ -170,7 +198,7 @@
         const headRow = document.createElement("tr");
         const body = document.createElement("tbody");
 
-        ["Rank", "Change", "Team", "RbS-Score", track.springLabel, track.robustLabel, "Submission Time"]
+        ["Rank", "Change", "Team", "RbS-Score", track.springLabel, track.robustLabel, "Spring Submission Time"]
             .forEach((label) => {
                 const cell = element("th", "", label);
                 cell.scope = "col";
@@ -199,13 +227,29 @@
             teamCell.append(element("strong", "leaderboard-team-name", row.teamName));
             const teamMeta = element("span", "leaderboard-team-meta");
             teamMeta.append(element("span", "leaderboard-team-id", row.teamId));
-            if (isPending) teamMeta.append(element("span", "leaderboard-pending-badge", "Awaiting result"));
+            if (isPending) {
+                teamMeta.append(element("span", "leaderboard-pending-badge", "Awaiting result"));
+            } else if (row.benchmarkMethod) {
+                const resultUrl = safeBenchmarkUrl(row.benchmarkUrl);
+                const method = element(resultUrl ? "a" : "span", "leaderboard-method", row.benchmarkMethod);
+                if (resultUrl) {
+                    method.href = resultUrl;
+                    method.target = "_blank";
+                    method.rel = "noopener noreferrer";
+                    method.setAttribute("aria-label", `${row.benchmarkMethod} benchmark result (opens in a new tab)`);
+                }
+                teamMeta.append(method);
+            }
             teamCell.append(teamMeta);
 
             const scoreCell = element("td", "leaderboard-score", formatNumber(row.score, 4));
             const springCell = element("td", "leaderboard-metric", formatNumber(row.springMetric, 3));
             const robustCell = element("td", "leaderboard-metric", formatNumber(row.robustSpringMetric, 3));
             const submittedCell = element("td", "leaderboard-submitted", formatDateTime(row.submittedAt));
+            const springComponents = componentTitle("Spring components", row.springComponents);
+            const robustComponents = componentTitle("RobustSpring proxy components", row.robustSpringComponents);
+            if (springComponents) springCell.title = springComponents;
+            if (robustComponents) robustCell.title = robustComponents;
             if (row.submittedAt) submittedCell.title = row.submittedAt;
 
             tableRow.append(
@@ -288,7 +332,7 @@
                 "leaderboard-panel-note",
                 track.key === "cross-task"
                     ? "Cross-Task standings include teams registered for all three quantitative tracks."
-                    : "Scored teams are ordered by RbS-Score; teams awaiting a verified result follow alphabetically."
+                    : "Scored teams are ordered by RbS-Score; teams awaiting a matched public result follow alphabetically."
             );
             note.id = `${panelId}-note`;
             const scrollHint = element(
@@ -348,7 +392,7 @@
                 card.append(element(
                     "p",
                     "leaderboard-preview-empty",
-                    `No verified results yet · ${allRows.length} registered ${noun}`
+                    `No matched public results yet · ${allRows.length} registered ${noun}`
                 ));
             }
             card.append(link);
@@ -364,15 +408,51 @@
         return snapshot;
     }
 
-    async function loadPublishedSnapshot({ cacheBust = false } = {}) {
+    async function loadPublishedSnapshot({ force = false } = {}) {
         const url = new URL(publishedSnapshotUrl);
-        if (cacheBust) url.searchParams.set("updated", Date.now().toString());
+        if (force) url.searchParams.set("updated", Date.now().toString());
         const response = await fetch(url, { cache: "no-store", credentials: "same-origin" });
         if (!response.ok) throw new Error(`Leaderboard snapshot request failed (${response.status}).`);
-        return validateSnapshot(await response.json());
+        return {
+            snapshot: validateSnapshot(await response.json()),
+            syncState: "fallback"
+        };
     }
 
-    function renderSnapshot(snapshot) {
+    function normalizeLoadResult(result) {
+        const supportedStates = new Set(["synchronized", "cached", "stale", "fallback"]);
+        if (result && typeof result === "object" && "snapshot" in result) {
+            return {
+                snapshot: validateSnapshot(result.snapshot),
+                syncState: supportedStates.has(result.syncState) ? result.syncState : "unverified"
+            };
+        }
+        return { snapshot: validateSnapshot(result), syncState: "unverified" };
+    }
+
+    function refreshStatus(syncState) {
+        if (syncState === "synchronized") return "Live standings refreshed.";
+        if (syncState === "cached") {
+            return "Cached live standings loaded; no newer sync was needed.";
+        }
+        if (syncState === "stale") {
+            return "Live refresh did not complete; stale cached standings remain visible.";
+        }
+        if (syncState === "fallback") {
+            return "Live sync is unavailable; the published fallback standings remain visible.";
+        }
+        return "Standings loaded, but a completed live sync could not be confirmed.";
+    }
+
+    function visibleSourceLabel(snapshot, syncState) {
+        const label = snapshot.sourceLabel || "Organizer-published leaderboard snapshot";
+        if (syncState === "synchronized") return `${label} · synchronized`;
+        if (syncState === "cached") return `${label} · live cache`;
+        if (syncState === "stale") return `${label} · stale cache`;
+        return label;
+    }
+
+    function renderSnapshot(snapshot, syncState = "unverified") {
         document.querySelectorAll("[data-leaderboard-root]").forEach((root, index) => {
             root.classList.remove("leaderboard-loading");
             if (root.dataset.mode === "preview") renderPreview(root, snapshot);
@@ -384,7 +464,7 @@
             if (snapshot.updatedAt) time.dateTime = snapshot.updatedAt;
         });
         document.querySelectorAll("[data-leaderboard-source]").forEach((node) => {
-            node.textContent = snapshot.sourceLabel || "Organizer-published roster snapshot";
+            node.textContent = visibleSourceLabel(snapshot, syncState);
         });
     }
 
@@ -401,38 +481,47 @@
         });
     }
 
-    async function refresh({ cacheBust = false, announce = false } = {}) {
+    async function refresh({ force = false, announce = false } = {}) {
+        const generation = ++refreshGeneration;
         const buttons = [...document.querySelectorAll("[data-leaderboard-refresh]")];
         const statusNodes = [...document.querySelectorAll("[data-leaderboard-refresh-status]")];
         buttons.forEach((button) => {
             button.disabled = true;
             button.classList.add("is-refreshing");
         });
-        if (announce) statusNodes.forEach((node) => { node.textContent = "Refreshing published standings…"; });
+        if (announce) statusNodes.forEach((node) => { node.textContent = "Checking live standings…"; });
 
         try {
-            currentSnapshot = validateSnapshot(await loadSnapshot({ cacheBust }));
-            renderSnapshot(currentSnapshot);
-            if (announce) statusNodes.forEach((node) => { node.textContent = "Published roster view refreshed."; });
+            const loaded = normalizeLoadResult(await loadSnapshot({ force }));
+            const { snapshot, syncState } = loaded;
+            // A slower, older request must never overwrite a newer snapshot.
+            if (generation !== refreshGeneration) return currentSnapshot ?? snapshot;
+            currentSnapshot = snapshot;
+            renderSnapshot(currentSnapshot, syncState);
+            if (announce) statusNodes.forEach((node) => {
+                node.textContent = refreshStatus(syncState);
+            });
             return currentSnapshot;
         } catch (error) {
-            if (!currentSnapshot) renderUnavailable();
-            if (announce) statusNodes.forEach((node) => {
+            if (generation === refreshGeneration && !currentSnapshot) renderUnavailable();
+            if (generation === refreshGeneration && announce) statusNodes.forEach((node) => {
                 node.textContent = "Refresh failed. The previously loaded standings remain visible.";
             });
             console.warn("Leaderboard refresh failed.", error);
             throw error;
         } finally {
-            buttons.forEach((button) => {
-                button.disabled = false;
-                button.classList.remove("is-refreshing");
-            });
+            if (generation === refreshGeneration) {
+                buttons.forEach((button) => {
+                    button.disabled = false;
+                    button.classList.remove("is-refreshing");
+                });
+            }
         }
     }
 
     document.querySelectorAll("[data-leaderboard-refresh]").forEach((button) => {
         button.addEventListener("click", () => {
-            refresh({ cacheBust: true, announce: true }).catch(() => undefined);
+            refresh({ force: true, announce: true }).catch(() => undefined);
         });
     });
 
@@ -442,10 +531,17 @@
         refresh: (options) => refresh(options),
         setDataSource(loader) {
             if (typeof loader !== "function") throw new TypeError("Leaderboard data source must be a function.");
-            loadSnapshot = loader;
-            return refresh({ cacheBust: true, announce: false });
+            // Render the bundled last-known-good snapshot first, then switch.
+            // This ordering prevents the initial static request from racing and
+            // overwriting a faster live response.
+            return initialRefreshPromise.then(() => {
+                loadSnapshot = loader;
+                // The server's five-minute cache is appropriate for automatic
+                // page loading. Only an explicit user refresh requests a sync.
+                return refresh({ force: false, announce: false });
+            });
         }
     });
 
-    refresh().catch(() => undefined);
+    initialRefreshPromise = refresh().catch(() => undefined);
 })();

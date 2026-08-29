@@ -19,7 +19,8 @@ const TEST_DISPLAY_NAME = "Ephemeral CI unit-test-label";
 const TEST_RESOURCE_NAME = `${DEBUG_TOKEN_COLLECTION}/unit-test-resource`;
 const EXPECTED_RESULTS = Object.freeze([
     Object.freeze({ name: "registerTeam", code: "functions/invalid-argument" }),
-    Object.freeze({ name: "getMyTeam", code: "functions/invalid-argument" })
+    Object.freeze({ name: "getMyTeam", code: "functions/invalid-argument" }),
+    Object.freeze({ name: "refreshLeaderboard", code: "functions/invalid-argument" })
 ]);
 const AUTHENTICATED_RESULTS = Object.freeze([
     Object.freeze({

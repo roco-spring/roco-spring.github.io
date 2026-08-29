@@ -71,6 +71,7 @@ export const EXPECTED_FUNCTIONS = Object.freeze([
     "getMyTeam",
     "updateMyTeam",
     "completeInitialPasswordChange",
+    "refreshLeaderboard",
     "reconcileRegistrations",
 ]);
 const PUBLIC_CALLABLE_FUNCTIONS = Object.freeze(
@@ -836,6 +837,7 @@ export function buildDesiredPolicies(channelName, schedulerJob = SCHEDULER_JOB_I
         "getmyteam",
         "updatemyteam",
         "completeinitialpasswordchange",
+        "refreshleaderboard",
     ]);
     const callable = {
         ...basePolicy(
@@ -917,11 +919,35 @@ export function buildDesiredPolicies(channelName, schedulerJob = SCHEDULER_JOB_I
         alertStrategy: logAlertStrategy(),
     };
 
+    const leaderboardRefreshFailure = {
+        ...basePolicy(
+            "leaderboard_refresh_failed",
+            "RoCo leaderboard: public benchmark refresh failed",
+            "The live leaderboard could not refresh from the public Spring/RobustSpring benchmark and is serving its last validated cache. Inspect only the sanitized `leaderboardRefresh` failure signal on the `refreshleaderboard` service, verify the public benchmark availability and table/detail schema, then retry one bounded refresh after the application cooldown. Do not copy response bodies, participant data, or unpublished submissions into incident notes.",
+            channelName,
+        ),
+        conditions: [{
+            displayName: "A live leaderboard refresh fell back to stale cache",
+            conditionMatchedLog: {
+                filter: [
+                    'resource.type="cloud_run_revision"',
+                    `resource.labels.location="${REGION}"`,
+                    'resource.labels.service_name="refreshleaderboard"',
+                    'jsonPayload.operation="leaderboardRefresh"',
+                    'jsonPayload.status="failed"',
+                    "severity>=ERROR",
+                ].join("\n"),
+            },
+        }],
+        alertStrategy: logAlertStrategy(),
+    };
+
     return Object.freeze([
         dependency,
         callable,
         scheduler,
         reconciliationFailure,
+        leaderboardRefreshFailure,
     ]);
 }
 

@@ -5,7 +5,9 @@ import test from "node:test";
 import {
     DIAGNOSTIC_ENVIRONMENT_KEYS,
     EXPECTED_AUTHENTICATED_PROBES,
+    EXPECTED_LEADERBOARD_BASELINES,
     EXPECTED_PROBES,
+    KNOWN_PUBLIC_TEAM_IDS,
     RECAPTCHA_ENTERPRISE_SITE_KEY,
     evaluateWithDeadline,
     isUuidV4,
@@ -15,6 +17,7 @@ import {
     sanitizeDiagnosticEnvironment,
     validateAuthenticatedProbeAccounts,
     verifyAuthenticatedProbeResults,
+    verifyLiveLeaderboardSnapshot,
     verifyProductionProjectId,
     verifyProbeResults
 } from "../scripts/verify-live-app-check.mjs";
@@ -46,6 +49,21 @@ const AUTHENTICATED_RESULTS = Object.freeze(EXPECTED_AUTHENTICATED_PROBES.map(({
     missingAppCheckErrorStatus: "UNAUTHENTICATED",
     validAfterCode: "functions/invalid-argument"
 })));
+const LIVE_LEADERBOARD_SNAPSHOT = Object.freeze({
+    schemaVersion: 2,
+    updatedAt: "2026-08-29T16:30:00.000Z",
+    sourceLabel: "Live Spring and RobustSpring public benchmark snapshot",
+    scoringConvention: "organizer-approved-additive-proxy",
+    baselines: EXPECTED_LEADERBOARD_BASELINES,
+    teams: Object.freeze(Array.from({ length: 25 }, (_, index) => Object.freeze({
+        teamId: `RoCo-${index + 8}`,
+        teamName: `Public Team ${index + 8}`,
+        registeredTracks: Object.freeze(["optical-flow"]),
+        results: Object.freeze({}),
+        submissionHistory: Object.freeze({})
+    }))),
+    syncStatus: "fresh"
+});
 
 test("live App Check probe uses only non-mutating validation payloads", () => {
     assert.deepEqual(EXPECTED_PROBES, [
@@ -58,6 +76,11 @@ test("live App Check probe uses only non-mutating validation payloads", () => {
             name: "getMyTeam",
             payload: { productionSmokeProbe: true },
             expectedCode: "functions/invalid-argument"
+        },
+        {
+            name: "refreshLeaderboard",
+            payload: { unexpected: true },
+            expectedCode: "functions/invalid-argument"
         }
     ]);
 });
@@ -65,13 +88,95 @@ test("live App Check probe uses only non-mutating validation payloads", () => {
 test("live App Check probe accepts only the expected handler validation boundary", () => {
     assert.doesNotThrow(() => verifyProbeResults([
         { name: "registerTeam", code: "functions/invalid-argument" },
-        { name: "getMyTeam", code: "functions/invalid-argument" }
+        { name: "getMyTeam", code: "functions/invalid-argument" },
+        { name: "refreshLeaderboard", code: "functions/invalid-argument" }
     ]));
     assert.throws(() => verifyProbeResults([
         { name: "registerTeam", code: "functions/unauthenticated" },
-        { name: "getMyTeam", code: "functions/invalid-argument" }
+        { name: "getMyTeam", code: "functions/invalid-argument" },
+        { name: "refreshLeaderboard", code: "functions/invalid-argument" }
     ]), /did not reach its safe validation boundary/u);
     assert.throws(() => verifyProbeResults([]), /incomplete result set/u);
+});
+
+test("live leaderboard proof accepts only a fresh or valid-cache public snapshot", () => {
+    assert.equal(KNOWN_PUBLIC_TEAM_IDS.size, 25);
+    assert.deepEqual(verifyLiveLeaderboardSnapshot(LIVE_LEADERBOARD_SNAPSHOT), {
+        teamCount: 25,
+        syncStatus: "fresh"
+    });
+    assert.doesNotThrow(() => verifyLiveLeaderboardSnapshot({
+        ...LIVE_LEADERBOARD_SNAPSHOT,
+        syncStatus: "cache-hit"
+    }));
+    assert.throws(() => verifyLiveLeaderboardSnapshot({
+        ...LIVE_LEADERBOARD_SNAPSHOT,
+        syncStatus: "stale-cache"
+    }), /snapshot schema is invalid/u);
+    assert.throws(() => verifyLiveLeaderboardSnapshot({
+        ...LIVE_LEADERBOARD_SNAPSHOT,
+        teams: LIVE_LEADERBOARD_SNAPSHOT.teams.map((team, index) => (
+            index === 0 ? { ...team, primaryContactEmail: "private@example.org" } : team
+        ))
+    }), /team projection is invalid/u);
+    assert.throws(() => verifyLiveLeaderboardSnapshot({
+        ...LIVE_LEADERBOARD_SNAPSHOT,
+        baselines: {
+            ...EXPECTED_LEADERBOARD_BASELINES,
+            "optical-flow": {
+                ...EXPECTED_LEADERBOARD_BASELINES["optical-flow"],
+                spring: 999
+            }
+        }
+    }), /snapshot schema is invalid/u);
+
+    const publicResult = {
+        rankChange: 0,
+        score: 1,
+        springMetric: 1,
+        robustSpringMetric: 1,
+        springTerm: 1,
+        robustSpringTerm: 1,
+        submittedAt: "2026-08-29T16:30:00.000Z",
+        benchmarkMethod: "RoCo-8 test result",
+        benchmarkUrl: "https://spring-benchmark.org/999/",
+        matchBasis: "team-id"
+    };
+    assert.doesNotThrow(() => verifyLiveLeaderboardSnapshot({
+        ...LIVE_LEADERBOARD_SNAPSHOT,
+        teams: LIVE_LEADERBOARD_SNAPSHOT.teams.map((team, index) => (
+            index === 0 ? { ...team, results: { "optical-flow": publicResult } } : team
+        ))
+    }));
+    assert.throws(() => verifyLiveLeaderboardSnapshot({
+        ...LIVE_LEADERBOARD_SNAPSHOT,
+        teams: LIVE_LEADERBOARD_SNAPSHOT.teams.map((team, index) => (
+            index === 0
+                ? {
+                    ...team,
+                    results: {
+                        "optical-flow": {
+                            ...publicResult,
+                            benchmarkUrl: "https://spring-benchmark.org/opticalflow"
+                        }
+                    }
+                }
+                : team
+        ))
+    }), /result URL is invalid/u);
+    assert.throws(() => verifyLiveLeaderboardSnapshot({
+        ...LIVE_LEADERBOARD_SNAPSHOT,
+        teams: [
+            ...LIVE_LEADERBOARD_SNAPSHOT.teams.slice(1),
+            {
+                teamId: "RoCo-100",
+                teamName: "New Public Team",
+                registeredTracks: ["optical-flow"],
+                results: {},
+                submissionHistory: {}
+            }
+        ]
+    }), /omitted a known public team/u);
 });
 
 test("live App Check probe rejects a live page configured for another project", () => {
@@ -243,7 +348,8 @@ test("live App Check probe injects an optional UUID4 before navigation", async (
     let closed = false;
     const expected = [
         { name: "registerTeam", code: "functions/invalid-argument" },
-        { name: "getMyTeam", code: "functions/invalid-argument" }
+        { name: "getMyTeam", code: "functions/invalid-argument" },
+        { name: "refreshLeaderboard", code: "functions/invalid-argument" }
     ];
 
     const results = await runLiveAppCheckProbe({
@@ -272,11 +378,16 @@ test("live App Check probe injects an optional UUID4 before navigation", async (
                         async evaluate(_implementation, argument) {
                             evaluations += 1;
                             if (evaluations === 1) return "roco-spring-registration-2026";
-                            assert.deepEqual(
-                                argument.probes,
-                                EXPECTED_PROBES.map(({ name, payload }) => ({ name, payload }))
-                            );
-                            return expected;
+                            if (evaluations === 2) {
+                                assert.deepEqual(
+                                    argument.probes,
+                                    EXPECTED_PROBES.map(({ name, payload }) => ({ name, payload }))
+                                );
+                                return expected;
+                            }
+                            assert.equal(argument.projectId, "roco-spring-registration-2026");
+                            assert.equal(argument.region, "europe-west3");
+                            return LIVE_LEADERBOARD_SNAPSHOT;
                         }
                     };
                 },
@@ -289,6 +400,7 @@ test("live App Check probe injects an optional UUID4 before navigation", async (
 
     assert.deepEqual(results, expected);
     assert.deepEqual(events.slice(0, 3), ["console-filter", "token-init", "goto"]);
+    assert.equal(evaluations, 3);
     assert.equal(closed, true);
     assert.equal(isUuidV4(debugToken), true);
 });
@@ -312,7 +424,8 @@ test("live App Check gate retries transient probe failures with a strict bound",
     const delays = [];
     const expected = [
         { name: "registerTeam", code: "functions/invalid-argument" },
-        { name: "getMyTeam", code: "functions/invalid-argument" }
+        { name: "getMyTeam", code: "functions/invalid-argument" },
+        { name: "refreshLeaderboard", code: "functions/invalid-argument" }
     ];
     const recovered = await runLiveAppCheckGate({
         maxAttempts: 3,

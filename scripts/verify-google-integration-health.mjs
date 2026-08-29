@@ -11,6 +11,7 @@ const FUNCTION_SECRET_REQUIREMENTS = Object.freeze({
     getMyTeam: Object.freeze([]),
     updateMyTeam: Object.freeze([]),
     completeInitialPasswordChange: Object.freeze([]),
+    refreshLeaderboard: Object.freeze([]),
     reconcileRegistrations: Object.freeze([
         "GOOGLE_OAUTH_CLIENT_SECRET",
         "GOOGLE_OAUTH_REFRESH_TOKEN"

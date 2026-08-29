@@ -19,7 +19,8 @@ const EXPECTED_CALLABLES = Object.freeze([
     "registerTeam",
     "getMyTeam",
     "updateMyTeam",
-    "completeInitialPasswordChange"
+    "completeInitialPasswordChange",
+    "refreshLeaderboard"
 ]);
 const DEFAULT_BASE_URL = `https://${REGION}-${PROJECT_ID}.cloudfunctions.net`;
 const RETRYABLE_CATEGORIES = new Set([
@@ -155,7 +156,7 @@ function classifyResponse(response, payload, callableName = "") {
                 detail: "HTTP 401 used the callable error shape without the required JSON response content type."
             };
         }
-        if (callableName === "registerTeam") {
+        if (["registerTeam", "refreshLeaderboard"].includes(callableName)) {
             return {
                 ok: true,
                 category: "DEPLOYED_GUARD",
@@ -375,7 +376,7 @@ async function main() {
         const options = parseArguments(process.argv.slice(2));
         if (options.help) {
             process.stdout.write(
-                "Checks production browser preflight and credential-free rejection for all four callable URLs.\n"
+                "Checks production browser preflight and credential-free rejection for all five callable URLs.\n"
                 + "Usage: node scripts/verify-production-callables.mjs [--base-url <URL>]\n"
             );
             return;
@@ -397,7 +398,7 @@ async function main() {
         }
 
         process.stdout.write(
-            "Production callable smoke gate passed: 4/4 endpoints support the required browser preflight and reject credential-free calls. registerTeam additionally provides missing-App-Check runtime evidence; authenticated callables provide deployed-guard evidence only. No credentials or tokens were sent or logged.\n"
+            "Production callable smoke gate passed: 5/5 endpoints support the required browser preflight and reject credential-free calls. registerTeam and refreshLeaderboard additionally provide missing-App-Check runtime evidence; authenticated callables provide deployed-guard evidence only. No credentials or tokens were sent or logged.\n"
         );
     } catch (error) {
         const message = error instanceof Error ? error.message : "Production callable smoke gate failed.";

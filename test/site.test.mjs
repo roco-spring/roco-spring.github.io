@@ -102,7 +102,29 @@ test("published leaderboard snapshot contains the exact public team roster", asy
         ["RoCo-32", ["XLR8", ["optical-flow", "stereo-matching", "scene-flow", "exploration"]]]
     ]);
 
-    assert.equal(snapshot.schemaVersion, 1);
+    assert.equal(snapshot.schemaVersion, 2);
+    assert.equal(snapshot.scoringConvention, "organizer-approved-additive-proxy");
+    assert.equal(snapshot.syncStatus, "static-fallback");
+    assert.deepEqual(snapshot.baselines, {
+        "optical-flow": {
+            spring: 0.9925,
+            medianDisagreement: 4.16,
+            robustSpringProxy: 6.03,
+            methodCount: 8
+        },
+        "stereo-matching": {
+            spring: 3.4545,
+            medianDisagreement: 16.18,
+            robustSpringProxy: 18.4505,
+            methodCount: 4
+        },
+        "scene-flow": {
+            methodCount: 2,
+            spring: { disparity1Abs: 7.466, disparity2Abs: 7.5935, flowEpe: 2.527 },
+            medianDisagreement: { disparity1Abs: 17.005, disparity2Abs: 0.215, flowEpe: 4.21 },
+            robustSpringProxy: { disparity1Abs: 24.471, disparity2Abs: 7.8085, flowEpe: 6.737 }
+        }
+    });
     assert.equal(snapshot.teams.length, expectedTeams.size);
     assert.equal(new Set(snapshot.teams.map((team) => team.teamId)).size, expectedTeams.size);
     for (const team of snapshot.teams) {
@@ -110,18 +132,12 @@ test("published leaderboard snapshot contains the exact public team roster", asy
         assert.ok(expected, team.teamId);
         assert.equal(team.teamName, expected[0], team.teamId);
         assert.deepEqual(team.registeredTracks, expected[1], team.teamId);
-        assert.equal(team.rankChange, 0, team.teamId);
-        assert.equal(team.score, null, team.teamId);
-        assert.equal(team.springMetric, null, team.teamId);
-        assert.equal(team.robustSpringMetric, null, team.teamId);
-        assert.equal(team.submittedAt, null, team.teamId);
+        assert.deepEqual(team.results, {}, team.teamId);
+        assert.deepEqual(team.submissionHistory, {}, team.teamId);
         assert.deepEqual(Object.keys(team).sort(), [
-            "rankChange",
             "registeredTracks",
-            "robustSpringMetric",
-            "score",
-            "springMetric",
-            "submittedAt",
+            "results",
+            "submissionHistory",
             "teamId",
             "teamName"
         ]);
@@ -134,29 +150,82 @@ test("published leaderboard snapshot contains the exact public team roster", asy
     assert.equal(crossTaskTeams.length, 12);
 });
 
-test("leaderboard UI is data-driven, transparent about refresh, and wired on both pages", async () => {
+test("leaderboard baselines are per-method additive-proxy medians", async () => {
+    const snapshot = JSON.parse(await source("assets/leaderboard-data.json"));
+    const median = (values) => {
+        const ordered = [...values].sort((left, right) => left - right);
+        const middle = Math.floor(ordered.length / 2);
+        const result = ordered.length % 2 === 1
+            ? ordered[middle]
+            : (ordered[middle - 1] + ordered[middle]) / 2;
+        return Number(result.toFixed(6));
+    };
+    const scalarBaseline = (rows) => ({
+        spring: median(rows.map(([clean]) => clean)),
+        medianDisagreement: median(rows.map(([, delta]) => delta)),
+        robustSpringProxy: median(rows.map(([clean, delta]) => clean + delta))
+    });
+    const opticalFlow = [
+        [0.643, 3.620], [0.723, 3.770], [1.040, 7.010], [1.476, 5.640],
+        [0.914, 4.030], [0.945, 2.980], [4.162, 4.290], [2.288, 7.250]
+    ];
+    const stereo = [
+        [3.025, 16.570], [1.516, 15.790], [3.884, 21.900], [4.594, 12.110]
+    ];
+    assert.deepEqual(scalarBaseline(opticalFlow), {
+        spring: snapshot.baselines["optical-flow"].spring,
+        medianDisagreement: snapshot.baselines["optical-flow"].medianDisagreement,
+        robustSpringProxy: snapshot.baselines["optical-flow"].robustSpringProxy
+    });
+    assert.deepEqual(scalarBaseline(stereo), {
+        spring: snapshot.baselines["stereo-matching"].spring,
+        medianDisagreement: snapshot.baselines["stereo-matching"].medianDisagreement,
+        robustSpringProxy: snapshot.baselines["stereo-matching"].robustSpringProxy
+    });
+
+    const sceneFlow = [
+        { clean: [7.890, 8.076, 2.526], delta: [21.900, 0.290, 3.390] },
+        { clean: [7.042, 7.111, 2.528], delta: [12.110, 0.140, 5.030] }
+    ];
+    const componentMedians = (selector) => [0, 1, 2].map((index) =>
+        median(sceneFlow.map((row) => selector(row, index)))
+    );
+    assert.deepEqual(componentMedians((row, index) => row.clean[index]), [7.466, 7.5935, 2.527]);
+    assert.deepEqual(componentMedians((row, index) => row.delta[index]), [17.005, 0.215, 4.21]);
+    assert.deepEqual(
+        componentMedians((row, index) => row.clean[index] + row.delta[index]),
+        [24.471, 7.8085, 6.737]
+    );
+});
+
+test("leaderboard UI is data-driven, documents the additive proxy, and is wired on both pages", async () => {
     const index = await source("index.html");
     const evaluation = await source("evaluation.html");
     const script = await source("assets/leaderboard.js");
+    const liveAdapter = await source("assets/leaderboard-live.js");
 
     assert.ok(evaluation.indexOf('id="leaderboards"') < evaluation.indexOf('<div class="eyebrow">Metric</div>'));
     assert.match(evaluation, /data-leaderboard-root data-mode="full"/u);
     assert.match(evaluation, /data-leaderboard-refresh/u);
+    assert.match(evaluation, /class="leaderboard-refresh-status" role="status"/u);
+    assert.doesNotMatch(evaluation, /class="visually-hidden"[^>]*data-leaderboard-refresh-status/u);
     assert.match(evaluation, /Last updated:/u);
-    assert.match(evaluation, /does not query Spring[\s\S]{0,80}trigger a benchmark sync/u);
-    assert.match(evaluation, /No current public benchmark entry exposes a validated[\s\S]{0,80}team ID/u);
-    assert.match(evaluation, /clean-to-corrupted prediction deltas instead/u);
-    assert.match(evaluation, /those quantities are not interchangeable/u);
+    assert.match(evaluation, /latest registered-team roster and public Spring\/RobustSpring results/u);
+    assert.match(evaluation, /exact RoCo team ID first[\s\S]{0,220}unique normalized team-name\s+substring/u);
+    assert.match(evaluation, /E<sub>R,proxy<\/sub> = E<sub>S<\/sub> \+ &Delta;/u);
+    assert.match(evaluation, /not presented as an exact corrupted-input[\s\S]{0,30}ground-truth measurement/u);
     assert.match(index, /<h2 id="leaderboard-preview-heading">Top Three by Track<\/h2>/u);
     assert.match(index, /data-leaderboard-root data-mode="preview"/u);
     assert.match(index, /Open full leaderboard/u);
     assert.match(index, /assets\/leaderboard\.js/u);
     assert.match(evaluation, /assets\/leaderboard\.js/u);
+    assert.match(index, /assets\/leaderboard-live\.js/u);
+    assert.match(evaluation, /assets\/leaderboard-live\.js/u);
 
     for (const label of ["Optical Flow", "Stereo Matching", "Scene Flow", "Cross-Task"]) {
         assert.ok(script.includes(`label: "${label}"`), label);
     }
-    for (const column of ["Rank", "Change", "Team", "RbS-Score", "Submission Time"]) {
+    for (const column of ["Rank", "Change", "Team", "RbS-Score", "Spring Submission Time"]) {
         assert.ok(script.includes(`"${column}"`), column);
     }
     assert.match(script, /node\.textContent = "— 0"/u);
@@ -165,10 +234,35 @@ test("leaderboard UI is data-driven, transparent about refresh, and wired on bot
     assert.match(script, /Swipe or scroll horizontally to see every column\./u);
     assert.match(script, /window\.RoCoLeaderboard = Object\.freeze/u);
     assert.match(script, /setDataSource\(loader\)/u);
+    assert.match(script, /return initialRefreshPromise\.then\(\(\) =>/u);
+    assert.match(script, /refresh\(\{ force: false, announce: false \}\)/u);
+    assert.match(script, /refresh\(\{ force: true, announce: true \}\)/u);
+    assert.equal((script.match(/force: true/gu) || []).length, 1);
+    assert.match(script, /syncState === "stale"/u);
+    assert.match(script, /stale cached standings remain visible/u);
+    assert.match(script, /snapshot\.sourceLabel \|\| "Organizer-published leaderboard snapshot"/u);
+    assert.match(script, /return `\$\{label\} · stale cache`/u);
+    assert.match(script, /generation !== refreshGeneration/u);
     assert.match(script, /left\.teamId\.localeCompare\(right\.teamId/u);
-    assert.match(evaluation, /B<sub>R<\/sub> constants and RbS-Scores remain pending/u);
-    assert.match(evaluation, /For the proposed RoCo-Spring score/u);
-    assert.match(evaluation, /Once the baselines are fixed/u);
+    assert.match(script, /numericDifference\(left\.robustSpringTerm, right\.robustSpringTerm\)/u);
+    assert.match(script, /numericDifference\(left\.springTerm, right\.springTerm\)/u);
+    assert.match(liveAdapter, /httpsCallable\(functions, "refreshLeaderboard"/u);
+    assert.match(liveAdapter, /force: force === true/u);
+    assert.match(liveAdapter, /response\.data\.syncStatus/u);
+    assert.match(liveAdapter, /status === "fresh"/u);
+    assert.match(liveAdapter, /status === "cache-hit"/u);
+    assert.match(liveAdapter, /status === "stale-cache"/u);
+    assert.match(liveAdapter, /installDataSource: installLiveDataSource/u);
+    assert.match(liveAdapter, /\["localhost", "127\.0\.0\.1"\]/u);
+    assert.match(liveAdapter, /import\("\.\/firebase-config\.js"\)/u);
+    assert.match(evaluation, /0\.9925/u);
+    assert.match(evaluation, /18\.4505/u);
+    assert.match(evaluation, /24\.471/u);
+    assert.match(evaluation, /arithmetic mean of a team's Optical Flow/u);
+    assert.match(evaluation, /numeric team ID as the deterministic final key/u);
+    assert.match(evaluation, /Automatic matches are provisional/u);
+    assert.match(evaluation, /same method,[\s\S]{0,100}checkpoint,[\s\S]{0,100}clean outputs/u);
+    assert.match(evaluation, /separate RobustSpring upload time is not exposed publicly/u);
 });
 
 test("site headings and named resources use consistent capitalization", async () => {
@@ -472,7 +566,8 @@ test("every production callable declares the required region, CORS allowlist, an
         "registerTeam",
         "getMyTeam",
         "updateMyTeam",
-        "completeInitialPasswordChange"
+        "completeInitialPasswordChange",
+        "refreshLeaderboard"
     ]) {
         const declaration = functionsIndex.match(
             new RegExp(`export const ${name} = onCall\\(([\\s\\S]*?)\\n\\);`, "u")

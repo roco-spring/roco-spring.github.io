@@ -11,6 +11,10 @@ import {
 import { REGION } from "./config.js";
 import { AppError, safeErrorCategory, toHttpsError } from "./errors.js";
 import { createGoogleApiClientFactory } from "./google-auth.js";
+import {
+  parseLeaderboardRefreshInput,
+  refreshLeaderboardOperation,
+} from "./leaderboard.js";
 import { parseInitialPasswordChangeInput } from "./password.js";
 import { reconcileRegistrationsOperation } from "./reconciliation.js";
 import { registerTeamOperation } from "./registration.js";
@@ -157,6 +161,32 @@ export const completeInitialPasswordChange = onCall(
     } catch (error: unknown) {
       logger.warn("Initial password change rejected", {
         operation: "completeInitialPasswordChange",
+        errorCategory: safeErrorCategory(error),
+      });
+      throw toHttpsError(error);
+    }
+  },
+);
+
+// The leaderboard is public, but App Check prevents arbitrary non-site clients
+// from turning the callable into an unbounded benchmark scraper. The operation
+// also applies a global Firestore cache and refresh lease.
+export const refreshLeaderboard = onCall(
+  {
+    region: REGION,
+    enforceAppCheck: true,
+    cors: callableCors,
+    timeoutSeconds: 60,
+    memory: "512MiB",
+    maxInstances: 4,
+  },
+  async (request) => {
+    try {
+      const { force } = parseLeaderboardRefreshInput(request.data);
+      return await refreshLeaderboardOperation(db, force);
+    } catch (error: unknown) {
+      logger.warn("Leaderboard refresh rejected", {
+        operation: "refreshLeaderboard",
         errorCategory: safeErrorCategory(error),
       });
       throw toHttpsError(error);

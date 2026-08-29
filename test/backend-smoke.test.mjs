@@ -64,11 +64,13 @@ test("backend smoke gate sends safe browser preflight and credential-free POST p
         { name: "registerTeam", category: "DEPLOYED_GUARD", attempts: 1 },
         { name: "getMyTeam", category: "DEPLOYED_GUARD", attempts: 1 },
         { name: "updateMyTeam", category: "DEPLOYED_GUARD", attempts: 1 },
-        { name: "completeInitialPasswordChange", category: "DEPLOYED_GUARD", attempts: 1 }
+        { name: "completeInitialPasswordChange", category: "DEPLOYED_GUARD", attempts: 1 },
+        { name: "refreshLeaderboard", category: "DEPLOYED_GUARD", attempts: 1 }
     ]);
 
     assert.match(gate.results[0].detail, /missing App Check token is rejected/u);
-    for (const result of gate.results.slice(1)) {
+    assert.match(gate.results.at(-1).detail, /missing App Check token is rejected/u);
+    for (const result of gate.results.slice(1, -1)) {
         assert.match(result.detail, /does not distinguish Auth from App Check/u);
         assert.doesNotMatch(result.detail, /missing App Check token is rejected/u);
     }
@@ -140,7 +142,8 @@ test("backend smoke gate rejects incomplete or blocked browser preflight", async
         { name: "registerTeam", category: "CORS_PREFLIGHT_MISCONFIGURED", attempts: 1 },
         { name: "getMyTeam", category: "CORS_PREFLIGHT_MISCONFIGURED", attempts: 1 },
         { name: "updateMyTeam", category: "CORS_PREFLIGHT_MISCONFIGURED", attempts: 1 },
-        { name: "completeInitialPasswordChange", category: "PREFLIGHT_BLOCKED", attempts: 1 }
+        { name: "completeInitialPasswordChange", category: "PREFLIGHT_BLOCKED", attempts: 1 },
+        { name: "refreshLeaderboard", category: "PREFLIGHT_BLOCKED", attempts: 1 }
     ]);
 });
 
@@ -174,7 +177,8 @@ test("backend smoke gate rejects malformed 401, blocked invocation, redirects, a
         { name: "registerTeam", category: "PROTOCOL_MISCONFIGURED" },
         { name: "getMyTeam", category: "INVOCATION_BLOCKED" },
         { name: "updateMyTeam", category: "REDIRECTED" },
-        { name: "completeInitialPasswordChange", category: "UNGUARDED" }
+        { name: "completeInitialPasswordChange", category: "UNGUARDED" },
+        { name: "refreshLeaderboard", category: "UNGUARDED" }
     ]);
     assert.equal(gate.results.some((result) => "payload" in result), false);
 });
@@ -225,7 +229,7 @@ test("backend smoke gate retries transient network, timeout, 404, and 5xx failur
     assert.ok(gate.results.every((result) => (
         result.category === "DEPLOYED_GUARD" && result.attempts === 2
     )));
-    assert.deepEqual([...delays].sort((left, right) => left - right), [7, 7, 7, 7]);
+    assert.deepEqual([...delays].sort((left, right) => left - right), [7, 7, 7, 7, 7]);
 });
 
 test("backend smoke gate bounds persistent transient retries with exponential backoff", async () => {
@@ -250,8 +254,8 @@ test("backend smoke gate bounds persistent transient retries with exponential ba
         result.category === "NETWORK_ERROR" && result.attempts === 3
     )));
     assert.deepEqual([...delays].sort((left, right) => left - right), [
-        2, 2, 2, 2,
-        4, 4, 4, 4
+        2, 2, 2, 2, 2,
+        4, 4, 4, 4, 4
     ]);
 });
 
@@ -260,7 +264,8 @@ test("backend smoke gate has an exact deployment inventory and safe URL boundary
         "registerTeam",
         "getMyTeam",
         "updateMyTeam",
-        "completeInitialPasswordChange"
+        "completeInitialPasswordChange",
+        "refreshLeaderboard"
     ]);
     assert.deepEqual(PREFLIGHT_REQUEST_HEADERS, [
         "authorization",

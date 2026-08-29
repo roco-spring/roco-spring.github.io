@@ -25,13 +25,13 @@
 
                 <p class="hero-subtitle">
                     A NeurIPS 2026 challenge on robust dense correspondence under realistic distribution shifts,
-                    covering optical flow, stereo matching, and scene flow.
+                    covering Optical Flow, Stereo Matching, and Scene Flow.
                 </p>
 
                 <div class="hero-body">
                     <p>
                         Dense correspondence has made remarkable progress on standard benchmarks. Although modern
-                        optical flow, stereo matching, and scene flow methods achieve strong performance under ideal
+                        Optical Flow, Stereo Matching, and Scene Flow methods achieve strong performance under ideal
                         conditions, their accuracy can degrade substantially under real-world visual shifts.
                     </p>
 
@@ -85,7 +85,7 @@
                     <div class="eyebrow">Leaderboard Preview</div>
                     <h2 id="leaderboard-preview-heading">Top Three by Track</h2>
                     <p>
-                        A quick view of verified scores in the current published roster snapshot.
+                        A quick view of the latest registered teams and live public benchmark scores.
                         Registered teams without scores remain visible on the full leaderboard.
                     </p>
                 </div>
@@ -117,9 +117,9 @@
                         Spring provides high-resolution stereo video with left and right images at
                         1920x1080 px, together with dense scene-flow ground truth at 4x
                         super-resolution. It includes bidirectional disparities for stereo and depth,
-                        disparity changes for scene flow, and forward/backward optical flow for both
+                        disparity changes for Scene Flow, and forward/backward Optical Flow for both
                         left and right views. This makes Spring a unified high-detail benchmark for
-                        optical flow, stereo matching, and scene flow.
+                        Optical Flow, Stereo Matching, and Scene Flow.
                     </p>
                     <div class="dataset-card-actions">
                         <a class="button secondary compact"
@@ -144,8 +144,8 @@
                         image corruptions, including blur, color changes, noise, quality degradations,
                         and weather effects. The corruptions are applied to stereo video data and are
                         integrated consistently over time, across stereo views, and with depth where
-                        applicable, enabling controlled robustness evaluation for optical flow, stereo,
-                        and scene flow.
+                        applicable, enabling controlled robustness evaluation for Optical Flow, Stereo Matching,
+                        and Scene Flow.
                     </p>
                     <div class="dataset-card-actions">
                         <a class="button secondary compact" href="https://openreview.net/pdf?id=RebPBMrMmk"
@@ -291,15 +291,15 @@
                             vision, large-scale datasets such as ImageNet<a class="citation-ref"
                                 href="#ref-deng2009imagenet" aria-label="Reference 1">[1]</a>, and
                             influential dense correspondence architectures across multiple tasks,
-                            including RAFT for optical flow<a class="citation-ref" href="#ref-teed2020raft"
-                                aria-label="Reference 2">[2]</a>, RAFT-Stereo for stereo matching<a
+                            including RAFT for Optical Flow<a class="citation-ref" href="#ref-teed2020raft"
+                                aria-label="Reference 2">[2]</a>, RAFT-Stereo for Stereo Matching<a
                                 class="citation-ref" href="#ref-lipson2021raft-stereo"
                                 aria-label="Reference 3">[3]</a>, and SEA-RAFT for efficient and accurate
-                            optical flow<a class="citation-ref" href="#ref-wang2024searaft"
+                            Optical Flow<a class="citation-ref" href="#ref-wang2024searaft"
                                 aria-label="Reference 4">[4]</a>. His keynote will connect the evolution
                             of correspondence methods and benchmark design with the central question of
-                            the challenge: how to turn clean benchmark progress into robust optical flow,
-                            stereo, and scene flow methods that remain reliable under realistic visual
+                            the challenge: how to turn clean benchmark progress into robust Optical Flow,
+                            Stereo Matching, and Scene Flow methods that remain reliable under realistic visual
                             shifts.
                         </p>
                     </div>
@@ -326,7 +326,7 @@
                             AI Research. His expertise connects robust visual perception, video
                             understanding, low-level vision, and real-world deployment. His prior work
                             includes scene-flow estimation under degraded video conditions, including
-                            simultaneous stereo video deblurring and scene flow estimation<a class="citation-ref"
+                            simultaneous stereo video deblurring and Scene Flow estimation<a class="citation-ref"
                                 href="#ref-pan2017stereodeblur" aria-label="Reference 5">[5]</a>, joint stereo video
                             deblurring, scene
                             flow estimation, and moving-object segmentation<a class="citation-ref"
@@ -609,6 +609,7 @@
     <script src="assets/lightbox.js"></script>
     <script src="assets/timeline.js"></script>
     <script src="assets/leaderboard.js"></script>
+    <script type="module" src="assets/leaderboard-live.js"></script>
 </body>
 
 </html>

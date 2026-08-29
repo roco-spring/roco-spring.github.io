@@ -84,7 +84,8 @@ function deployedFunctionResource(
     if ([
         "getMyTeam",
         "updateMyTeam",
-        "completeInitialPasswordChange"
+        "completeInitialPasswordChange",
+        "refreshLeaderboard"
     ].includes(functionName)) {
         return { serviceConfig: { secretEnvironmentVariables: [] } };
     }
@@ -235,6 +236,7 @@ test("bound mode requires the exact split numeric secret architecture", async ()
         "getMyTeam",
         "updateMyTeam",
         "completeInitialPasswordChange",
+        "refreshLeaderboard",
         "reconcileRegistrations"
     ]);
 });
@@ -269,7 +271,8 @@ test("bound mode rejects OAuth secret bindings on public callables", async () =>
         "registerTeam",
         "getMyTeam",
         "updateMyTeam",
-        "completeInitialPasswordChange"
+        "completeInitialPasswordChange",
+        "refreshLeaderboard"
     ]) {
         await assert.rejects(
             resolveSecretVersionNames("bound", {

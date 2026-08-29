@@ -29,6 +29,7 @@ const ADMIN_OPERATION_TIMEOUT_MS = 30_000;
 const CI_PROOF_MARKER = "VALID_CI_DEBUG_APP_CHECK_TO_VALIDATION_BOUNDARY";
 const CLEANUP_PROOF_MARKER = "CI_DEBUG_TOKEN_REVOKED_AND_DELETION_VERIFIED";
 const AUTH_PROOF_MARKER = "VALID_AUTH_AND_APP_CHECK_ENFORCEMENT";
+const LEADERBOARD_PROOF_MARKER = "VALID_APP_CHECK_TO_PUBLIC_LEADERBOARD_SNAPSHOT";
 const AUTH_CLEANUP_PROOF_MARKER = "CI_AUTH_USERS_DELETED_AND_ABSENCE_VERIFIED";
 const AUTH_DISPLAY_NAME_PREFIX = "Ephemeral App Check CI ";
 const AUTH_CLAIM_MARKER = "rocoAppCheckCiMarker";
@@ -608,6 +609,7 @@ async function main() {
         for (const result of authenticatedResults) {
             process.stdout.write(`PASS ${result.name} [${AUTH_PROOF_MARKER}]\n`);
         }
+        process.stdout.write(`PASS refreshLeaderboard [${LEADERBOARD_PROOF_MARKER}]\n`);
         process.stdout.write(`PASS appCheckDebugToken [${CLEANUP_PROOF_MARKER}]\n`);
         process.stdout.write(`PASS firebaseAuthUsers [${AUTH_CLEANUP_PROOF_MARKER}]\n`);
         process.stdout.write(
@@ -644,6 +646,7 @@ export {
     CLEANUP_PROOF_MARKER,
     DEBUG_TOKEN_COLLECTION,
     DISPLAY_NAME_PREFIX,
+    LEADERBOARD_PROOF_MARKER,
     PROJECT_NUMBER,
     createAdcAppCheckApi,
     createAppCheckRestApi,

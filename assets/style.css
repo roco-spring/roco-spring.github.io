@@ -1140,6 +1140,87 @@ p {
     white-space: nowrap;
 }
 
+/* Baseline tables keep the scoring constants readable on narrow screens. */
+.baseline-table-wrap {
+    margin: 20px 0;
+    overflow-x: auto;
+    border: 1px solid rgba(138, 223, 255, 0.18);
+    border-radius: 16px;
+    background: rgba(7, 17, 39, 0.7);
+}
+
+.baseline-table-wrap:focus-visible {
+    outline: 3px solid rgba(113, 213, 255, 0.72);
+    outline-offset: 3px;
+}
+
+.baseline-table {
+    width: 100%;
+    min-width: 610px;
+    border-collapse: collapse;
+    font-variant-numeric: tabular-nums;
+}
+
+.baseline-table--methods {
+    min-width: 520px;
+}
+
+.baseline-table--scene-methods {
+    min-width: 1040px;
+}
+
+.baseline-table th,
+.baseline-table td {
+    padding: 13px 15px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    text-align: left;
+    white-space: nowrap;
+}
+
+.baseline-table thead th {
+    color: rgba(255, 255, 255, 0.7);
+    background: rgba(65, 112, 207, 0.14);
+    font-size: 0.78rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+
+.baseline-table tbody th {
+    color: var(--text);
+    font-weight: 700;
+}
+
+.baseline-table tbody td {
+    color: rgba(255, 255, 255, 0.82);
+}
+
+.baseline-table tbody tr:last-child th,
+.baseline-table tbody tr:last-child td {
+    border-bottom: 0;
+}
+
+.baseline-sources {
+    font-size: 0.9rem;
+}
+
+.baseline-methods {
+    margin: 18px 0 26px;
+    padding: 14px 16px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.025);
+}
+
+.baseline-methods summary {
+    color: rgba(255, 255, 255, 0.9);
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.baseline-methods p:last-child {
+    margin-bottom: 0;
+}
+
 .table-wrapper {
     overflow-x: auto;
 }
@@ -3676,6 +3757,17 @@ details p {
     font-size: 0.82rem;
 }
 
+.leaderboard-refresh-status {
+    margin: -6px 0 16px;
+    color: rgba(207, 235, 255, 0.88);
+    font-size: 0.82rem;
+    line-height: 1.45;
+}
+
+.leaderboard-refresh-status:empty {
+    display: none;
+}
+
 .leaderboard-integrity-note,
 .metric-integrity-note {
     padding: 13px 15px;
@@ -3937,6 +4029,26 @@ details p {
     color: rgba(255, 255, 255, 0.72);
     font-size: 0.72rem;
     font-weight: 700;
+}
+
+.leaderboard-method {
+    max-width: 190px;
+    overflow: hidden;
+    color: #8adfff;
+    font-size: 0.7rem;
+    font-weight: 750;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+a.leaderboard-method:hover,
+a.leaderboard-method:focus-visible {
+    color: #c8f3ff;
+}
+
+a.leaderboard-method:focus-visible {
+    outline: 2px solid rgba(138, 223, 255, 0.72);
+    outline-offset: 2px;
 }
 
 .leaderboard-pending-badge {

@@ -31,6 +31,7 @@ function healthyInventory(secretFreeBindings = {}) {
             "completeInitialPasswordChange",
             secretFreeBindings.completeInitialPasswordChange
         ),
+        resource("refreshLeaderboard", secretFreeBindings.refreshLeaderboard),
         resource("reconcileRegistrations", [
             binding("GOOGLE_OAUTH_CLIENT_SECRET"),
             binding("GOOGLE_OAUTH_REFRESH_TOKEN")
@@ -48,7 +49,8 @@ test("cleanup plan identifies only stale bindings on secret-free callables", () 
     for (const functionId of [
         "getMyTeam",
         "updateMyTeam",
-        "completeInitialPasswordChange"
+        "completeInitialPasswordChange",
+        "refreshLeaderboard"
     ]) {
         assert.deepEqual(
             buildSecretCleanupPlan(healthyInventory({
@@ -91,14 +93,15 @@ test("apply preflights, clears stale bindings, waits, and verifies read-back", a
     ]) {
         assert.equal(events.filter((event) => event === `clear:${functionId}`).length, 1);
     }
-    assert.equal(events.filter((event) => event.startsWith("get:")).length, 10);
+    assert.equal(events.filter((event) => event.startsWith("get:")).length, 12);
 });
 
 test("verify rejects stale bindings without mutation", async () => {
     for (const functionId of [
         "getMyTeam",
         "updateMyTeam",
-        "completeInitialPasswordChange"
+        "completeInitialPasswordChange",
+        "refreshLeaderboard"
     ]) {
         const inventory = healthyInventory({
             [functionId]: [binding("GOOGLE_OAUTH_CLIENT_SECRET")]

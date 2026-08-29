@@ -390,11 +390,11 @@ test("Function inventory reads every region and rejects unreachable regions", as
 
 test("remote Function inventory is exact, active Node.js 22, and managed HTTPS", () => {
     const byId = verifyRemoteFunctionInventory(remoteFunctions());
-    assert.equal(byId.size, 5);
+    assert.equal(byId.size, 6);
     assert.equal(byId.get("registerTeam").state, "ACTIVE");
 
     assert.throws(
-        () => verifyRemoteFunctionInventory(remoteFunctions().slice(0, 4)),
+        () => verifyRemoteFunctionInventory(remoteFunctions().slice(0, 5)),
         expectStage("function_inventory"),
     );
     assert.throws(
@@ -601,7 +601,7 @@ test("Cloud Run IAM exposes only callables and authenticates the Scheduler", () 
             policies,
             schedulerJob(),
         ),
-        { publicCallables: 4, privateSchedulers: 1 },
+        { publicCallables: 5, privateSchedulers: 1 },
     );
 
     const privateCallable = new Map(policies);
@@ -727,9 +727,9 @@ test("missing organizer channel fails with exact setup guidance", () => {
     );
 });
 
-test("desired policies exactly scope dependency, callable, Scheduler, and terminal-resource failures", () => {
+test("desired policies exactly scope registration and leaderboard failures", () => {
     const policies = buildDesiredPolicies(CHANNEL_NAME, SCHEDULER_JOB_ID);
-    assert.equal(policies.length, 4);
+    assert.equal(policies.length, 5);
     assert.deepEqual(
         policies.map((policy) => policy.userLabels.policy_key),
         [
@@ -737,6 +737,7 @@ test("desired policies exactly scope dependency, callable, Scheduler, and termin
             "callables_5xx",
             "scheduler_failure",
             "reconciliation_failed",
+            "leaderboard_refresh_failed",
         ],
     );
     for (const policy of policies) {
@@ -757,12 +758,13 @@ test("desired policies exactly scope dependency, callable, Scheduler, and termin
 
     assert.match(policies[1].documentation.content, /billing:verify/u);
 
-    assert.equal(policies[1].conditions.length, 4);
+    assert.equal(policies[1].conditions.length, 5);
     const callableServices = [
         "registerteam",
         "getmyteam",
         "updatemyteam",
         "completeinitialpasswordchange",
+        "refreshleaderboard",
     ];
     policies[1].conditions.forEach((condition, index) => {
         const threshold = condition.conditionThreshold;
@@ -797,6 +799,19 @@ test("desired policies exactly scope dependency, callable, Scheduler, and termin
     assert.match(reconciliationFilter, /severity>=ERROR/u);
     assert.deepEqual(
         policies[3].alertStrategy.notificationRateLimit,
+        { period: "300s" },
+    );
+
+    const leaderboardFilter =
+        policies[4].conditions[0].conditionMatchedLog.filter;
+    assert.match(leaderboardFilter, /service_name="refreshleaderboard"/u);
+    assert.match(leaderboardFilter, /operation="leaderboardRefresh"/u);
+    assert.match(leaderboardFilter, /status="failed"/u);
+    assert.match(leaderboardFilter, /severity>=ERROR/u);
+    assert.match(policies[4].documentation.content, /last validated cache/u);
+    assert.match(policies[4].documentation.content, /Do not copy response bodies/u);
+    assert.deepEqual(
+        policies[4].alertStrategy.notificationRateLimit,
         { period: "300s" },
     );
 });
@@ -839,7 +854,7 @@ test("policy planning is order-insensitive, deterministic, and idempotent", () =
     const plan = planPolicyChanges(serverPolicies, desired, "verify");
     assert.deepEqual(
         plan.map(({ action }) => action),
-        ["noop", "noop", "noop", "noop"],
+        ["noop", "noop", "noop", "noop", "noop"],
     );
 });
 
@@ -853,7 +868,7 @@ test("apply plans create missing and update only explicitly managed drift", () =
     const plan = planPolicyChanges([managedDrift], desired, "apply");
     assert.deepEqual(
         plan.map(({ action }) => action),
-        ["update", "create", "create", "create"],
+        ["update", "create", "create", "create", "create"],
     );
     assert.throws(
         () => planPolicyChanges([managedDrift], desired, "verify"),
@@ -970,10 +985,10 @@ test("apply workflow reads every prerequisite, mutates idempotently, then reads 
     const result = await runProductionMonitoringWorkflow({ mode: "apply", api });
     assert.deepEqual(result, {
         mode: "apply",
-        functions: 5,
-        iam: { publicCallables: 4, privateSchedulers: 1 },
-        alerts: 4,
-        changed: 4,
+        functions: 6,
+        iam: { publicCallables: 5, privateSchedulers: 1 },
+        alerts: 5,
+        changed: 5,
     });
     assert.deepEqual(calls, [
         "functions:list",
@@ -986,6 +1001,8 @@ test("apply workflow reads every prerequisite, mutates idempotently, then reads 
         "iam:get:updateMyTeam",
         "run:get:completeInitialPasswordChange",
         "iam:get:completeInitialPasswordChange",
+        "run:get:refreshLeaderboard",
+        "iam:get:refreshLeaderboard",
         "run:get:reconcileRegistrations",
         "iam:get:reconcileRegistrations",
         "channels:list",
@@ -994,6 +1011,7 @@ test("apply workflow reads every prerequisite, mutates idempotently, then reads 
         "policy:create:callables_5xx",
         "policy:create:scheduler_failure",
         "policy:create:reconciliation_failed",
+        "policy:create:leaderboard_refresh_failed",
         "policies:list",
     ]);
 
@@ -1001,9 +1019,9 @@ test("apply workflow reads every prerequisite, mutates idempotently, then reads 
     const second = await runProductionMonitoringWorkflow({ mode: "apply", api });
     assert.deepEqual(second, {
         mode: "apply",
-        functions: 5,
-        iam: { publicCallables: 4, privateSchedulers: 1 },
-        alerts: 4,
+        functions: 6,
+        iam: { publicCallables: 5, privateSchedulers: 1 },
+        alerts: 5,
         changed: 0,
     });
     assert.deepEqual(calls, [
@@ -1017,6 +1035,8 @@ test("apply workflow reads every prerequisite, mutates idempotently, then reads 
         "iam:get:updateMyTeam",
         "run:get:completeInitialPasswordChange",
         "iam:get:completeInitialPasswordChange",
+        "run:get:refreshLeaderboard",
+        "iam:get:refreshLeaderboard",
         "run:get:reconcileRegistrations",
         "iam:get:reconcileRegistrations",
         "channels:list",
@@ -1116,10 +1136,12 @@ test("runbook keeps monitoring remote, canonical, and free of Sheet canaries", a
     ]);
     assert.match(readme, /entirely remote/u);
     assert.match(runbook, new RegExp(ORGANIZER_NOTIFICATION_ADDRESS, "u"));
-    assert.match(runbook, /All four deliver/u);
+    assert.match(runbook, /All five policies deliver/u);
+    assert.match(runbook, /leaderboardRefresh/u);
+    assert.match(runbook, /cooldown cache hits do not emit another failure log/u);
     assert.match(runbook, /extra enabled or paused Scheduler job targets the reconciler/u);
     assert.match(runbook, /stale\/keyless RoCo-managed alert policy/u);
-    assert.match(readme, /exact four-key remote Cloud Monitoring policy inventory/u);
+    assert.match(readme, /exact five-key remote Cloud Monitoring policy inventory/u);
     assert.doesNotMatch(
         `${readme}\n${runbook}`,
         /(?:reads|available) (?:an? )?managed[- ]Sheet/u,

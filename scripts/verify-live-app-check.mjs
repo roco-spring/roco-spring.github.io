@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import process from "node:process";
+import { isDeepStrictEqual } from "node:util";
 import { pathToFileURL } from "node:url";
 
 const DIAGNOSTIC_ENVIRONMENT_KEYS = Object.freeze([
@@ -34,6 +35,11 @@ const EXPECTED_PROBES = Object.freeze([
         name: "getMyTeam",
         payload: Object.freeze({ productionSmokeProbe: true }),
         expectedCode: "functions/invalid-argument"
+    }),
+    Object.freeze({
+        name: "refreshLeaderboard",
+        payload: Object.freeze({ unexpected: true }),
+        expectedCode: "functions/invalid-argument"
     })
 ]);
 const EXPECTED_AUTHENTICATED_PROBES = Object.freeze([
@@ -46,6 +52,195 @@ const EXPECTED_AUTHENTICATED_PROBES = Object.freeze([
         expectedMustChangePassword: true
     })
 ]);
+const EXPECTED_LEADERBOARD_BASELINES = Object.freeze({
+    "optical-flow": {
+        spring: 0.9925,
+        medianDisagreement: 4.16,
+        robustSpringProxy: 6.03,
+        methodCount: 8
+    },
+    "stereo-matching": {
+        spring: 3.4545,
+        medianDisagreement: 16.18,
+        robustSpringProxy: 18.4505,
+        methodCount: 4
+    },
+    "scene-flow": {
+        methodCount: 2,
+        spring: { disparity1Abs: 7.466, disparity2Abs: 7.5935, flowEpe: 2.527 },
+        medianDisagreement: { disparity1Abs: 17.005, disparity2Abs: 0.215, flowEpe: 4.21 },
+        robustSpringProxy: { disparity1Abs: 24.471, disparity2Abs: 7.8085, flowEpe: 6.737 }
+    }
+});
+const LEADERBOARD_TRACKS = new Set([
+    "optical-flow",
+    "stereo-matching",
+    "scene-flow",
+    "cross-task"
+]);
+const QUANTITATIVE_TRACKS = new Set([
+    "optical-flow",
+    "stereo-matching",
+    "scene-flow"
+]);
+const REGISTRATION_TRACKS = new Set([...QUANTITATIVE_TRACKS, "exploration"]);
+const KNOWN_PUBLIC_TEAM_IDS = new Set(
+    Array.from({ length: 25 }, (_value, index) => `RoCo-${index + 8}`)
+);
+
+function isPlainObject(value) {
+    return typeof value === "object"
+        && value !== null
+        && !Array.isArray(value)
+        && Object.getPrototypeOf(value) === Object.prototype;
+}
+
+function hasOnlyKeys(value, allowed) {
+    return isPlainObject(value) && Object.keys(value).every((key) => allowed.has(key));
+}
+
+function validIsoTimestamp(value) {
+    return typeof value === "string"
+        && Number.isFinite(Date.parse(value))
+        && new Date(value).toISOString() === value;
+}
+
+function verifyPublicLeaderboardResult(result, track) {
+    const allowed = new Set([
+        "rankChange", "score", "springMetric", "robustSpringMetric",
+        "springTerm", "robustSpringTerm", "submittedAt", "benchmarkMethod",
+        "benchmarkUrl", "matchBasis", "springComponents", "robustSpringComponents"
+    ]);
+    const required = [
+        "rankChange", "score", "springMetric", "robustSpringMetric",
+        "springTerm", "robustSpringTerm", "submittedAt", "benchmarkMethod",
+        "benchmarkUrl", "matchBasis"
+    ];
+    if (!hasOnlyKeys(result, allowed) || required.some((key) => !Object.hasOwn(result, key))) {
+        throw new Error("The live leaderboard result schema is invalid.");
+    }
+    const expectedMatchBasis = track === "cross-task"
+        ? result.matchBasis === "cross-task"
+        : ["team-id", "team-name"].includes(result.matchBasis);
+    if (!Number.isSafeInteger(result.rankChange)
+        || Math.abs(result.rankChange) > 10_000
+        || [result.score, result.springMetric, result.robustSpringMetric,
+            result.springTerm, result.robustSpringTerm]
+            .some((value) => (
+                typeof value !== "number" || !Number.isFinite(value) || value < 0 || value > 1e9
+            ))
+        || !validIsoTimestamp(result.submittedAt)
+        || typeof result.benchmarkMethod !== "string"
+        || result.benchmarkMethod.length === 0
+        || result.benchmarkMethod.length > 240
+        || /[\u0000-\u001f\u007f]/u.test(result.benchmarkMethod)
+        || !expectedMatchBasis) {
+        throw new Error("The live leaderboard result values are invalid.");
+    }
+    let benchmarkUrl;
+    try {
+        benchmarkUrl = new URL(result.benchmarkUrl);
+    } catch {
+        throw new Error("The live leaderboard result URL is invalid.");
+    }
+    const expectedBenchmarkUrl = track === "cross-task"
+        ? benchmarkUrl.href === "https://spring-benchmark.org/"
+        : /^https:\/\/spring-benchmark\.org\/\d{1,9}\/$/u.test(benchmarkUrl.href);
+    if (!expectedBenchmarkUrl || benchmarkUrl.username || benchmarkUrl.password) {
+        throw new Error("The live leaderboard result URL is invalid.");
+    }
+    const componentKeys = ["springComponents", "robustSpringComponents"];
+    if (track === "scene-flow" && componentKeys.some((key) => !Object.hasOwn(result, key))) {
+        throw new Error("The live leaderboard Scene Flow components are incomplete.");
+    }
+    if (track !== "scene-flow" && componentKeys.some((key) => Object.hasOwn(result, key))) {
+        throw new Error("The live leaderboard result has unexpected components.");
+    }
+    for (const key of componentKeys) {
+        if (!Object.hasOwn(result, key)) continue;
+        const components = result[key];
+        if (!hasOnlyKeys(components, new Set(["d1", "d2", "flow"]))
+            || ["d1", "d2", "flow"].some((component) => (
+                typeof components[component] !== "number"
+                || !Number.isFinite(components[component])
+                || components[component] < 0
+            ))) {
+            throw new Error("The live leaderboard component schema is invalid.");
+        }
+    }
+}
+
+function verifyLiveLeaderboardSnapshot(snapshot) {
+    const topLevelKeys = new Set([
+        "schemaVersion", "updatedAt", "sourceLabel", "scoringConvention",
+        "baselines", "teams", "syncStatus"
+    ]);
+    if (!hasOnlyKeys(snapshot, topLevelKeys)
+        || Object.keys(snapshot).length !== topLevelKeys.size
+        || snapshot.schemaVersion !== 2
+        || !validIsoTimestamp(snapshot.updatedAt)
+        || typeof snapshot.sourceLabel !== "string"
+        || snapshot.sourceLabel.length === 0
+        || snapshot.sourceLabel.length > 200
+        || snapshot.scoringConvention !== "organizer-approved-additive-proxy"
+        || !["fresh", "cache-hit"].includes(snapshot.syncStatus)
+        || !isDeepStrictEqual(snapshot.baselines, EXPECTED_LEADERBOARD_BASELINES)
+        || !Array.isArray(snapshot.teams)
+        || snapshot.teams.length < 25
+        || snapshot.teams.length > 10_000) {
+        throw new Error("The live leaderboard snapshot schema is invalid.");
+    }
+
+    const teamKeys = new Set([
+        "teamId", "teamName", "registeredTracks", "results", "submissionHistory"
+    ]);
+    const seenTeamIds = new Set();
+    for (const team of snapshot.teams) {
+        const idMatch = typeof team?.teamId === "string" ? /^RoCo-([1-9]\d*)$/u.exec(team.teamId) : null;
+        if (!hasOnlyKeys(team, teamKeys)
+            || Object.keys(team).length !== teamKeys.size
+            || !idMatch
+            || Number(idMatch[1]) < 8
+            || seenTeamIds.has(team.teamId)
+            || typeof team.teamName !== "string"
+            || team.teamName.length === 0
+            || team.teamName.length > 120
+            || /[\u0000-\u001f\u007f]/u.test(team.teamName)
+            || !Array.isArray(team.registeredTracks)
+            || team.registeredTracks.length === 0
+            || new Set(team.registeredTracks).size !== team.registeredTracks.length
+            || team.registeredTracks.some((track) => !REGISTRATION_TRACKS.has(track))
+            || !hasOnlyKeys(team.results, LEADERBOARD_TRACKS)
+            || !hasOnlyKeys(team.submissionHistory, QUANTITATIVE_TRACKS)) {
+            throw new Error("The live leaderboard team projection is invalid.");
+        }
+        seenTeamIds.add(team.teamId);
+        for (const [track, result] of Object.entries(team.results)) {
+            const registeredForResult = track === "cross-task"
+                ? [...QUANTITATIVE_TRACKS].every((candidate) => team.registeredTracks.includes(candidate))
+                : team.registeredTracks.includes(track);
+            if (!LEADERBOARD_TRACKS.has(track) || !registeredForResult) {
+                throw new Error("The live leaderboard result track is invalid.");
+            }
+            verifyPublicLeaderboardResult(result, track);
+        }
+        for (const [track, history] of Object.entries(team.submissionHistory)) {
+            if (!QUANTITATIVE_TRACKS.has(track)
+                || !Array.isArray(history)
+                || history.length > 20) {
+                throw new Error("The live leaderboard history is invalid.");
+            }
+            if (!team.registeredTracks.includes(track)) {
+                throw new Error("The live leaderboard history track is invalid.");
+            }
+            history.forEach((result) => verifyPublicLeaderboardResult(result, track));
+        }
+    }
+    if ([...KNOWN_PUBLIC_TEAM_IDS].some((teamId) => !seenTeamIds.has(teamId))) {
+        throw new Error("The live leaderboard omitted a known public team.");
+    }
+    return Object.freeze({ teamCount: snapshot.teams.length, syncStatus: snapshot.syncStatus });
+}
 
 function verifyProbeResults(results) {
     if (!Array.isArray(results) || results.length !== EXPECTED_PROBES.length) {
@@ -224,6 +419,36 @@ async function runLiveAppCheckProbe({
         );
 
         verifyProbeResults(results);
+
+        // Prove the real read-only success path with a valid App Check token.
+        // The full response is validated in memory and is never printed.
+        const leaderboardSnapshot = await evaluateWithDeadline(
+            page,
+            async ({ firebaseVersion, projectId, region }) => {
+                const [{ getApp }, { getFunctions, httpsCallable }] = await Promise.all([
+                    import(`https://www.gstatic.com/firebasejs/${firebaseVersion}/firebase-app.js`),
+                    import(`https://www.gstatic.com/firebasejs/${firebaseVersion}/firebase-functions.js`)
+                ]);
+                const productionApp = getApp();
+                if (productionApp.options.projectId !== projectId) {
+                    throw new Error("Live Firebase project identity changed during the leaderboard probe.");
+                }
+                const productionFunctions = getFunctions(productionApp, region);
+                const response = await httpsCallable(
+                    productionFunctions,
+                    "refreshLeaderboard",
+                    { timeout: 60_000 }
+                )({ force: false });
+                return response.data;
+            },
+            {
+                firebaseVersion: FIREBASE_VERSION,
+                projectId: PROJECT_ID,
+                region: FUNCTIONS_REGION
+            },
+            PUBLIC_PROBE_TIMEOUT_MS
+        );
+        verifyLiveLeaderboardSnapshot(leaderboardSnapshot);
         return results;
     } finally {
         await browser.close();
@@ -451,6 +676,7 @@ async function main() {
         for (const result of results) {
             process.stdout.write(`PASS ${result.name} [VALID_APP_CHECK_TO_VALIDATION_BOUNDARY]\n`);
         }
+        process.stdout.write("PASS refreshLeaderboard [VALID_APP_CHECK_TO_PUBLIC_SNAPSHOT]\n");
         process.stdout.write(
             `Live App Check probe passed in ${attempts} attempt(s) without credentials, team creation, or private response logging.\n`
         );
@@ -469,7 +695,9 @@ export {
     DEFAULT_RETRY_DELAY_MS,
     DIAGNOSTIC_ENVIRONMENT_KEYS,
     EXPECTED_PROBES,
+    KNOWN_PUBLIC_TEAM_IDS,
     EXPECTED_AUTHENTICATED_PROBES,
+    EXPECTED_LEADERBOARD_BASELINES,
     FUNCTIONS_REGION,
     LIVE_REGISTRATION_URL,
     PROJECT_ID,
@@ -484,6 +712,7 @@ export {
     sanitizeDiagnosticEnvironment,
     validateAuthenticatedProbeAccounts,
     verifyAuthenticatedProbeResults,
+    verifyLiveLeaderboardSnapshot,
     verifyProductionProjectId,
     verifyProbeResults
 };

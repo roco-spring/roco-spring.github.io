@@ -1,257 +1,216 @@
 {
-  "schemaVersion": 1,
-  "updatedAt": "2026-08-29T16:48:13+02:00",
-  "sourceLabel": "Organizer-published roster snapshot",
+  "schemaVersion": 2,
+  "updatedAt": "2026-08-29T19:09:32+02:00",
+  "sourceLabel": "Fallback snapshot · roster verified 29 Aug 2026 · no public result matches at publication",
+  "scoringConvention": "organizer-approved-additive-proxy",
+  "syncStatus": "static-fallback",
+  "baselines": {
+    "optical-flow": {
+      "spring": 0.9925,
+      "medianDisagreement": 4.16,
+      "robustSpringProxy": 6.03,
+      "methodCount": 8
+    },
+    "stereo-matching": {
+      "spring": 3.4545,
+      "medianDisagreement": 16.18,
+      "robustSpringProxy": 18.4505,
+      "methodCount": 4
+    },
+    "scene-flow": {
+      "methodCount": 2,
+      "spring": {
+        "disparity1Abs": 7.466,
+        "disparity2Abs": 7.5935,
+        "flowEpe": 2.527
+      },
+      "medianDisagreement": {
+        "disparity1Abs": 17.005,
+        "disparity2Abs": 0.215,
+        "flowEpe": 4.21
+      },
+      "robustSpringProxy": {
+        "disparity1Abs": 24.471,
+        "disparity2Abs": 7.8085,
+        "flowEpe": 6.737
+      }
+    }
+  },
   "teams": [
     {
       "teamId": "RoCo-8",
       "teamName": "JTS@UW",
       "registeredTracks": ["optical-flow", "exploration"],
-      "rankChange": 0,
-      "score": null,
-      "springMetric": null,
-      "robustSpringMetric": null,
-      "submittedAt": null
+      "results": {},
+      "submissionHistory": {}
     },
     {
       "teamId": "RoCo-9",
       "teamName": "Nitansh Jain",
       "registeredTracks": ["optical-flow", "stereo-matching"],
-      "rankChange": 0,
-      "score": null,
-      "springMetric": null,
-      "robustSpringMetric": null,
-      "submittedAt": null
+      "results": {},
+      "submissionHistory": {}
     },
     {
       "teamId": "RoCo-10",
       "teamName": "iktsuarpok",
       "registeredTracks": ["optical-flow"],
-      "rankChange": 0,
-      "score": null,
-      "springMetric": null,
-      "robustSpringMetric": null,
-      "submittedAt": null
+      "results": {},
+      "submissionHistory": {}
     },
     {
       "teamId": "RoCo-11",
       "teamName": "MLDA@EEE",
       "registeredTracks": ["scene-flow"],
-      "rankChange": 0,
-      "score": null,
-      "springMetric": null,
-      "robustSpringMetric": null,
-      "submittedAt": null
+      "results": {},
+      "submissionHistory": {}
     },
     {
       "teamId": "RoCo-12",
       "teamName": "aneev",
       "registeredTracks": ["optical-flow", "stereo-matching", "scene-flow"],
-      "rankChange": 0,
-      "score": null,
-      "springMetric": null,
-      "robustSpringMetric": null,
-      "submittedAt": null
+      "results": {},
+      "submissionHistory": {}
     },
     {
       "teamId": "RoCo-13",
       "teamName": "Abdulrahman M.Saadeldin",
       "registeredTracks": ["optical-flow", "stereo-matching", "scene-flow", "exploration"],
-      "rankChange": 0,
-      "score": null,
-      "springMetric": null,
-      "robustSpringMetric": null,
-      "submittedAt": null
+      "results": {},
+      "submissionHistory": {}
     },
     {
       "teamId": "RoCo-14",
       "teamName": "ZXUv2.0",
       "registeredTracks": ["optical-flow"],
-      "rankChange": 0,
-      "score": null,
-      "springMetric": null,
-      "robustSpringMetric": null,
-      "submittedAt": null
+      "results": {},
+      "submissionHistory": {}
     },
     {
       "teamId": "RoCo-15",
       "teamName": "Drivers",
       "registeredTracks": ["optical-flow", "stereo-matching"],
-      "rankChange": 0,
-      "score": null,
-      "springMetric": null,
-      "robustSpringMetric": null,
-      "submittedAt": null
+      "results": {},
+      "submissionHistory": {}
     },
     {
       "teamId": "RoCo-16",
       "teamName": "Swarm",
       "registeredTracks": ["optical-flow", "stereo-matching", "scene-flow", "exploration"],
-      "rankChange": 0,
-      "score": null,
-      "springMetric": null,
-      "robustSpringMetric": null,
-      "submittedAt": null
+      "results": {},
+      "submissionHistory": {}
     },
     {
       "teamId": "RoCo-17",
       "teamName": "BuildDiff",
       "registeredTracks": ["optical-flow", "stereo-matching", "scene-flow", "exploration"],
-      "rankChange": 0,
-      "score": null,
-      "springMetric": null,
-      "robustSpringMetric": null,
-      "submittedAt": null
+      "results": {},
+      "submissionHistory": {}
     },
     {
       "teamId": "RoCo-18",
       "teamName": "KOGUMA Lab",
       "registeredTracks": ["optical-flow", "stereo-matching", "scene-flow"],
-      "rankChange": 0,
-      "score": null,
-      "springMetric": null,
-      "robustSpringMetric": null,
-      "submittedAt": null
+      "results": {},
+      "submissionHistory": {}
     },
     {
       "teamId": "RoCo-19",
       "teamName": "KoreaU_DLmath",
       "registeredTracks": ["optical-flow", "stereo-matching", "scene-flow", "exploration"],
-      "rankChange": 0,
-      "score": null,
-      "springMetric": null,
-      "robustSpringMetric": null,
-      "submittedAt": null
+      "results": {},
+      "submissionHistory": {}
     },
     {
       "teamId": "RoCo-20",
       "teamName": "DDEVS",
       "registeredTracks": ["stereo-matching"],
-      "rankChange": 0,
-      "score": null,
-      "springMetric": null,
-      "robustSpringMetric": null,
-      "submittedAt": null
+      "results": {},
+      "submissionHistory": {}
     },
     {
       "teamId": "RoCo-21",
       "teamName": "mau5",
       "registeredTracks": ["optical-flow", "exploration"],
-      "rankChange": 0,
-      "score": null,
-      "springMetric": null,
-      "robustSpringMetric": null,
-      "submittedAt": null
+      "results": {},
+      "submissionHistory": {}
     },
     {
       "teamId": "RoCo-22",
       "teamName": "cactus8603",
       "registeredTracks": ["optical-flow", "stereo-matching", "scene-flow", "exploration"],
-      "rankChange": 0,
-      "score": null,
-      "springMetric": null,
-      "robustSpringMetric": null,
-      "submittedAt": null
+      "results": {},
+      "submissionHistory": {}
     },
     {
       "teamId": "RoCo-23",
       "teamName": "PlayStation",
       "registeredTracks": ["optical-flow"],
-      "rankChange": 0,
-      "score": null,
-      "springMetric": null,
-      "robustSpringMetric": null,
-      "submittedAt": null
+      "results": {},
+      "submissionHistory": {}
     },
     {
       "teamId": "RoCo-24",
       "teamName": "E-lab",
       "registeredTracks": ["optical-flow", "stereo-matching", "scene-flow", "exploration"],
-      "rankChange": 0,
-      "score": null,
-      "springMetric": null,
-      "robustSpringMetric": null,
-      "submittedAt": null
+      "results": {},
+      "submissionHistory": {}
     },
     {
       "teamId": "RoCo-25",
       "teamName": "HexWarrior",
       "registeredTracks": ["optical-flow", "stereo-matching", "scene-flow", "exploration"],
-      "rankChange": 0,
-      "score": null,
-      "springMetric": null,
-      "robustSpringMetric": null,
-      "submittedAt": null
+      "results": {},
+      "submissionHistory": {}
     },
     {
       "teamId": "RoCo-26",
       "teamName": "Batman",
       "registeredTracks": ["optical-flow", "stereo-matching", "scene-flow", "exploration"],
-      "rankChange": 0,
-      "score": null,
-      "springMetric": null,
-      "robustSpringMetric": null,
-      "submittedAt": null
+      "results": {},
+      "submissionHistory": {}
     },
     {
       "teamId": "RoCo-27",
       "teamName": "Mysterious Power of the East",
       "registeredTracks": ["optical-flow", "exploration"],
-      "rankChange": 0,
-      "score": null,
-      "springMetric": null,
-      "robustSpringMetric": null,
-      "submittedAt": null
+      "results": {},
+      "submissionHistory": {}
     },
     {
       "teamId": "RoCo-28",
       "teamName": "Norisk",
       "registeredTracks": ["scene-flow"],
-      "rankChange": 0,
-      "score": null,
-      "springMetric": null,
-      "robustSpringMetric": null,
-      "submittedAt": null
+      "results": {},
+      "submissionHistory": {}
     },
     {
       "teamId": "RoCo-29",
       "teamName": "VSAI",
       "registeredTracks": ["optical-flow"],
-      "rankChange": 0,
-      "score": null,
-      "springMetric": null,
-      "robustSpringMetric": null,
-      "submittedAt": null
+      "results": {},
+      "submissionHistory": {}
     },
     {
       "teamId": "RoCo-30",
       "teamName": "acvlab",
       "registeredTracks": ["optical-flow", "stereo-matching", "scene-flow", "exploration"],
-      "rankChange": 0,
-      "score": null,
-      "springMetric": null,
-      "robustSpringMetric": null,
-      "submittedAt": null
+      "results": {},
+      "submissionHistory": {}
     },
     {
       "teamId": "RoCo-31",
       "teamName": "e-motion AI",
       "registeredTracks": ["scene-flow", "exploration"],
-      "rankChange": 0,
-      "score": null,
-      "springMetric": null,
-      "robustSpringMetric": null,
-      "submittedAt": null
+      "results": {},
+      "submissionHistory": {}
     },
     {
       "teamId": "RoCo-32",
       "teamName": "XLR8",
       "registeredTracks": ["optical-flow", "stereo-matching", "scene-flow", "exploration"],
-      "rankChange": 0,
-      "score": null,
-      "springMetric": null,
-      "robustSpringMetric": null,
-      "submittedAt": null
+      "results": {},
+      "submissionHistory": {}
     }
   ]
 }

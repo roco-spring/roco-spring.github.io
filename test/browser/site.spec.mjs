@@ -39,7 +39,7 @@ for (const path of SITE_PAGES) {
   });
 }
 
-test("Leaderboard tabs render the complete pending roster and refresh only the published view", async ({ page }) => {
+test("Leaderboard tabs render the complete pending roster and expose live refresh", async ({ page }) => {
   await page.goto("/evaluation.html");
 
   const tabs = page.getByRole("tab");
@@ -67,11 +67,157 @@ test("Leaderboard tabs render the complete pending roster and refresh only the p
   await tabs.nth(3).click();
   await expect(visibleRows).toHaveCount(12);
   await expect(page.locator("[data-leaderboard-updated]")).not.toHaveText("Loading…");
-  await expect(page.locator("#leaderboard-refresh-note")).toContainText("does not query Spring");
+  await expect(page.locator("#leaderboard-refresh-note")).toContainText("public Spring/RobustSpring results");
 
   await page.getByRole("button", { name: "Refresh standings" }).click();
   await expect(page.locator("[data-leaderboard-refresh-status]"))
-    .toHaveText("Published roster view refreshed.");
+    .toHaveText("Live sync is unavailable; the published fallback standings remain visible.");
+  await expect(page.locator("[data-leaderboard-refresh-status]")).toBeVisible();
+});
+
+test("live leaderboard renders scored results and only forces explicit user refreshes", async ({ page }) => {
+  await page.goto("/evaluation.html");
+  await page.waitForFunction(() => Boolean(window.RoCoLeaderboardLive));
+
+  await page.evaluate(async () => {
+    window.__leaderboardTestForces = [];
+    window.__leaderboardTestForcedCalls = 0;
+    await window.RoCoLeaderboardLive.installDataSource(async ({ force }) => {
+      window.__leaderboardTestForces.push(force);
+      if (force) window.__leaderboardTestForcedCalls += 1;
+      const stale = window.__leaderboardTestForcedCalls === 2;
+      const cacheHit = window.__leaderboardTestForcedCalls > 2;
+      return {
+        snapshot: {
+          schemaVersion: 2,
+          updatedAt: stale ? "2026-08-29T18:00:00.000Z" : "2026-08-29T18:05:00.000Z",
+          sourceLabel: "Browser-tested live snapshot",
+          syncStatus: stale ? "stale-cache" : ((force && !cacheHit) ? "fresh" : "cache-hit"),
+          teams: [{
+            teamId: "RoCo-99",
+            teamName: "Browser Racing",
+            registeredTracks: ["optical-flow", "stereo-matching", "scene-flow"],
+            results: {
+              "optical-flow": {
+                rankChange: 2,
+                score: 0.4321,
+                springMetric: 0.8,
+                robustSpringMetric: 4.2,
+                submittedAt: "2026-08-29T17:59:00.000Z",
+                benchmarkMethod: "RoCo-99 TurboFlow",
+                benchmarkUrl: "https://spring-benchmark.org/999/"
+              },
+              "stereo-matching": {
+                rankChange: 0,
+                score: 0.5,
+                springMetric: 2.1,
+                robustSpringMetric: 10.2,
+                submittedAt: "2026-08-29T17:58:00.000Z"
+              },
+              "scene-flow": {
+                rankChange: 0,
+                score: 0.6,
+                springMetric: 0.7,
+                robustSpringMetric: 0.8,
+                submittedAt: "2026-08-29T17:57:00.000Z"
+              },
+              "cross-task": {
+                rankChange: 0,
+                score: 0.5107,
+                springMetric: 0.6,
+                robustSpringMetric: 0.7,
+                submittedAt: "2026-08-29T17:59:00.000Z"
+              }
+            }
+          }]
+        },
+        syncState: stale ? "stale" : ((force && !cacheHit) ? "synchronized" : "cached")
+      };
+    });
+  });
+
+  const visibleRow = page.locator('[role="tabpanel"]:not([hidden]) tbody tr');
+  await expect(visibleRow).toHaveCount(1);
+  await expect(visibleRow.locator(".leaderboard-rank")).toHaveText("1");
+  await expect(visibleRow.locator(".rank-change")).toHaveText("▲ 2");
+  await expect(visibleRow.locator(".leaderboard-team-name")).toHaveText("Browser Racing");
+  await expect(visibleRow.locator(".leaderboard-score")).toHaveText("0.4321");
+  await expect(visibleRow.locator(".leaderboard-method")).toHaveAttribute(
+    "href",
+    "https://spring-benchmark.org/999/"
+  );
+  await expect.poll(() => page.evaluate(() => window.__leaderboardTestForces))
+    .toEqual([false]);
+  await expect(page.locator("[data-leaderboard-source]"))
+    .toHaveText("Browser-tested live snapshot · live cache");
+
+  await page.getByRole("button", { name: "Refresh standings" }).click();
+  await expect(page.locator("[data-leaderboard-refresh-status]"))
+    .toHaveText("Live standings refreshed.");
+  await expect(page.locator("[data-leaderboard-source]"))
+    .toHaveText("Browser-tested live snapshot · synchronized");
+  await expect.poll(() => page.evaluate(() => window.__leaderboardTestForces))
+    .toEqual([false, true]);
+
+  await page.getByRole("button", { name: "Refresh standings" }).click();
+  await expect(page.locator("[data-leaderboard-refresh-status]"))
+    .toHaveText("Live refresh did not complete; stale cached standings remain visible.");
+  await expect(page.locator("[data-leaderboard-source]"))
+    .toHaveText("Browser-tested live snapshot · stale cache");
+  await expect.poll(() => page.evaluate(() => window.__leaderboardTestForces))
+    .toEqual([false, true, true]);
+
+  await page.getByRole("button", { name: "Refresh standings" }).click();
+  await expect(page.locator("[data-leaderboard-refresh-status]"))
+    .toHaveText("Cached live standings loaded; no newer sync was needed.");
+  await expect.poll(() => page.evaluate(() => window.__leaderboardTestForces))
+    .toEqual([false, true, true, true]);
+});
+
+test("exact leaderboard ties use the same numeric team-ID key as rank-change history", async ({ page }) => {
+  await page.goto("/evaluation.html");
+  await page.waitForFunction(() => Boolean(window.RoCoLeaderboardLive));
+
+  await page.evaluate(async () => {
+    const result = (teamId) => ({
+      rankChange: 0,
+      score: 1,
+      springMetric: 1,
+      robustSpringMetric: 1,
+      springTerm: 1,
+      robustSpringTerm: 1,
+      submittedAt: "2026-08-29T18:00:00.000Z",
+      benchmarkMethod: `${teamId} exact tie`,
+      benchmarkUrl: `https://spring-benchmark.org/${teamId === "RoCo-9" ? "901" : "999"}/`
+    });
+    await window.RoCoLeaderboardLive.installDataSource(async () => ({
+      syncState: "cached",
+      snapshot: {
+        schemaVersion: 2,
+        updatedAt: "2026-08-29T18:05:00.000Z",
+        sourceLabel: "Tie-order test snapshot",
+        teams: [
+          {
+            teamId: "RoCo-99",
+            teamName: "Alpha Team",
+            registeredTracks: ["optical-flow"],
+            results: { "optical-flow": result("RoCo-99") }
+          },
+          {
+            teamId: "RoCo-9",
+            teamName: "Zulu Team",
+            registeredTracks: ["optical-flow"],
+            results: { "optical-flow": result("RoCo-9") }
+          }
+        ]
+      }
+    }));
+  });
+
+  const names = page.locator('[role="tabpanel"]:not([hidden]) .leaderboard-team-name');
+  await expect(names).toHaveText(["Zulu Team", "Alpha Team"]);
+  await expect(page.locator('[role="tabpanel"]:not([hidden]) .leaderboard-rank'))
+    .toHaveText(["1", "2"]);
 });
 
 test("homepage preview does not promote alphabetically sorted pending teams", async ({ page }) => {
@@ -82,7 +228,7 @@ test("homepage preview does not promote alphabetically sorted pending teams", as
   await expect(page.locator(".leaderboard-preview-list")).toHaveCount(0);
   await expect(page.locator(".leaderboard-preview-empty")).toHaveCount(4);
   for (const card of await cards.all()) {
-    await expect(card.locator(".leaderboard-preview-empty")).toContainText("No verified results yet");
+    await expect(card.locator(".leaderboard-preview-empty")).toContainText("No matched public results yet");
   }
 });
 
