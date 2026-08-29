@@ -513,6 +513,21 @@ test("homepage portraits and funding logos stay compact at desktop and mobile si
       expect(Math.abs(box.width - box.height)).toBeLessThanOrEqual(1);
     }
 
+    const organizerPortraits = page.locator(".organizer-photo");
+    await expect(organizerPortraits).toHaveCount(8);
+    await expect
+      .poll(() => organizerPortraits.evaluateAll((images) =>
+        images.every((image) => image.complete && image.naturalWidth > 0)
+      ))
+      .toBe(true);
+    for (const portrait of await organizerPortraits.all()) {
+      const box = await portrait.boundingBox();
+      expect(box).not.toBeNull();
+      expect(box.width).toBeLessThanOrEqual(52);
+      expect(box.height).toBeLessThanOrEqual(52);
+      expect(Math.abs(box.width - box.height)).toBeLessThanOrEqual(1);
+    }
+
     const logoImages = page.locator("#sponsors img");
     await logoImages.first().scrollIntoViewIfNeeded();
     await expect(logoImages).toHaveCount(5);

@@ -369,6 +369,30 @@ test("homepage includes the requested sponsor and project-specific acknowledgeme
     assert.match(index, /href="https:\/\/www\.sfbtrr161\.de\/"[\s\S]{0,220}SFB-TRR 161/u);
 });
 
+test("Noah Berenguel Senn appears in the requested organizer position", async () => {
+    const index = await source("index.html");
+    const organizerSection = index.match(
+        /<div class="organizer-grid content-card">([\s\S]*?)<\/section>/u
+    )?.[1] ?? "";
+
+    assert.match(
+        organizerSection,
+        /Katrin Bauer[\s\S]*Noah Berenguel Senn[\s\S]*Henrique Morimitsu/u
+    );
+    assert.match(
+        organizerSection,
+        /<img class="organizer-photo" src="img\/berenguel-senn\.jpg" alt="Noah Berenguel Senn">/u
+    );
+    assert.match(
+        organizerSection,
+        /<strong>Noah Berenguel Senn<\/strong><span>University of Stuttgart<\/span>/u
+    );
+    await assert.doesNotReject(
+        access(path.join(ROOT, "img/berenguel-senn.jpg")),
+        "Noah Berenguel Senn portrait"
+    );
+});
+
 test("keynote speaker names and portraits link to their verified homepages", async () => {
     const index = await source("index.html");
 

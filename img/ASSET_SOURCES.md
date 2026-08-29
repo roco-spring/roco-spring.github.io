@@ -2,6 +2,11 @@
 
 The website stores these public-facing assets locally so production pages do not depend on third-party hotlinks.
 
+## Organizers
+
+- `berenguel-senn.jpg` is the organizer portrait supplied from Noah Berenguel Senn's
+  [official University of Stuttgart staff image](https://www.vis.uni-stuttgart.de/img/staff/Berenguel-Noah.jpg?__scale=w:440,h:440,cx:0,cy:110,cw:960,ch:960).
+
 ## Keynote speakers
 
 - `speakers/jia-deng.webp` is an optimized derivative of Jia Deng's portrait on his
