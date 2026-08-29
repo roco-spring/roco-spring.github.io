@@ -4,7 +4,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Evaluation — RoCo-Spring</title>
+    <title>Leaderboard — RoCo-Spring</title>
     <meta name="description"
         content="RbS-Score metric, leaderboards, baselines, and submission instructions for RoCo-Spring.">
     <link rel="stylesheet" href="assets/style.css">
@@ -18,12 +18,63 @@
 
     <main>
         <section class="page-header section">
-            <div class="eyebrow">Evaluation</div>
-            <h1>Metrics, Leaderboards &amp; Submissions</h1>
+            <div class="eyebrow">Leaderboard</div>
+            <h1>Rankings, Metrics &amp; Submissions</h1>
             <p class="page-intro">
-                Methods are ranked by the RbS-Score, which balances clean Spring performance and
+                Verified methods will be ranked by the RbS-Score, which balances clean Spring performance and
                 corrupted RobustSpring performance with equal weight.
             </p>
+        </section>
+
+        <section class="section leaderboard-section" id="leaderboards">
+            <div class="section-heading leaderboard-heading">
+                <div>
+                    <div class="eyebrow">Current Standings</div>
+                    <h2>RoCo-Spring Leaderboard</h2>
+                    <p>
+                        Lower RbS-Scores rank higher. Registered teams without a verified benchmark result
+                        appear after scored teams in alphabetical order.
+                    </p>
+                </div>
+
+                <div class="leaderboard-update-card">
+                    <button class="button primary leaderboard-refresh" type="button"
+                        data-leaderboard-refresh aria-describedby="leaderboard-refresh-note">
+                        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                            <path fill="currentColor"
+                                d="M12 4a8 8 0 0 1 7.4 5H17l3.5 3.5L24 9h-2.5A10 10 0 1 0 22 15h-2.1A8 8 0 1 1 12 4Z" />
+                        </svg>
+                        <span>Refresh standings</span>
+                    </button>
+                    <p class="leaderboard-updated">
+                        Last updated:
+                        <time data-leaderboard-updated>Loading…</time>
+                    </p>
+                    <p class="leaderboard-source" data-leaderboard-source>
+                        Organizer-published roster snapshot
+                    </p>
+                </div>
+            </div>
+
+            <p class="leaderboard-refresh-note" id="leaderboard-refresh-note">
+                Refresh reloads the latest organizer-published roster snapshot; it does not query Spring or
+                trigger a benchmark sync.
+            </p>
+            <p class="leaderboard-integrity-note" role="note">
+                Only organizer-verified results are ranked. No current public benchmark entry exposes a validated
+                RoCo-Spring team ID, so scores remain blank instead of being inferred from method names.
+            </p>
+            <p class="visually-hidden" role="status" aria-live="polite" data-leaderboard-refresh-status></p>
+
+            <div class="leaderboard-loading" data-leaderboard-root data-mode="full" aria-live="polite">
+                Loading published standings…
+            </div>
+
+            <noscript>
+                <p class="leaderboard-unavailable">
+                    JavaScript is required to display the published standings.
+                </p>
+            </noscript>
         </section>
 
         <section class="section">
@@ -33,8 +84,14 @@
             </div>
 
             <div class="metric-card content-card">
+                <p class="metric-integrity-note" role="note">
+                    <strong>Scoring integrity note:</strong> the formula below defines the RobustSpring term as
+                    error against ground truth on corrupted inputs. The current public RobustSpring tables expose
+                    clean-to-corrupted prediction deltas instead. Because those quantities are not interchangeable,
+                    public delta values are not substituted into the RbS-Score.
+                </p>
                 <p>
-                    Each quantitative task is ranked using the
+                    Each quantitative task will be ranked using the
                     <strong>Robustness-balanced Spring Score (RbS-Score)</strong>.
                     The score combines a method's accuracy on the clean Spring benchmark (S)
                     with its accuracy on the corrupted RobustSpring benchmark (R).
@@ -72,33 +129,38 @@
                             B<sub>S</sub><sup>t</sup>,
                             B<sub>R</sub><sup>t</sup>:
                         </strong>
-                        fixed task-specific baseline errors used to normalize the clean and
-                        corrupted results.
+                        task-specific baseline errors that must be fixed before score
+                        publication.
                     </li>
                 </ul>
 
-                <h3>Task-specific error metrics</h3>
+                <p>
+                    Consequently, the B<sub>R</sub> constants and RbS-Scores remain pending
+                    organizer-approved corrupted-input ground-truth measurements.
+                </p>
+
+                <h3>Task-Specific Error Metrics</h3>
 
                 <p>
-                    The same task-specific error definition is used for Spring and
-                    RobustSpring. RobustSpring therefore measures prediction accuracy on
-                    corrupted inputs rather than only the change between clean and corrupted
-                    predictions.
+                    For the proposed RoCo-Spring score, the same task-specific error definition
+                    would be used for Spring and RobustSpring. The RobustSpring term would measure
+                    prediction accuracy on corrupted inputs rather than only the change between
+                    clean and corrupted predictions.
                 </p>
 
                 <ul>
                     <li>
-                        <strong>Optical flow:</strong>
+                        <strong>Optical Flow:</strong>
                         mean endpoint error (EPE).
                     </li>
 
                     <li>
-                        <strong>Stereo:</strong>
+                        <strong>Stereo Matching:</strong>
                         mean absolute disparity error (Abs).
                     </li>
 
                     <li>
-                        <strong>Scene flow:</strong>
+                        <strong>Scene Flow:</strong>
                         a balanced combination of the errors for reference-frame disparity
                         <em>d</em><sub>1</sub>, target-frame disparity
                         <em>d</em><sub>2</sub>, and optical flow. Each component is normalized
@@ -131,12 +193,13 @@
                 </ul>
 
                 <p>
-                    A score of <strong>1.0</strong> indicates that the method matches the
-                    selected baselines on average. Scores below 1.0 indicate better normalized
-                    performance, while scores above 1.0 indicate worse normalized performance.
+                    Once the baselines are fixed, a score of <strong>1.0</strong> will indicate
+                    that a method matches them on average. Scores below 1.0 will indicate better
+                    normalized performance, while scores above 1.0 will indicate worse normalized
+                    performance.
                 </p>
 
-                <h3>Tie-breaking</h3>
+                <h3>Tie-Breaking</h3>
 
                 <p>
                     If two methods obtain the same RbS-Score, ties are resolved in the
@@ -150,50 +213,16 @@
             </div>
         </section>
 
-        <section class="section" id="leaderboards">
-            <div class="section-heading">
-                <div class="eyebrow">Leaderboards</div>
-                <h2>Public rankings</h2>
-            </div>
-
-            <div class="card-grid five">
-                <span class="leaderboard-card disabled" aria-disabled="true">
-                    <strong>Optical Flow Leaderboard</strong>
-                    <span class="coming-soon">Coming soon</span>
-                </span>
-
-                <span class="leaderboard-card disabled" aria-disabled="true">
-                    <strong>Stereo Matching Leaderboard</strong>
-                    <span class="coming-soon">Coming soon</span>
-                </span>
-
-                <span class="leaderboard-card disabled" aria-disabled="true">
-                    <strong>Scene Flow Leaderboard</strong>
-                    <span class="coming-soon">Coming soon</span>
-                </span>
-
-                <span class="leaderboard-card disabled" aria-disabled="true">
-                    <strong>Cross-Task Leaderboard</strong>
-                    <span class="coming-soon">Coming soon</span>
-                </span>
-
-                <span class="leaderboard-card disabled" aria-disabled="true">
-                    <strong>Exploration Track</strong>
-                    <span class="coming-soon">Coming soon</span>
-                </span>
-            </div>
-        </section>
-
         <section class="section">
             <div class="section-heading">
                 <div class="eyebrow">Submissions</div>
-                <h2>Submission workflow</h2>
+                <h2>Submission Workflow</h2>
             </div>
 
             <ol class="steps content-card">
                 <li>Generate predictions for the selected task</li>
                 <li>Package archive in the required format</li>
-                <li>Validate archive locally using the starting kit</li>
+                <li>Validate archive locally using the Starter Kit</li>
                 <li>Submit to the benchmark server using your unique team ID</li>
                 <li>Check leaderboard for results</li>
             </ol>
@@ -202,7 +231,7 @@
         <section class="section" id="call-for-papers">
             <div class="section-heading">
                 <div class="eyebrow">Call for Papers</div>
-                <h2>Paper requirements</h2>
+                <h2>Paper Requirements</h2>
             </div>
 
             <div class="content-card">
@@ -229,7 +258,7 @@
                     </a>
                 </div>
 
-                <h3 id="reproducibility">Reproducibility package</h3>
+                <h3 id="reproducibility">Reproducibility Package</h3>
                 <p>
                     With the camera-ready deadline, each entry must submit a reproducibility package
                     together with the paper. Award eligibility requires an accepted workshop paper
@@ -270,6 +299,7 @@
     <footer id="site-footer"></footer>
 
     <script src="assets/flow.js"></script>
+    <script src="assets/leaderboard.js"></script>
 </body>
 
 </html>

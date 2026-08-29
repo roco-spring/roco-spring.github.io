@@ -37,3 +37,4 @@ oauth-token*.json
 
 .DS_Store
 debugging/
+private_local/

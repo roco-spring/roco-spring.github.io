@@ -39,6 +39,53 @@ for (const path of SITE_PAGES) {
   });
 }
 
+test("Leaderboard tabs render the complete pending roster and refresh only the published view", async ({ page }) => {
+  await page.goto("/evaluation.html");
+
+  const tabs = page.getByRole("tab");
+  await expect(tabs).toHaveCount(4);
+  await expect(tabs.nth(0)).toHaveText("Optical Flow");
+  await expect(tabs.nth(1)).toHaveText("Stereo Matching");
+  await expect(tabs.nth(2)).toHaveText("Scene Flow");
+  await expect(tabs.nth(3)).toHaveText("Cross-Task");
+  await expect(tabs.nth(0)).toHaveAttribute("aria-selected", "true");
+
+  const visibleRows = page.locator('[role="tabpanel"]:not([hidden]) tbody tr');
+  await expect(visibleRows).toHaveCount(21);
+  await expect(visibleRows.locator(".leaderboard-pending-badge")).toHaveCount(21);
+  await expect(visibleRows.first().locator(".leaderboard-rank")).toHaveText("—");
+  await expect(visibleRows.first().locator(".rank-change")).toHaveText("— 0");
+  await expect(visibleRows.first().locator(".leaderboard-score")).toHaveText("—");
+
+  await tabs.nth(1).click();
+  await expect(visibleRows).toHaveCount(15);
+  await tabs.nth(1).press("ArrowRight");
+  await expect(tabs.nth(2)).toHaveAttribute("aria-selected", "true");
+  await expect(tabs.nth(2)).toBeFocused();
+  await expect(visibleRows).toHaveCount(15);
+
+  await tabs.nth(3).click();
+  await expect(visibleRows).toHaveCount(12);
+  await expect(page.locator("[data-leaderboard-updated]")).not.toHaveText("Loading…");
+  await expect(page.locator("#leaderboard-refresh-note")).toContainText("does not query Spring");
+
+  await page.getByRole("button", { name: "Refresh standings" }).click();
+  await expect(page.locator("[data-leaderboard-refresh-status]"))
+    .toHaveText("Published roster view refreshed.");
+});
+
+test("homepage preview does not promote alphabetically sorted pending teams", async ({ page }) => {
+  await page.goto("/index.html");
+
+  const cards = page.locator(".leaderboard-preview-card");
+  await expect(cards).toHaveCount(4);
+  await expect(page.locator(".leaderboard-preview-list")).toHaveCount(0);
+  await expect(page.locator(".leaderboard-preview-empty")).toHaveCount(4);
+  for (const card of await cards.all()) {
+    await expect(card.locator(".leaderboard-preview-empty")).toContainText("No verified results yet");
+  }
+});
+
 test("registration portal starts with three slots, validates partial members, and switches tabs", async ({ page }) => {
   const pageErrors = [];
   page.on("pageerror", (error) => pageErrors.push(error.message));
@@ -84,9 +131,9 @@ test("registration portal starts with three slots, validates partial members, an
 test("Participate Step 4 contains the homepage-style starter-kit button", async ({ page }) => {
   await page.goto("/participate.html");
   const stepFour = page.locator(".step-card").filter({
-    has: page.getByRole("heading", { name: "Install starting kit", exact: true })
+    has: page.getByRole("heading", { name: "Install the Starter Kit", exact: true })
   });
-  const starterKit = stepFour.getByRole("link", { name: "Starter kit (codebase)", exact: true });
+  const starterKit = stepFour.getByRole("link", { name: "GitHub Starter Kit", exact: true });
   await expect(stepFour).toHaveCount(1);
   await expect(starterKit).toBeVisible();
   await expect(starterKit).toHaveAttribute(
@@ -175,7 +222,7 @@ test("buttons pop, participation CTAs glow, and navigation tabs animate on hover
   expect(participateHover.background).toContain("linear-gradient");
   expect(participateHover.transform).not.toBe("none");
 
-  const evaluation = page.getByRole("link", { name: "Evaluation", exact: true }).last();
+  const evaluation = page.getByRole("link", { name: "Leaderboard", exact: true }).last();
   const evaluationShadow = await evaluation.evaluate((element) => getComputedStyle(element).boxShadow);
   await evaluation.hover();
   await expect.poll(() => evaluation.evaluate((element) =>

@@ -139,15 +139,17 @@ test("production wiring tests, publishes non-force, and proves same-SHA Pages be
     const push = commands.indexOf("release:push");
     assert.ok(firstCloudMutation >= 0 && secrets >= 0 && health >= 0 && push >= 0);
     assert.ok(prepushIndices[1] < secrets && secrets < health && health < push);
-    assert.deepEqual(commands.slice(push, push + 7), [
+    assert.deepEqual(commands.slice(push, push + 8), [
         "release:push",
         "release:fetch",
         "release:source",
         "release:publication",
         "release:fetch",
         "release:source",
+        "billing:verify",
         "identity:configure"
     ]);
+    assert.equal(commands[firstCloudMutation - 1], "billing:verify");
     const deploy = commands.indexOf("deploy:firebase");
     assert.ok(deploy > firstCloudMutation);
     assert.equal(commands[deploy - 2], "release:fetch");

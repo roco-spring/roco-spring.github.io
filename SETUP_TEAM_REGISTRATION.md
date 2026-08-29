@@ -30,7 +30,7 @@ After deployment, this read-only gate verifies the exact active second-generatio
 npm run production:runtime:verify
 ```
 
-The gate uses Application Default Credentials only for the duration of the administrative read. Its native token exchange and every control-plane request are single-attempt, redirect-rejecting, and deadline-bounded. It never prints access tokens, channel resource names, endpoint URLs, or provider response bodies. The operator needs read access equivalent to Cloud Functions Viewer, Cloud Run Viewer, Cloud Scheduler Viewer, Monitoring Viewer, and Monitoring Notification Channel Viewer for `roco-spring-registration-2026`.
+The gate uses Application Default Credentials only for the duration of the administrative read. Its native token exchange and every control-plane request are single-attempt, redirect-rejecting, and deadline-bounded. It never prints access tokens, channel resource names, endpoint URLs, or provider response bodies. The billing client requests the `cloud-billing.readonly` OAuth scope. Service-account ADC honors that requested scope; authorized-user ADC can retain the scopes granted when its refresh token was created, so OAuth scope selection is not treated as the security boundary. The gate exposes only two Cloud Billing `GET` operations, and IAM must remain least-privilege. The operator needs read access equivalent to Cloud Functions Viewer, Cloud Run Viewer, Cloud Scheduler Viewer, Monitoring Viewer, and Monitoring Notification Channel Viewer for `roco-spring-registration-2026`. The billing preflight additionally requires `resourcemanager.projects.get` on the project and `billing.accounts.get` on its linked billing account; Project Viewer and Billing Account Viewer are the corresponding predefined read-only roles.
 
 ## Runtime ownership: no workstation or cluster dependency
 
@@ -104,6 +104,19 @@ npm run security:audit
 git diff --check
 ```
 
+Before any production release mutation, verify both the project's billing link
+and the linked account's open state:
+
+```bash
+npm run billing:verify
+```
+
+The two checks are intentionally separate. Google may continue to report
+`billingEnabled: true` for a project linked to a closed billing account, while
+Cloud Run rejects every Function request before application code starts. The
+gate prints only a safe failure stage and never prints payment details or OAuth
+material.
+
 The production release command fetches `origin/main` and requires a clean committed `main` that tracks the exact RoCo GitHub origin with the fetched remote commit as an ancestor. After local and read-only cloud gates pass, it performs a non-force push, fetches again, and requires `HEAD` to equal `origin/main`. It then waits for same-SHA GitHub CI and Pages success and compares every reviewed direct executable/layout dependency of the homepage, Tasks & Data page, and registration page to the immutable blobs in that exact commit. It refetches and revalidates the clean exact source after publication and again immediately before deploying Firebase. After deployment it verifies the intended least-privilege split: numeric OAuth bindings only on `reconcileRegistrations`, a numeric rate-limit HMAC binding only on `registerTeam`, and no secret binding on `getMyTeam`, `updateMyTeam`, or `completeInitialPasswordChange`:
 
 ```bash
@@ -127,20 +140,37 @@ For a release that changes registration semantics or OAuth credentials, use an o
 
 Do not rotate secrets, delete Auth users, or clear Firestore broadly before collecting evidence.
 
-1. Run credential-free callable health and the bound integration check:
+1. Verify Cloud Billing before changing application configuration:
+
+   ```bash
+   npm run billing:verify
+   ```
+
+   If the failure stage is `billing_account_closed`, a Billing Account
+   Administrator must resolve any payment suspension and reopen the linked
+   account, or link the project to a different active account. This resumes
+   charges and is not a repository-level repair. Do not weaken App Check,
+   Scheduler OIDC, IAM, or Firestore rules to work around it. Cloud Run may take
+   up to 30 minutes to recover after billing is restored.
+
+2. Run only read-only runtime checks while diagnosing configuration:
 
    ```bash
    npm run backend:smoke
-   npm run function-secrets:configure
+   npm run function-secrets:verify
    npm run google:health:bound
    ```
 
-2. Inspect sanitized Cloud logs for `registerTeam` and `registrationDependencyHealth`. Record only stage, safe category, revision, status, and duration.
-3. Inspect recent `registrationRequests` using only state/category/timestamps and resource-presence booleans. Do not export participant payloads.
-4. Determine whether the authoritative team transaction committed before repairing or cleaning a partial saga.
-5. If OAuth is invalid, first put the consent app into the required production state, then rotate/bootstrap OAuth, run the live preflight, deploy, and verify the bound versions.
-6. Requeue only affected pending/failed Sheet or email records after dependency health passes. Reset rate-limit documents only for requests demonstrably consumed by the incident.
-7. Run a controlled E2E test and monitor logs through at least two reconciler intervals.
+   `function-secrets:configure` is an applying command. Run it only after the
+   read-only verifier identifies secret-binding drift, the committed release
+   source has passed its gates, and that exact repair is authorized.
+
+3. Inspect sanitized Cloud logs for `registerTeam` and `registrationDependencyHealth`. Record only stage, safe category, revision, status, and duration.
+4. Inspect recent `registrationRequests` using only state/category/timestamps and resource-presence booleans. Do not export participant payloads.
+5. Determine whether the authoritative team transaction committed before repairing or cleaning a partial saga.
+6. If OAuth is invalid, first put the consent app into the required production state, then rotate/bootstrap OAuth, run the live preflight, deploy, and verify the bound versions.
+7. Requeue only affected pending/failed Sheet or email records after dependency health passes. Reset rate-limit documents only for requests demonstrably consumed by the incident.
+8. Run a controlled E2E test and monitor logs through at least two reconciler intervals.
 
 ## Monitoring
 

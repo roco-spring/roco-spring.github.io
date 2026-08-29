@@ -841,7 +841,7 @@ export function buildDesiredPolicies(channelName, schedulerJob = SCHEDULER_JOB_I
         ...basePolicy(
             "callables_5xx",
             "RoCo registration: callable sustained 5xx",
-            "A remote registration callable has sustained 5xx responses, including request deadlines. Inspect sanitized Cloud Run and Function logs for the deployed revision; preserve idempotency records and committed teams during recovery.",
+            "A remote registration callable has sustained 5xx responses, including request deadlines. Run `npm run billing:verify` first, then inspect sanitized Cloud Run and Function logs for the deployed revision. Preserve idempotency records and committed teams during recovery.",
             channelName,
         ),
         conditions: callableServices.map((serviceName) => ({
@@ -875,7 +875,7 @@ export function buildDesiredPolicies(channelName, schedulerJob = SCHEDULER_JOB_I
         ...basePolicy(
             "scheduler_failure",
             "RoCo registration: reconciler Scheduler failure",
-            "The remote five-minute Cloud Scheduler invocation failed. Verify that the exact `reconcileRegistrations` Scheduler job remains enabled and that its HTTPS OIDC target can invoke the deployed Firebase Function.",
+            "The remote five-minute Cloud Scheduler invocation failed. Run `npm run billing:verify` first; a closed linked billing account blocks the target before application code runs. If billing is healthy, verify that the exact `reconcileRegistrations` Scheduler job remains enabled and that its HTTPS OIDC target can invoke the deployed Firebase Function.",
             channelName,
         ),
         conditions: [{

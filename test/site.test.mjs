@@ -59,6 +59,140 @@ test("every local HTML fragment reference has a matching target", async () => {
     }
 });
 
+test("Leaderboard is the consistent public page name", async () => {
+    const index = await source("index.html");
+    const evaluation = await source("evaluation.html");
+    const chrome = await source("assets/site-chrome.html");
+
+    assert.match(evaluation, /<title>Leaderboard — RoCo-Spring<\/title>/u);
+    assert.match(evaluation, /<div class="eyebrow">Leaderboard<\/div>/u);
+    assert.match(chrome, /<a href="evaluation\.html">Leaderboard<\/a>/u);
+    assert.match(index, /class="button secondary" href="evaluation\.html">Leaderboard<\/a>/u);
+    assert.doesNotMatch(chrome, />Evaluation<\/a>/u);
+    assert.doesNotMatch(index, /href="evaluation\.html">Evaluation<\/a>/u);
+});
+
+test("published leaderboard snapshot contains the exact public team roster", async () => {
+    const snapshot = JSON.parse(await source("assets/leaderboard-data.json"));
+    const expectedTeams = new Map([
+        ["RoCo-8", ["JTS@UW", ["optical-flow", "exploration"]]],
+        ["RoCo-9", ["Nitansh Jain", ["optical-flow", "stereo-matching"]]],
+        ["RoCo-10", ["iktsuarpok", ["optical-flow"]]],
+        ["RoCo-11", ["MLDA@EEE", ["scene-flow"]]],
+        ["RoCo-12", ["aneev", ["optical-flow", "stereo-matching", "scene-flow"]]],
+        ["RoCo-13", ["Abdulrahman M.Saadeldin", ["optical-flow", "stereo-matching", "scene-flow", "exploration"]]],
+        ["RoCo-14", ["ZXUv2.0", ["optical-flow"]]],
+        ["RoCo-15", ["Drivers", ["optical-flow", "stereo-matching"]]],
+        ["RoCo-16", ["Swarm", ["optical-flow", "stereo-matching", "scene-flow", "exploration"]]],
+        ["RoCo-17", ["BuildDiff", ["optical-flow", "stereo-matching", "scene-flow", "exploration"]]],
+        ["RoCo-18", ["KOGUMA Lab", ["optical-flow", "stereo-matching", "scene-flow"]]],
+        ["RoCo-19", ["KoreaU_DLmath", ["optical-flow", "stereo-matching", "scene-flow", "exploration"]]],
+        ["RoCo-20", ["DDEVS", ["stereo-matching"]]],
+        ["RoCo-21", ["mau5", ["optical-flow", "exploration"]]],
+        ["RoCo-22", ["cactus8603", ["optical-flow", "stereo-matching", "scene-flow", "exploration"]]],
+        ["RoCo-23", ["PlayStation", ["optical-flow"]]],
+        ["RoCo-24", ["E-lab", ["optical-flow", "stereo-matching", "scene-flow", "exploration"]]],
+        ["RoCo-25", ["HexWarrior", ["optical-flow", "stereo-matching", "scene-flow", "exploration"]]],
+        ["RoCo-26", ["Batman", ["optical-flow", "stereo-matching", "scene-flow", "exploration"]]],
+        ["RoCo-27", ["Mysterious Power of the East", ["optical-flow", "exploration"]]],
+        ["RoCo-28", ["Norisk", ["scene-flow"]]],
+        ["RoCo-29", ["VSAI", ["optical-flow"]]],
+        ["RoCo-30", ["acvlab", ["optical-flow", "stereo-matching", "scene-flow", "exploration"]]],
+        ["RoCo-31", ["e-motion AI", ["scene-flow", "exploration"]]],
+        ["RoCo-32", ["XLR8", ["optical-flow", "stereo-matching", "scene-flow", "exploration"]]]
+    ]);
+
+    assert.equal(snapshot.schemaVersion, 1);
+    assert.equal(snapshot.teams.length, expectedTeams.size);
+    assert.equal(new Set(snapshot.teams.map((team) => team.teamId)).size, expectedTeams.size);
+    for (const team of snapshot.teams) {
+        const expected = expectedTeams.get(team.teamId);
+        assert.ok(expected, team.teamId);
+        assert.equal(team.teamName, expected[0], team.teamId);
+        assert.deepEqual(team.registeredTracks, expected[1], team.teamId);
+        assert.equal(team.rankChange, 0, team.teamId);
+        assert.equal(team.score, null, team.teamId);
+        assert.equal(team.springMetric, null, team.teamId);
+        assert.equal(team.robustSpringMetric, null, team.teamId);
+        assert.equal(team.submittedAt, null, team.teamId);
+        assert.deepEqual(Object.keys(team).sort(), [
+            "rankChange",
+            "registeredTracks",
+            "robustSpringMetric",
+            "score",
+            "springMetric",
+            "submittedAt",
+            "teamId",
+            "teamName"
+        ]);
+    }
+
+    const crossTaskTeams = snapshot.teams.filter((team) =>
+        ["optical-flow", "stereo-matching", "scene-flow"]
+            .every((track) => team.registeredTracks.includes(track))
+    );
+    assert.equal(crossTaskTeams.length, 12);
+});
+
+test("leaderboard UI is data-driven, transparent about refresh, and wired on both pages", async () => {
+    const index = await source("index.html");
+    const evaluation = await source("evaluation.html");
+    const script = await source("assets/leaderboard.js");
+
+    assert.ok(evaluation.indexOf('id="leaderboards"') < evaluation.indexOf('<div class="eyebrow">Metric</div>'));
+    assert.match(evaluation, /data-leaderboard-root data-mode="full"/u);
+    assert.match(evaluation, /data-leaderboard-refresh/u);
+    assert.match(evaluation, /Last updated:/u);
+    assert.match(evaluation, /does not query Spring[\s\S]{0,80}trigger a benchmark sync/u);
+    assert.match(evaluation, /No current public benchmark entry exposes a validated[\s\S]{0,80}team ID/u);
+    assert.match(evaluation, /clean-to-corrupted prediction deltas instead/u);
+    assert.match(evaluation, /those quantities are not interchangeable/u);
+    assert.match(index, /<h2 id="leaderboard-preview-heading">Top Three by Track<\/h2>/u);
+    assert.match(index, /data-leaderboard-root data-mode="preview"/u);
+    assert.match(index, /Open full leaderboard/u);
+    assert.match(index, /assets\/leaderboard\.js/u);
+    assert.match(evaluation, /assets\/leaderboard\.js/u);
+
+    for (const label of ["Optical Flow", "Stereo Matching", "Scene Flow", "Cross-Task"]) {
+        assert.ok(script.includes(`label: "${label}"`), label);
+    }
+    for (const column of ["Rank", "Change", "Team", "RbS-Score", "Submission Time"]) {
+        assert.ok(script.includes(`"${column}"`), column);
+    }
+    assert.match(script, /node\.textContent = "— 0"/u);
+    assert.match(script, /return "—"/u);
+    assert.match(script, /isFiniteNumber\(row\.rank\) \? String\(row\.rank\) : "—"/u);
+    assert.match(script, /Swipe or scroll horizontally to see every column\./u);
+    assert.match(script, /window\.RoCoLeaderboard = Object\.freeze/u);
+    assert.match(script, /setDataSource\(loader\)/u);
+    assert.match(script, /left\.teamId\.localeCompare\(right\.teamId/u);
+    assert.match(evaluation, /B<sub>R<\/sub> constants and RbS-Scores remain pending/u);
+    assert.match(evaluation, /For the proposed RoCo-Spring score/u);
+    assert.match(evaluation, /Once the baselines are fixed/u);
+});
+
+test("site headings and named resources use consistent capitalization", async () => {
+    const pages = await Promise.all(HTML_FILES.map(source));
+    const html = pages.join("\n");
+
+    for (const required of [
+        "Four Challenge Tracks",
+        "Competition Schedule",
+        "Confirmed Keynote Speakers",
+        "Sponsors &amp; Acknowledgements",
+        "Step-by-Step Participation",
+        "Task-Specific Error Metrics",
+        "Frequently Asked Questions",
+        "Register or Manage Your Team",
+    ]) {
+        assert.ok(html.includes(required), required);
+    }
+
+    assert.doesNotMatch(html, /starting kit/u);
+    assert.doesNotMatch(html, /Starter kit/u);
+    assert.match(html, /GitHub Starter Kit/u);
+});
+
 test("homepage and Participate registration placeholders link to the live page", async () => {
     const index = await source("index.html");
     const participate = await source("participate.html");
@@ -72,19 +206,19 @@ test("the devkit is the published GitHub resource and support destinations are a
     const faq = await source("rules-faq.html");
 
     assert.match(index, /class="button starter-kit"[\s\S]{0,180}https:\/\/github\.com\/hmorimitsu\/roco-spring-devkit/u);
-    assert.match(index, /Starter kit \(codebase\)/u);
-    assert.match(index, /Starter kit codebase:[\s\S]{0,180}hmorimitsu\/roco-spring-devkit/u);
+    assert.match(index, /<span>GitHub Starter Kit<\/span>/u);
+    assert.match(index, /GitHub Starter Kit:[\s\S]{0,180}hmorimitsu\/roco-spring-devkit/u);
     assert.doesNotMatch(index, /roco-spring\/roco-spring\.github\.io/u);
     assert.match(participate, /https:\/\/github\.com\/hmorimitsu\/roco-spring-devkit/u);
     const stepFour = participate.match(
         /<li class="step-card">[\s\S]*?<div class="step-number" aria-hidden="true">4<\/div>[\s\S]*?<\/li>/u
     )?.[0] ?? "";
-    assert.match(stepFour, /<h3>Install starting kit<\/h3>/u);
+    assert.match(stepFour, /<h3>Install the Starter Kit<\/h3>/u);
     assert.match(
         stepFour,
         /class="button starter-kit" href="https:\/\/github\.com\/hmorimitsu\/roco-spring-devkit"[\s\S]*?target="_blank" rel="noopener noreferrer"/u
     );
-    assert.match(stepFour, /class="button-icon"[\s\S]*?Starter kit \(codebase\)/u);
+    assert.match(stepFour, /class="button-icon"[\s\S]*?<span>GitHub Starter Kit<\/span>/u);
     for (const html of [participate, faq]) {
         assert.match(html, /https:\/\/github\.com\/roco-spring\/roco-spring\.github\.io\/issues/u);
         assert.match(html, /https:\/\/github\.com\/roco-spring\/roco-spring\.github\.io\/issues\/new\/choose/u);
@@ -234,7 +368,7 @@ test("OpenReview submission calls to action are branded, safe, and present at al
     }
 
     assert.match(evaluation, /<div class="eyebrow">Call for Papers<\/div>/u);
-    assert.match(evaluation, /<h3 id="reproducibility">Reproducibility package<\/h3>/u);
+    assert.match(evaluation, /<h3 id="reproducibility">Reproducibility Package<\/h3>/u);
     assert.match(style, /\.button\.openreview\s*\{[\s\S]*?background: #8c1b13;/u);
     assert.match(style, /\.button\.openreview:hover[^{]*\{[\s\S]*?background: #7d1803;/u);
     assert.match(style, /\.openreview-wordmark\s*\{[\s\S]*?font-family: "Noto Sans", sans-serif;/u);
@@ -250,7 +384,8 @@ test("registration page includes the exact introduction and required controls", 
     assert.match(html, /id="add-edit-member"/u);
     assert.match(html, /No fixed<\/strong> member limit/u);
     assert.doesNotMatch(html, /10 (?:members maximum|max)|up to 10 members|teammates up to 10/u);
-    assert.match(html, /I confirm that the person submitting this registration is one of the team members listed below\.|I confirm that the person submitting this registration is one of the team members listed above\./u);
+    assert.match(html, /I confirm that the person submitting this registration is one of the team members listed above, and I understand that the team name, team ID, and selected tracks will appear on the public leaderboard\./u);
+    assert.match(html, /Member names and contact details remain private\./u);
 });
 
 test("registration page includes a concise regional Google-services access notice", async () => {
@@ -260,7 +395,7 @@ test("registration page includes a concise regional Google-services access notic
         /class="portal-region-notice" role="note">\s*<strong>Regional access notice:<\/strong> If Google services are blocked or unavailable in your region, registration and sign-in may not work\. Where permitted, we recommend using a trusted VPN; this has worked smoothly in our testing\.\s*<\/p>/u
     );
     assert.ok(
-        html.indexOf("Team registration and account")
+        html.indexOf("Team Registration and Account")
         < html.indexOf("Regional access notice:")
     );
 });

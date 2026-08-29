@@ -755,6 +755,8 @@ test("desired policies exactly scope dependency, callable, Scheduler, and termin
         { period: "300s" },
     );
 
+    assert.match(policies[1].documentation.content, /billing:verify/u);
+
     assert.equal(policies[1].conditions.length, 4);
     const callableServices = [
         "registerteam",
@@ -777,6 +779,9 @@ test("desired policies exactly scope dependency, callable, Scheduler, and termin
             threshold.thresholdValue < 1 / 60,
         );
     });
+
+    assert.match(policies[2].documentation.content, /closed linked billing account/u);
+    assert.match(policies[2].documentation.content, /billing:verify/u);
 
     const schedulerFilter =
         policies[2].conditions[0].conditionMatchedLog.filter;
@@ -1091,7 +1096,7 @@ test("release wiring configures monitoring before the canonical read-only gate",
     );
     assert.equal(
         packageConfig.scripts["production:runtime:verify"],
-        "npm run monitoring:verify",
+        "npm run billing:verify && npm run monitoring:verify",
     );
     const chain = packageConfig.scripts["deploy:production"];
     const deployment = chain.indexOf("deploy:firebase");
