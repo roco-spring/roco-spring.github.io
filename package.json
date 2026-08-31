@@ -33,6 +33,7 @@
     "backend:appcheck-ci-smoke": "node scripts/verify-app-check-ci.mjs",
     "monitoring:configure": "node scripts/configure-production-monitoring.mjs --apply",
     "monitoring:verify": "node scripts/configure-production-monitoring.mjs --verify",
+    "registration:requeue-sheet": "node scripts/requeue-sheet-reconciliation.mjs",
     "production:runtime:verify": "npm run billing:verify && npm run monitoring:verify",
     "preemulators": "npm run build",
     "emulators": "node scripts/firebase-safe.mjs emulators:start --only auth,firestore,functions --project roco-spring-registration-2026",

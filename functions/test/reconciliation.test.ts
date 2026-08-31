@@ -709,6 +709,7 @@ describe("scheduled reconciliation routing", () => {
     mocks.synchronize.mockResolvedValue({
       status: "failed",
       errorCategory: "external_permanent",
+      failureStage: "formatting",
     });
     mocks.claimEmail.mockResolvedValue({
       leaseId: "terminal-email-lease",
@@ -770,6 +771,14 @@ describe("scheduled reconciliation routing", () => {
         }),
       );
     }
+    expect(mocks.loggerError).toHaveBeenCalledWith(
+      "Team sheet reconciliation reached a terminal failure",
+      expect.objectContaining({
+        resourceType: "sheet",
+        errorCategory: "external_permanent",
+        failureStage: "formatting",
+      }),
+    );
   });
 
   it("bounds ambiguous Drive cleanup deletions within one scheduler job", async () => {

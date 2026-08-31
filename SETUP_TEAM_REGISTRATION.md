@@ -174,6 +174,26 @@ Do not rotate secrets, delete Auth users, or clear Firestore broadly before coll
 7. Requeue only affected pending/failed Sheet or email records after dependency health passes. Reset rate-limit documents only for requests demonstrably consumed by the incident.
 8. Run a controlled E2E test and monitor logs through at least two reconciler intervals.
 
+### Exact 2026-08-31 Sheet-timeout recovery
+
+The operator command below is deliberately incident-specific. It accepts only RoCo-10, RoCo-14, RoCo-20, or RoCo-28 and requires the exact audited document update time, last-attempt time, retry count, active/sent/failed state, matching authoritative and synchronized revisions, existing Sheet/request bindings, `external_permanent` category, and exactly null lease fields. Any later edit or different failure makes the command ineligible. It preserves the original retry count and attempt timestamp, and changes only the misclassified status/category.
+
+1. Complete `npm run deploy:production`. Confirm the new `reconcileRegistrations` revision is active, then require `npm run google:health:bound` and `npm run production:runtime:verify` to pass.
+2. Process exactly one team at a time in this order: RoCo-10, RoCo-14, RoCo-20, RoCo-28. Start with the read-only dry run:
+
+   ```bash
+   npm run registration:requeue-sheet -- --team RoCo-10
+   ```
+
+3. After independently confirming that exact stored Sheet still has the expected marker, parent, spreadsheet MIME type, privacy, editability, and `Team Details` / `Change Log` tabs, apply the guarded transaction:
+
+   ```bash
+   npm run registration:requeue-sheet -- --team RoCo-10 --apply
+   ```
+
+4. Wait for the next five-minute Scheduler pass. Require a sanitized `Team sheet reconciliation completed` log with `status=synced` for that team and a Firestore read-back showing `sheetSyncStatus=synced`, retry count zero, no safe error category or lease, and `sheetLastSyncedRevision=revision` before substituting the next allowlisted ID.
+5. After the fourth team is synchronized, observe two additional Scheduler intervals. Each must return HTTP 200 with healthy dependency logs and no new reconciler or Scheduler errors. Do not silence the durable-resource alert, batch all four records, reset the retry history, or use this command for a future incident.
+
 ## Monitoring
 
 Cloud Monitoring is itself a managed remote service; no local watcher is used. An enabled email notification channel for `roco-spring-org@googlegroups.com` must already exist and Google Cloud must report it as `VERIFIED`. The release workflow deliberately does not create an unverified channel blindly. If it is absent, select project `roco-spring-registration-2026` in Google Cloud Console, open **Monitoring > Alerting > Edit notification channels**, add that exact address under Email, complete the verification received by the group, and confirm the channel is enabled.

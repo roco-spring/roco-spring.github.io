@@ -12,6 +12,7 @@ import type { TeamDocument, UpdateTeamInput } from "../src/models.js";
 import {
   getMyTeamOperation,
   synchronizeLatestTeamOperation,
+  synchronizeLatestTeamOperationResult,
   updateMyTeamOperation,
 } from "../src/teams.js";
 import { FakeFirestore } from "./helpers/fake-firestore.js";
@@ -85,6 +86,7 @@ function googleMock(options: {
     get: vi.fn().mockResolvedValue({ data: { values: [] } }),
     append: vi.fn().mockResolvedValue({ data: {} }),
   };
+  const sheetBatchUpdate = vi.fn().mockResolvedValue({ data: {} });
   const listFiles = options.ambiguousCreate
     ? vi
         .fn()
@@ -131,7 +133,7 @@ function googleMock(options: {
           ],
         },
       }),
-      batchUpdate: vi.fn().mockResolvedValue({ data: {} }),
+      batchUpdate: sheetBatchUpdate,
       values,
     },
   };
@@ -149,6 +151,7 @@ function googleMock(options: {
     updateFile,
     createFile,
     listFiles,
+    sheetBatchUpdate,
     values,
   };
 }
@@ -385,6 +388,45 @@ describe("team read and update operations", () => {
       sheetSyncStatus: "failed",
       sheetSyncSafeErrorCategory: "external_permanent",
     });
+  });
+
+  it("returns the precise safe stage for a retryable Sheet timeout", async () => {
+    vi.useFakeTimers();
+    try {
+      const fake = seededTeam({
+        sheetSyncStatus: "pending",
+        sheetSyncRetryCount: 0,
+        sheetSyncLeaseId: null,
+        sheetSyncLeaseExpiresAt: null,
+      });
+      const google = googleMock();
+      google.sheetBatchUpdate.mockRejectedValue({
+        name: "Error",
+        config: { timeout: 8_000, signal: { aborted: true } },
+        cause: { name: "AbortError" },
+      });
+
+      const synchronization = synchronizeLatestTeamOperationResult(
+        fake as unknown as Firestore,
+        google.clients,
+        "RoCo-1",
+        "Reconciliation",
+      );
+      await vi.runAllTimersAsync();
+      await expect(synchronization).resolves.toEqual({
+        status: "pending",
+        errorCategory: "google_transient",
+        failureStage: "formatting",
+      });
+      expect(google.sheetBatchUpdate).toHaveBeenCalledTimes(2);
+      expect(fake.read("teams/RoCo-1")).toMatchObject({
+        sheetSyncStatus: "pending",
+        sheetSyncRetryCount: 1,
+        sheetSyncSafeErrorCategory: "google_transient",
+      });
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("rejects stale revisions before invoking Google APIs", async () => {

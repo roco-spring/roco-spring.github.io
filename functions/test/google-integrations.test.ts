@@ -14,6 +14,7 @@ import {
 import { GOOGLE_API_REQUEST_OPTIONS } from "../src/google-retry.js";
 import {
   synchronizeTeamSpreadsheet,
+  TeamSpreadsheetSyncError,
   teamDetailsLiteralRows,
 } from "../src/google-sheets.js";
 import type { TeamDocument } from "../src/models.js";
@@ -497,6 +498,62 @@ describe("Sheets synchronization", () => {
       "Reconciliation",
     );
     expect(mock.spreadsheets.values.append).not.toHaveBeenCalled();
+  });
+
+  it("retries an idempotent timeout once and reports its safe stage", async () => {
+    vi.useFakeTimers();
+    try {
+      const timeoutError = {
+        name: "Error",
+        config: { timeout: 8_000, signal: { aborted: true } },
+        cause: { name: "AbortError" },
+      };
+      const mock = sheetsMock();
+      mock.spreadsheets.batchUpdate.mockRejectedValue(timeoutError);
+
+      const synchronization = expect(
+        synchronizeTeamSpreadsheet(
+          mock as unknown as sheets_v4.Sheets,
+          team(),
+          "Reconciliation",
+        ),
+      ).rejects.toMatchObject({
+        name: "TeamSpreadsheetSyncError",
+        stage: "formatting",
+        category: "google_transient",
+        cause: timeoutError,
+      });
+      await vi.runAllTimersAsync();
+      await synchronization;
+
+      expect(mock.spreadsheets.batchUpdate).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("never retries an ambiguous change-log append timeout", async () => {
+    const timeoutError = {
+      name: "Error",
+      config: { timeout: 8_000, signal: { aborted: true } },
+      cause: { name: "AbortError" },
+    };
+    const mock = sheetsMock();
+    mock.spreadsheets.values.append.mockRejectedValue(timeoutError);
+
+    const error = await synchronizeTeamSpreadsheet(
+      mock as unknown as sheets_v4.Sheets,
+      team(),
+      "Reconciliation",
+    ).catch((caught: unknown) => caught);
+    expect(error).toBeInstanceOf(TeamSpreadsheetSyncError);
+    expect(error).toMatchObject({
+      stage: "change_log_append",
+      category: "google_transient",
+      cause: timeoutError,
+    });
+    expect(mock.spreadsheets.values.append).toHaveBeenCalledTimes(1);
+    expect(mock.spreadsheets.batchUpdate).not.toHaveBeenCalled();
   });
 
   it("never includes a password in the sheet representation", () => {

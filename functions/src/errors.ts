@@ -28,12 +28,25 @@ export class AppError extends Error {
 
 function externalErrorDetails(error: unknown): {
   looksExternal: boolean;
+  hasResponse: boolean;
   status: number | undefined;
   code: string;
   reasons: string[];
+  nestedCodes: string[];
+  nestedNames: string[];
+  requestTimedOut: boolean;
 } {
   if (typeof error !== "object" || error === null) {
-    return { looksExternal: false, status: undefined, code: "", reasons: [] };
+    return {
+      looksExternal: false,
+      hasResponse: false,
+      status: undefined,
+      code: "",
+      reasons: [],
+      nestedCodes: [],
+      nestedNames: [],
+      requestTimedOut: false,
+    };
   }
   const record = error as Record<string, unknown>;
   const response =
@@ -61,15 +74,57 @@ function externalErrorDetails(error: unknown): {
   });
   const oauthError = responseData?.error;
   if (typeof oauthError === "string") reasons.push(oauthError);
+  const nestedErrors = [record.error, record.cause].filter(
+    (candidate): candidate is Record<string, unknown> =>
+      typeof candidate === "object" && candidate !== null,
+  );
+  const nestedCodes = nestedErrors.flatMap((candidate) =>
+    typeof candidate.code === "string" || typeof candidate.code === "number"
+      ? [String(candidate.code)]
+      : [],
+  );
+  const nestedNames = nestedErrors.flatMap((candidate) =>
+    typeof candidate.name === "string" ? [candidate.name] : [],
+  );
+  const config =
+    typeof record.config === "object" && record.config !== null
+      ? (record.config as Record<string, unknown>)
+      : undefined;
+  const signal =
+    typeof config?.signal === "object" && config.signal !== null
+      ? (config.signal as Record<string, unknown>)
+      : undefined;
+  const timeout = config?.timeout;
+  // Gaxios 7 reports a timeout as an aborted nested AbortError. Older Gaxios
+  // reports a FetchError with the exact request-timeout type. Detect only
+  // those structural shapes without inspecting messages, URLs, or payloads.
+  const requestTimedOut =
+    response === undefined &&
+    typeof timeout === "number" &&
+    Number.isFinite(timeout) &&
+    timeout > 0 &&
+    ((signal?.aborted === true &&
+      nestedNames.some((name) =>
+        ["AbortError", "TimeoutError"].includes(name),
+      )) ||
+      nestedErrors.some(
+        (candidate) =>
+          candidate.name === "FetchError" &&
+          candidate.type === "request-timeout",
+      ));
   return {
     looksExternal:
       status !== undefined ||
       code.length > 0 ||
       record.name === "GaxiosError" ||
       "config" in record,
+    hasResponse: response !== undefined,
     status,
     code,
     reasons,
+    nestedCodes,
+    nestedNames,
+    requestTimedOut,
   };
 }
 
@@ -154,7 +209,26 @@ export function isRetryableSafeCategory(category: string): boolean {
 }
 
 export function isTransientExternalError(error: unknown): boolean {
-  const { looksExternal, status, code, reasons } = externalErrorDetails(error);
+  const {
+    looksExternal,
+    hasResponse,
+    status,
+    code,
+    reasons,
+    nestedCodes,
+    requestTimedOut,
+  } = externalErrorDetails(error);
+  const transportCodes = new Set([
+    "ABORT_ERR",
+    "EAI_AGAIN",
+    "ECONNABORTED",
+    "ECONNRESET",
+    "ERR_CANCELED",
+    "ETIMEDOUT",
+    "UND_ERR_BODY_TIMEOUT",
+    "UND_ERR_CONNECT_TIMEOUT",
+    "UND_ERR_HEADERS_TIMEOUT",
+  ]);
   return (
     looksExternal &&
     (status === 408 ||
@@ -167,6 +241,10 @@ export function isTransientExternalError(error: unknown): boolean {
       reasons.some((reason) =>
         ["server_error", "temporarily_unavailable"].includes(reason),
       ) ||
-      ["ECONNRESET", "ETIMEDOUT", "EAI_AGAIN"].includes(code))
+      requestTimedOut ||
+      (!hasResponse &&
+        [code, ...nestedCodes].some((candidate) =>
+          transportCodes.has(candidate),
+        )))
   );
 }

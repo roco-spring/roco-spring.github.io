@@ -71,6 +71,9 @@ async function reconcileSheet(
       "Reconciliation",
       audit,
     );
+    const failureStageMetadata = {
+      ...(result.failureStage ? { failureStage: result.failureStage } : {}),
+    };
     if (result.status === "failed") {
       logger.error("Team sheet reconciliation reached a terminal failure", {
         operation: "reconcileRegistrations",
@@ -78,6 +81,7 @@ async function reconcileSheet(
         resourceType: "sheet",
         teamId: team.teamId,
         errorCategory: result.errorCategory ?? "internal",
+        ...failureStageMetadata,
       });
     } else {
       logger.info("Team sheet reconciliation completed", {
@@ -85,6 +89,10 @@ async function reconcileSheet(
         resourceType: "sheet",
         teamId: team.teamId,
         status: result.status,
+        ...(result.errorCategory
+          ? { errorCategory: result.errorCategory }
+          : {}),
+        ...failureStageMetadata,
       });
     }
   } catch (error: unknown) {

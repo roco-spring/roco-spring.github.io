@@ -1,6 +1,6 @@
 import type { sheets_v4 } from "googleapis";
 import { TRACK_LABELS, TRACKS } from "./config.js";
-import { AppError } from "./errors.js";
+import { AppError, safeErrorCategory } from "./errors.js";
 import {
   GOOGLE_API_REQUEST_OPTIONS,
   withBoundedGoogleRetry,
@@ -9,6 +9,54 @@ import type { TeamDocument } from "./models.js";
 
 export type LiteralCell = string | number | boolean;
 export type LiteralRows = LiteralCell[][];
+
+export type TeamSpreadsheetSyncStage =
+  | "structure"
+  | "team_details_clear"
+  | "team_details_write"
+  | "change_log_header_write"
+  | "change_log_revision_read"
+  | "change_log_append"
+  | "formatting";
+
+/** Keeps production telemetry useful without retaining provider messages. */
+export class TeamSpreadsheetSyncError extends AppError {
+  public constructor(
+    public readonly stage: TeamSpreadsheetSyncStage,
+    cause: unknown,
+  ) {
+    super(
+      "internal",
+      "The registration spreadsheet could not be synchronized.",
+      safeErrorCategory(cause),
+    );
+    this.name = "TeamSpreadsheetSyncError";
+    this.cause = cause;
+  }
+}
+
+async function runSheetStage<T>(
+  stage: TeamSpreadsheetSyncStage,
+  operation: () => Promise<T>,
+): Promise<T> {
+  try {
+    return await operation();
+  } catch (error: unknown) {
+    if (error instanceof TeamSpreadsheetSyncError) throw error;
+    throw new TeamSpreadsheetSyncError(stage, error);
+  }
+}
+
+function withIdempotentGoogleRetry<T>(
+  operation: (
+    requestOptions: typeof GOOGLE_API_REQUEST_OPTIONS,
+  ) => Promise<T>,
+): Promise<T> {
+  // These reads, literal writes, clears, and formatting updates are safe to
+  // repeat once after a transport failure. The append below is intentionally
+  // excluded because the next reconciliation pass performs its revision read.
+  return withBoundedGoogleRetry(operation, { attempts: 2 });
+}
 
 export function teamDetailsLiteralRows(team: TeamDocument): LiteralRows {
   const rows: LiteralRows = [
@@ -51,7 +99,7 @@ async function ensureSpreadsheetStructure(
   sheets: sheets_v4.Sheets,
   spreadsheetId: string,
 ): Promise<{ detailsSheetId: number; changeLogSheetId: number }> {
-  const metadata = await withBoundedGoogleRetry((requestOptions) =>
+  const metadata = await withIdempotentGoogleRetry((requestOptions) =>
     sheets.spreadsheets.get(
       {
         spreadsheetId,
@@ -91,7 +139,7 @@ async function ensureSpreadsheetStructure(
         GOOGLE_API_REQUEST_OPTIONS,
       );
     } catch (error: unknown) {
-      const recovery = await withBoundedGoogleRetry((requestOptions) =>
+      const recovery = await withIdempotentGoogleRetry((requestOptions) =>
         sheets.spreadsheets.get(
           {
             spreadsheetId,
@@ -106,7 +154,7 @@ async function ensureSpreadsheetStructure(
       if (!titles.has("Team Details") || !titles.has("Change Log")) throw error;
     }
   }
-  const refreshed = await withBoundedGoogleRetry((requestOptions) =>
+  const refreshed = await withIdempotentGoogleRetry((requestOptions) =>
     sheets.spreadsheets.get(
       {
         spreadsheetId,
@@ -233,15 +281,19 @@ async function appendChangeLogOnce(
   changeType: "Registration" | "Team update" | "Reconciliation",
   changedBy: string,
 ): Promise<void> {
-  const revisionResponse = await withBoundedGoogleRetry((requestOptions) =>
-    sheets.spreadsheets.values.get(
-      {
-        spreadsheetId,
-        range: "'Change Log'!B2:B",
-        valueRenderOption: "UNFORMATTED_VALUE",
-      },
-      requestOptions,
-    ),
+  const revisionResponse = await runSheetStage(
+    "change_log_revision_read",
+    () =>
+      withIdempotentGoogleRetry((requestOptions) =>
+        sheets.spreadsheets.values.get(
+          {
+            spreadsheetId,
+            range: "'Change Log'!B2:B",
+            valueRenderOption: "UNFORMATTED_VALUE",
+          },
+          requestOptions,
+        ),
+      ),
   );
   const alreadyLogged = (revisionResponse.data.values ?? []).some(
     (row) => Number(row[0]) === team.revision,
@@ -255,15 +307,28 @@ async function appendChangeLogOnce(
         : "Team details updated";
   // Append is non-idempotent. An ambiguous response is reconciled by reading
   // the revision on the next sync instead of blindly appending a duplicate.
-  await sheets.spreadsheets.values.append({
-      spreadsheetId,
-      range: "'Change Log'!A:E",
-      valueInputOption: "RAW",
-      insertDataOption: "INSERT_ROWS",
-      requestBody: {
-        values: [[team.updatedAt.toDate().toISOString(), team.revision, changeType, changedBy, summary]],
+  await runSheetStage("change_log_append", () =>
+    sheets.spreadsheets.values.append(
+      {
+        spreadsheetId,
+        range: "'Change Log'!A:E",
+        valueInputOption: "RAW",
+        insertDataOption: "INSERT_ROWS",
+        requestBody: {
+          values: [
+            [
+              team.updatedAt.toDate().toISOString(),
+              team.revision,
+              changeType,
+              changedBy,
+              summary,
+            ],
+          ],
+        },
       },
-    }, GOOGLE_API_REQUEST_OPTIONS);
+      GOOGLE_API_REQUEST_OPTIONS,
+    ),
+  );
 }
 
 export async function synchronizeTeamSpreadsheet(
@@ -280,41 +345,55 @@ export async function synchronizeTeamSpreadsheet(
       "internal",
     );
   }
-  const { detailsSheetId, changeLogSheetId } = await ensureSpreadsheetStructure(
-    sheets,
-    spreadsheetId,
+  const { detailsSheetId, changeLogSheetId } = await runSheetStage(
+    "structure",
+    () => ensureSpreadsheetStructure(sheets, spreadsheetId),
   );
-  await withBoundedGoogleRetry((requestOptions) =>
-    sheets.spreadsheets.values.clear(
-      {
-        spreadsheetId,
-        range: "'Team Details'!A:E",
-      },
-      requestOptions,
-    ),
-  );
-  await withBoundedGoogleRetry((requestOptions) =>
-    sheets.spreadsheets.values.update(
-      {
-        spreadsheetId,
-        range: "'Team Details'!A1",
-        valueInputOption: "RAW",
-        requestBody: { values: teamDetailsLiteralRows(team) },
-      },
-      requestOptions,
-    ),
-  );
-  await withBoundedGoogleRetry((requestOptions) =>
-    sheets.spreadsheets.values.update(
-      {
-        spreadsheetId,
-        range: "'Change Log'!A1:E1",
-        valueInputOption: "RAW",
-        requestBody: {
-          values: [["Timestamp", "Revision", "Change Type", "Changed By", "Summary"]],
+  await runSheetStage("team_details_clear", () =>
+    withIdempotentGoogleRetry((requestOptions) =>
+      sheets.spreadsheets.values.clear(
+        {
+          spreadsheetId,
+          range: "'Team Details'!A:E",
         },
-      },
-      requestOptions,
+        requestOptions,
+      ),
+    ),
+  );
+  await runSheetStage("team_details_write", () =>
+    withIdempotentGoogleRetry((requestOptions) =>
+      sheets.spreadsheets.values.update(
+        {
+          spreadsheetId,
+          range: "'Team Details'!A1",
+          valueInputOption: "RAW",
+          requestBody: { values: teamDetailsLiteralRows(team) },
+        },
+        requestOptions,
+      ),
+    ),
+  );
+  await runSheetStage("change_log_header_write", () =>
+    withIdempotentGoogleRetry((requestOptions) =>
+      sheets.spreadsheets.values.update(
+        {
+          spreadsheetId,
+          range: "'Change Log'!A1:E1",
+          valueInputOption: "RAW",
+          requestBody: {
+            values: [
+              [
+                "Timestamp",
+                "Revision",
+                "Change Type",
+                "Changed By",
+                "Summary",
+              ],
+            ],
+          },
+        },
+        requestOptions,
+      ),
     ),
   );
   await appendChangeLogOnce(
@@ -324,13 +403,17 @@ export async function synchronizeTeamSpreadsheet(
     changeType,
     changedBy,
   );
-  await withBoundedGoogleRetry((requestOptions) =>
-    sheets.spreadsheets.batchUpdate(
-      {
-        spreadsheetId,
-        requestBody: { requests: formattingRequests(detailsSheetId, changeLogSheetId) },
-      },
-      requestOptions,
+  await runSheetStage("formatting", () =>
+    withIdempotentGoogleRetry((requestOptions) =>
+      sheets.spreadsheets.batchUpdate(
+        {
+          spreadsheetId,
+          requestBody: {
+            requests: formattingRequests(detailsSheetId, changeLogSheetId),
+          },
+        },
+        requestOptions,
+      ),
     ),
   );
 }

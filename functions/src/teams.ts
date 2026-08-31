@@ -14,7 +14,11 @@ import {
   SpreadsheetCreationRejectedError,
   verifyPrivateTeamSpreadsheet,
 } from "./google-drive.js";
-import { synchronizeTeamSpreadsheet } from "./google-sheets.js";
+import {
+  synchronizeTeamSpreadsheet,
+  TeamSpreadsheetSyncError,
+  type TeamSpreadsheetSyncStage,
+} from "./google-sheets.js";
 import type {
   PublicTeam,
   TeamDocument,
@@ -100,7 +104,15 @@ export interface UpdateTeamResult {
 export interface SheetSynchronizationResult {
   status: "synced" | "pending" | "failed";
   errorCategory?: SafeErrorCategory;
+  failureStage?: SheetSynchronizationFailureStage;
 }
+
+export type SheetSynchronizationFailureStage =
+  | "provisioning"
+  | "drive_verification"
+  | "rename"
+  | TeamSpreadsheetSyncStage
+  | "commit";
 
 export async function synchronizeLatestTeamOperationResult(
   db: Firestore,
@@ -117,6 +129,7 @@ export async function synchronizeLatestTeamOperationResult(
   );
   if (!claim) return { status: "pending" };
   let team = claim.team;
+  let failureStage: SheetSynchronizationFailureStage = "provisioning";
   try {
     team = await ensureTeamSpreadsheet(db, google, claim.leaseId, team);
     if (typeof team.sheetId !== "string" || team.sheetId.length === 0) {
@@ -126,17 +139,22 @@ export async function synchronizeLatestTeamOperationResult(
         "internal",
       );
     }
+    failureStage = "drive_verification";
     await verifyPrivateTeamSpreadsheet(
       google.drive,
       team.sheetId,
       team.registrationRequestId,
     );
+    failureStage = "rename";
     await renameTeamSpreadsheet(
       google.drive,
       team.sheetId,
       team.teamId,
       team.teamName,
     );
+    // The Sheets client reports a more precise safe stage if synchronization
+    // fails, so this placeholder is never logged for a handled Sheets error.
+    failureStage = "structure";
     await synchronizeTeamSpreadsheet(
       google.sheets,
       team,
@@ -145,6 +163,7 @@ export async function synchronizeLatestTeamOperationResult(
         ? "system reconciliation"
         : team.primaryContactEmail,
     );
+    failureStage = "commit";
     const outcome = await finishSheetSynchronizationPass(
       db,
       team.teamId,
@@ -157,6 +176,8 @@ export async function synchronizeLatestTeamOperationResult(
     return { status: "pending" };
   } catch (error: unknown) {
     const errorCategory = safeErrorCategory(error);
+    const reportedFailureStage =
+      error instanceof TeamSpreadsheetSyncError ? error.stage : failureStage;
     const status = await failClaimedSheetSynchronization(
       db,
       teamId,
@@ -172,7 +193,11 @@ export async function synchronizeLatestTeamOperationResult(
           error instanceof SpreadsheetCreationRejectedError,
       },
     );
-    return { status, errorCategory };
+    return {
+      status,
+      errorCategory,
+      failureStage: reportedFailureStage,
+    };
   }
 }
 

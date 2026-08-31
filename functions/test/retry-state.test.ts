@@ -1,4 +1,7 @@
+import { createServer } from "node:http";
+import type { AddressInfo } from "node:net";
 import { Timestamp, type Firestore } from "firebase-admin/firestore";
+import { Gaxios } from "googleapis-common";
 import { describe, expect, it, vi } from "vitest";
 import {
   isTransientExternalError,
@@ -440,6 +443,115 @@ describe("bounded reconciliation state", () => {
 });
 
 describe("Google error classification", () => {
+  it("classifies the installed Gaxios timeout shape as retryable", async () => {
+    const server = createServer(() => {
+      // Deliberately leave the response open so Gaxios reaches its own timeout.
+    });
+    await new Promise<void>((resolve) => {
+      server.listen(0, "127.0.0.1", resolve);
+    });
+    const address = server.address() as AddressInfo;
+    let timeoutError: unknown;
+    try {
+      await new Gaxios().request({
+        url: `http://127.0.0.1:${address.port}/`,
+        timeout: 15,
+        retry: false,
+      });
+    } catch (error: unknown) {
+      timeoutError = error;
+    } finally {
+      server.closeAllConnections();
+      await new Promise<void>((resolve, reject) => {
+        server.close((error) => {
+          if (error) reject(error);
+          else resolve();
+        });
+      });
+    }
+
+    expect(timeoutError).toBeDefined();
+    expect(isTransientExternalError(timeoutError)).toBe(true);
+    expect(safeErrorCategory(timeoutError)).toBe("google_transient");
+  });
+
+  it("does not confuse an unrelated configured fetch failure with a timeout", () => {
+    const unrelatedError = {
+      name: "Error",
+      config: { timeout: 8_000, signal: { aborted: false } },
+      cause: { name: "FetchError" },
+    };
+    expect(isTransientExternalError(unrelatedError)).toBe(false);
+    expect(safeErrorCategory(unrelatedError)).toBe("external_permanent");
+  });
+
+  it("recognizes the older exact Gaxios request-timeout shape", () => {
+    const timeoutError = {
+      name: "Error",
+      config: { timeout: 8_000 },
+      error: { name: "FetchError", type: "request-timeout" },
+    };
+    expect(isTransientExternalError(timeoutError)).toBe(true);
+    expect(safeErrorCategory(timeoutError)).toBe("google_transient");
+  });
+
+  it("does not cross-pair unrelated nested FetchError fields", () => {
+    const unrelatedError = {
+      name: "Error",
+      config: { timeout: 8_000 },
+      error: { name: "FetchError" },
+      cause: { type: "request-timeout" },
+    };
+    expect(isTransientExternalError(unrelatedError)).toBe(false);
+    expect(safeErrorCategory(unrelatedError)).toBe("external_permanent");
+  });
+
+  it("does not let nested transport metadata override an HTTP client error", () => {
+    const clientError = {
+      name: "GaxiosError",
+      response: { status: 400 },
+      config: {},
+      cause: { code: "UND_ERR_CONNECT_TIMEOUT" },
+    };
+    expect(isTransientExternalError(clientError)).toBe(false);
+    expect(safeErrorCategory(clientError)).toBe("external_permanent");
+  });
+
+  it("keeps the exact timeout category pending in durable Sheet state", async () => {
+    const fake = new FakeFirestore();
+    fake.seed("teams/RoCo-timeout", {
+      teamId: "RoCo-timeout",
+      revision: 1,
+      sheetId: "sheet-timeout",
+      sheetSyncStatus: "pending",
+      sheetSyncRetryCount: 0,
+      sheetSyncLeaseId: null,
+      sheetSyncLeaseExpiresAt: null,
+    });
+    const db = fake as unknown as Firestore;
+    const claim = await claimSheetSynchronization(db, "RoCo-timeout", 1);
+    const timeoutShape = {
+      name: "Error",
+      config: { timeout: 8_000, signal: { aborted: true } },
+      cause: { name: "AbortError" },
+    };
+    const category = safeErrorCategory(timeoutShape);
+
+    await expect(
+      failClaimedSheetSynchronization(
+        db,
+        "RoCo-timeout",
+        claim?.leaseId ?? "missing",
+        category,
+      ),
+    ).resolves.toBe("pending");
+    expect(fake.read("teams/RoCo-timeout")).toMatchObject({
+      sheetSyncStatus: "pending",
+      sheetSyncRetryCount: 1,
+      sheetSyncSafeErrorCategory: "google_transient",
+    });
+  });
+
   it("does not retry a transient Google call by default", async () => {
     const error = {
       name: "GaxiosError",
@@ -497,6 +609,7 @@ describe("Google error classification", () => {
     { response: { status: 503 }, config: {} },
     { code: "ECONNRESET", config: {} },
     { code: "ETIMEDOUT", name: "GaxiosError" },
+    { config: {}, cause: { code: "UND_ERR_CONNECT_TIMEOUT" } },
   ])("classifies nested-version HTTP/network shapes as transient", (error) => {
     expect(isTransientExternalError(error)).toBe(true);
     expect(safeErrorCategory(error)).toBe("google_transient");

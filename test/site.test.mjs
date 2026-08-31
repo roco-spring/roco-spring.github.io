@@ -367,6 +367,8 @@ test("homepage includes the requested sponsor and project-specific acknowledgeme
         await assert.doesNotReject(access(path.join(ROOT, asset)), asset);
     }
     assert.match(index, /href="https:\/\/www\.sfbtrr161\.de\/"[\s\S]{0,220}SFB-TRR 161/u);
+    assert.match(index, /href="https:\/\/imprs\.is\.mpg\.de\/"/u);
+    assert.doesNotMatch(index, /https:\/\/imprs-is\.mpg\.de\//u);
 });
 
 test("Noah Berenguel Senn appears in the requested organizer position", async () => {
