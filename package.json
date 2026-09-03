@@ -54,6 +54,7 @@
     "firebase-tools": "15.23.0"
   },
   "overrides": {
+    "qs": "6.16.0",
     "googleapis-common": {
       "gaxios": "7.2.0"
     },

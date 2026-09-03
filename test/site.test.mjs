@@ -99,7 +99,14 @@ test("published leaderboard snapshot contains the exact public team roster", asy
         ["RoCo-29", ["VSAI", ["optical-flow"]]],
         ["RoCo-30", ["acvlab", ["optical-flow", "stereo-matching", "scene-flow", "exploration"]]],
         ["RoCo-31", ["e-motion AI", ["scene-flow", "exploration"]]],
-        ["RoCo-32", ["XLR8", ["optical-flow", "stereo-matching", "scene-flow", "exploration"]]]
+        ["RoCo-32", ["XLR8", ["optical-flow", "stereo-matching", "scene-flow", "exploration"]]],
+        ["RoCo-33", ["Epoch Labs", ["optical-flow", "stereo-matching", "scene-flow", "exploration"]]],
+        ["RoCo-34", ["Pamboo", ["optical-flow", "stereo-matching", "scene-flow", "exploration"]]],
+        ["RoCo-35", ["Team'5", ["optical-flow", "stereo-matching", "scene-flow", "exploration"]]],
+        ["RoCo-36", ["c-mike", ["optical-flow", "stereo-matching", "scene-flow", "exploration"]]],
+        ["RoCo-37", ["Innovators", ["optical-flow", "stereo-matching", "scene-flow", "exploration"]]],
+        ["RoCo-38", ["Four And Furios", ["optical-flow", "stereo-matching", "scene-flow", "exploration"]]],
+        ["RoCo-39", ["PocketChange", ["exploration"]]]
     ]);
 
     assert.equal(snapshot.schemaVersion, 2);
@@ -147,7 +154,7 @@ test("published leaderboard snapshot contains the exact public team roster", asy
         ["optical-flow", "stereo-matching", "scene-flow"]
             .every((track) => team.registeredTracks.includes(track))
     );
-    assert.equal(crossTaskTeams.length, 12);
+    assert.equal(crossTaskTeams.length, 18);
 });
 
 test("leaderboard baselines are per-method additive-proxy medians", async () => {
@@ -203,6 +210,7 @@ test("leaderboard UI is data-driven, documents the additive proxy, and is wired 
     const evaluation = await source("evaluation.html");
     const script = await source("assets/leaderboard.js");
     const liveAdapter = await source("assets/leaderboard-live.js");
+    const style = await source("assets/style.css");
 
     assert.ok(evaluation.indexOf('id="leaderboards"') < evaluation.indexOf('<div class="eyebrow">Metric</div>'));
     assert.match(evaluation, /data-leaderboard-root data-mode="full"/u);
@@ -225,13 +233,52 @@ test("leaderboard UI is data-driven, documents the additive proxy, and is wired 
     for (const label of ["Optical Flow", "Stereo Matching", "Scene Flow", "Cross-Task"]) {
         assert.ok(script.includes(`label: "${label}"`), label);
     }
-    for (const column of ["Rank", "Change", "Team", "RbS-Score", "Spring Submission Time"]) {
+    for (const column of ["Rank", "Change", "Team", "Method Name", "RbS-Score", "Spring Submission Time"]) {
         assert.ok(script.includes(`"${column}"`), column);
     }
+    for (const definition of [
+        '{ method: "SEA-RAFT", resultId: 291, springMetric: 0.363, disagreement: 2.960, submittedAt: "2025-11-23T10:05:00Z" }',
+        '{ method: "MS-RAFT+", resultId: 51, springMetric: 0.643, disagreement: 3.620, submittedAt: "2022-11-01T13:00:00Z" }',
+        '{ method: "FlowFormer", resultId: 54, springMetric: 0.723, disagreement: 3.770, submittedAt: "2022-11-01T13:00:00Z" }',
+        '{ method: "FlowNet2", resultId: 56, springMetric: 1.040, disagreement: 7.010, submittedAt: "2022-05-01T09:29:00Z" }',
+        '{ method: "RoCo-Spring Team Baselines-Optical Flow", resultId: 460, springMetric: 1.493, disagreement: 4.360, submittedAt: "2026-08-14T14:16:00Z" }',
+        '{ method: "RAFT", resultId: 52, springMetric: 1.476, disagreement: 5.640, submittedAt: "2022-11-01T13:00:00Z" }',
+        '{ method: "GMA", resultId: 53, springMetric: 0.914, disagreement: 4.030, submittedAt: "2022-11-01T13:00:00Z" }',
+        '{ method: "GMFlow", resultId: 58, springMetric: 0.945, disagreement: 2.980, submittedAt: "2022-11-01T13:00:00Z" }',
+        '{ method: "RAFT-3D (K)", resultId: 71, springMetric: 2.528, disagreement: 5.030, submittedAt: "2022-11-08T16:15:00Z" }',
+        '{ method: "M-FUSE (K)", resultId: 64, springMetric: 2.526, disagreement: 3.390, submittedAt: "2022-11-01T13:00:00Z" }',
+        '{ method: "SPyNet", resultId: 55, springMetric: 4.162, disagreement: 4.290, submittedAt: "2022-11-01T13:00:00Z" }',
+        '{ method: "PWCNet", resultId: 57, springMetric: 2.288, disagreement: 7.250, submittedAt: "2022-11-01T13:00:00Z" }',
+        '{ method: "RAFT-Stereo", resultId: 66, springMetric: 3.025, disagreement: 16.570, submittedAt: "2022-11-01T13:00:00Z" }',
+        '{ method: "ACVNet", resultId: 68, springMetric: 1.516, disagreement: 15.790, submittedAt: "2022-11-01T13:00:00Z" }',
+        '{ method: "RoCo-Spring Team Baselines-Stereo", resultId: 458, springMetric: 3.875, disagreement: 18.908, submittedAt: "2026-08-13T00:24:00Z" }',
+        '{ method: "LEAStereo", resultId: 60, springMetric: 3.884, disagreement: 21.900, submittedAt: "2022-11-01T13:00:00Z" }',
+        '{ method: "GANet", resultId: 59, springMetric: 4.594, disagreement: 12.110, submittedAt: "2022-11-01T13:00:00Z" }',
+        '{ method: "GANet (K)", resultId: 204, springMetric: 5.287, disagreement: 6.440, submittedAt: "2025-03-07T10:25:00Z" }',
+        '{ method: "LEAStereo (K)", resultId: 205, springMetric: 6.145, disagreement: 8.240, submittedAt: "2025-03-07T11:32:00Z" }'
+    ]) {
+        assert.ok(script.includes(definition), definition);
+    }
+    assert.match(script, /method: "M-FUSE \(K\)",\s*resultId: 64,\s*springComponents: \{ d1: 7\.890, d2: 8\.076, flow: 2\.526 \},\s*disagreementComponents: \{ d1: 21\.900, d2: 0\.290, flow: 3\.390 \}/u);
+    assert.match(script, /method: "RAFT-3D \(K\)",\s*resultId: 71,\s*springComponents: \{ d1: 7\.042, d2: 7\.111, flow: 2\.528 \},\s*disagreementComponents: \{ d1: 12\.110, d2: 0\.140, flow: 5\.030 \}/u);
+    assert.match(script, /method: "RoCo-Spring Team Baselines-Scene Flow",\s*resultId: 462,\s*springComponents: \{ d1: 3\.875, d2: 3\.802, flow: 1\.250 \},\s*disagreementComponents: \{ d1: 18\.908, d2: 18\.590, flow: 6\.813 \}/u);
+    assert.match(script, /disagreementComponents: \{ d1: 21\.900, d2: 0\.290, flow: 3\.390 \},\s*submittedAt: "2022-11-01T13:00:00Z"/u);
+    assert.match(script, /disagreementComponents: \{ d1: 12\.110, d2: 0\.140, flow: 5\.030 \},\s*submittedAt: "2022-11-08T16:15:00Z"/u);
+    assert.match(script, /Array\.isArray\(team\.submissionHistory\?\.\[trackKey\]\)/u);
+    assert.match(script, /distinct\.set\(resultIdentity\(result, index\), normalizeResult\(result\)\)/u);
+    assert.match(script, /score: roundMetric\(0\.5 \* springTerm \+ 0\.5 \* robustSpringTerm\)/u);
+    assert.match(script, /entry\.springComponents\.d1 \/ springBaseline\.d1/u);
+    assert.match(script, /robustSpringComponents\.flow \/ robustBaseline\.flow/u);
+    assert.match(script, /benchmarkUrl: `https:\/\/spring-benchmark\.org\/\$\{entry\.resultId\}\//u);
+    assert.match(script, /const allRows = rowsForTrack\(snapshot, track\.key\)/u);
+    assert.match(script, /Rows labeled Baseline are score-sorted, unranked Spring-Team references with complete Spring and RobustSpring metrics/u);
+    assert.match(style, /\.leaderboard-row--baseline/u);
+    assert.match(style, /\.leaderboard-baseline-badge/u);
+    assert.match(style, /\.leaderboard-method-cell/u);
     assert.match(script, /node\.textContent = "— 0"/u);
     assert.match(script, /return "—"/u);
     assert.match(script, /isFiniteNumber\(row\.rank\) \? String\(row\.rank\) : "—"/u);
-    assert.match(script, /Swipe or scroll horizontally to see every column\./u);
+    assert.match(script, /Scroll horizontally to see every column\./u);
     assert.match(script, /window\.RoCoLeaderboard = Object\.freeze/u);
     assert.match(script, /setDataSource\(loader\)/u);
     assert.match(script, /return initialRefreshPromise\.then\(\(\) =>/u);
@@ -259,7 +306,9 @@ test("leaderboard UI is data-driven, documents the additive proxy, and is wired 
     assert.match(evaluation, /18\.4505/u);
     assert.match(evaluation, /24\.471/u);
     assert.match(evaluation, /arithmetic mean of a team's Optical Flow/u);
-    assert.match(evaluation, /numeric team ID as the deterministic final key/u);
+    assert.match(evaluation, /most recently submitted complete method/u);
+    assert.match(evaluation, /Lower organizer-issued numeric team ID/u);
+    assert.match(evaluation, /Lower immutable numeric Spring result ID/u);
     assert.match(evaluation, /Automatic matches are provisional/u);
     assert.match(evaluation, /same method,[\s\S]{0,100}checkpoint,[\s\S]{0,100}clean outputs/u);
     assert.match(evaluation, /separate RobustSpring upload time is not exposed publicly/u);
@@ -508,16 +557,19 @@ test("registration page includes the exact introduction and required controls", 
     assert.match(html, /Member names and contact details remain private\./u);
 });
 
-test("registration page includes a concise regional Google-services access notice", async () => {
+test("registration page documents and preloads global security verification", async () => {
     const html = (await source("team-registration.html")).replace(/\s+/gu, " ");
     assert.match(
         html,
-        /class="portal-region-notice" role="note">\s*<strong>Regional access notice:<\/strong> If Google services are blocked or unavailable in your region, registration and sign-in may not work\. Where permitted, we recommend using a trusted VPN; this has worked smoothly in our testing\.\s*<\/p>/u
+        /class="portal-region-notice" role="note">\s*<strong>Global security verification:<\/strong> Registration uses Google's official <code>www\.recaptcha\.net<\/code> endpoint for regions where <code>www\.google\.com<\/code> is unavailable\. Browser privacy extensions must allow this endpoint for registration\.\s*<\/p>/u
     );
     assert.ok(
         html.indexOf("Team Registration and Account")
-        < html.indexOf("Regional access notice:")
+        < html.indexOf("Global security verification:")
     );
+    const enterpriseLoader = 'src="https://www.recaptcha.net/recaptcha/enterprise.js?render=explicit"';
+    assert.ok(html.includes(enterpriseLoader));
+    assert.ok(html.indexOf(enterpriseLoader) < html.indexOf('src="assets/team-registration.js"'));
 });
 
 test("registration success includes an initially hidden spam-folder reminder", async () => {

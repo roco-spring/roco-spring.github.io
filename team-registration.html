@@ -34,9 +34,9 @@
                         <p class="portal-subtitle">Everything your team needs to enter, update, and stay ready for
                             RoCo-Spring.</p>
                         <p class="portal-region-notice" role="note">
-                            <strong>Regional access notice:</strong> If Google services are blocked or unavailable in
-                            your region, registration and sign-in may not work. Where permitted, we recommend using a
-                            trusted VPN; this has worked smoothly in our testing.
+                            <strong>Global security verification:</strong> Registration uses Google's official
+                            <code>www.recaptcha.net</code> endpoint for regions where <code>www.google.com</code> is
+                            unavailable. Browser privacy extensions must allow this endpoint for registration.
                         </p>
                     </div>
                     <div class="portal-mark" aria-hidden="true">
@@ -458,6 +458,9 @@
 
     <script src="assets/flow.js"></script>
     <script src="assets/team-registration-fallback.js"></script>
+    <!-- Google documents recaptcha.net as its globally accessible reCAPTCHA endpoint. Loading it before
+         Firebase App Check prevents the SDK from selecting the less widely reachable google.com host. -->
+    <script src="https://www.recaptcha.net/recaptcha/enterprise.js?render=explicit"></script>
     <script type="module" src="assets/team-registration.js"></script>
 </body>
 

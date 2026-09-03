@@ -55,7 +55,7 @@ const LIVE_LEADERBOARD_SNAPSHOT = Object.freeze({
     sourceLabel: "Live Spring and RobustSpring public benchmark snapshot",
     scoringConvention: "organizer-approved-additive-proxy",
     baselines: EXPECTED_LEADERBOARD_BASELINES,
-    teams: Object.freeze(Array.from({ length: 25 }, (_, index) => Object.freeze({
+    teams: Object.freeze(Array.from({ length: 32 }, (_, index) => Object.freeze({
         teamId: `RoCo-${index + 8}`,
         teamName: `Public Team ${index + 8}`,
         registeredTracks: Object.freeze(["optical-flow"]),
@@ -100,9 +100,9 @@ test("live App Check probe accepts only the expected handler validation boundary
 });
 
 test("live leaderboard proof accepts only a fresh or valid-cache public snapshot", () => {
-    assert.equal(KNOWN_PUBLIC_TEAM_IDS.size, 25);
+    assert.equal(KNOWN_PUBLIC_TEAM_IDS.size, 32);
     assert.deepEqual(verifyLiveLeaderboardSnapshot(LIVE_LEADERBOARD_SNAPSHOT), {
-        teamCount: 25,
+        teamCount: 32,
         syncStatus: "fresh"
     });
     assert.doesNotThrow(() => verifyLiveLeaderboardSnapshot({

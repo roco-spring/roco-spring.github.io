@@ -3881,7 +3881,7 @@ details p {
 }
 
 .leaderboard-scroll-hint {
-    display: none;
+    display: block;
     margin: -4px 0 11px;
     color: rgba(255, 255, 255, 0.72);
     font-size: 0.76rem;
@@ -3902,7 +3902,7 @@ details p {
 }
 
 .leaderboard-table {
-    min-width: 940px;
+    min-width: 1120px;
 }
 
 .leaderboard-table th,
@@ -4031,14 +4031,25 @@ details p {
     font-weight: 700;
 }
 
+.leaderboard-table .leaderboard-method-cell {
+    min-width: 210px;
+    max-width: 250px;
+}
+
 .leaderboard-method {
-    max-width: 190px;
+    display: inline-block;
+    max-width: 220px;
     overflow: hidden;
     color: #8adfff;
-    font-size: 0.7rem;
+    font-size: 0.76rem;
     font-weight: 750;
     text-overflow: ellipsis;
     white-space: nowrap;
+}
+
+.leaderboard-method-placeholder {
+    color: rgba(255, 255, 255, 0.58);
+    font-weight: 750;
 }
 
 a.leaderboard-method:hover,
@@ -4063,6 +4074,18 @@ a.leaderboard-method:focus-visible {
     text-transform: uppercase;
 }
 
+.leaderboard-baseline-badge {
+    padding: 2px 7px;
+    border: 1px solid rgba(218, 226, 237, 0.32);
+    border-radius: 999px;
+    color: rgba(243, 246, 250, 0.92);
+    background: rgba(218, 226, 237, 0.1);
+    font-size: 0.65rem;
+    font-weight: 850;
+    letter-spacing: 0.045em;
+    text-transform: uppercase;
+}
+
 .leaderboard-score {
     color: #8adfff !important;
     font-size: 0.98rem;
@@ -4083,6 +4106,48 @@ a.leaderboard-method:focus-visible {
 .leaderboard-row--pending .leaderboard-metric,
 .leaderboard-row--pending .leaderboard-submitted {
     color: rgba(255, 255, 255, 0.72) !important;
+}
+
+/* Paper baselines are score-sorted references, never ranked participants. */
+.leaderboard-table tbody .leaderboard-row--baseline,
+.leaderboard-table tbody .leaderboard-row--baseline:hover {
+    background:
+        linear-gradient(90deg, rgba(213, 221, 232, 0.105), rgba(186, 197, 212, 0.045));
+}
+
+.leaderboard-row--baseline > :first-child {
+    box-shadow: inset 3px 0 0 rgba(213, 221, 232, 0.5);
+}
+
+.leaderboard-row--baseline .leaderboard-rank {
+    color: rgba(240, 244, 249, 0.74);
+    border-color: rgba(213, 221, 232, 0.22);
+    background: rgba(213, 221, 232, 0.07);
+    box-shadow: none;
+}
+
+.leaderboard-row--baseline .rank-change--baseline,
+.leaderboard-row--baseline .leaderboard-team-id,
+.leaderboard-row--baseline .leaderboard-metric,
+.leaderboard-row--baseline .leaderboard-submitted {
+    color: rgba(230, 235, 242, 0.72) !important;
+}
+
+.leaderboard-row--baseline .leaderboard-team-name {
+    color: rgba(247, 249, 252, 0.9);
+}
+
+.leaderboard-row--baseline .leaderboard-score {
+    color: rgba(233, 239, 247, 0.9) !important;
+}
+
+.leaderboard-row--baseline .leaderboard-method {
+    color: rgba(225, 232, 241, 0.9);
+}
+
+.leaderboard-row--baseline a.leaderboard-method:hover,
+.leaderboard-row--baseline a.leaderboard-method:focus-visible {
+    color: white;
 }
 
 .leaderboard-preview-section {
@@ -4190,6 +4255,10 @@ a.leaderboard-method:focus-visible {
 .leaderboard-preview-team small {
     color: rgba(255, 255, 255, 0.72);
     font-size: 0.68rem;
+}
+
+.leaderboard-preview-team .leaderboard-preview-method {
+    color: #8adfff;
 }
 
 .leaderboard-preview-score,

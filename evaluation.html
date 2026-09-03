@@ -376,7 +376,9 @@
                 <p>
                     The <strong>Cross-Task score</strong> is the arithmetic mean of a team's Optical Flow,
                     Stereo Matching, and Scene Flow RbS-Scores. It is published only after the team has a
-                    valid result in all three quantitative tasks.
+                    valid result in all three quantitative tasks. When a team has several methods in one
+                    task, the most recently submitted complete method is used for that task's Cross-Task
+                    component; the task leaderboard continues to show every retained method separately.
                 </p>
 
                 <h3>Tie-Breaking</h3>
@@ -389,7 +391,8 @@
                     <ol>
                         <li>Lower normalized RobustSpring term</li>
                         <li>Lower normalized Spring term</li>
-                        <li>Lower organizer-issued numeric team ID as the deterministic final key</li>
+                        <li>Lower organizer-issued numeric team ID</li>
+                        <li>Lower immutable numeric Spring result ID when the same team still has an exact tie</li>
                     </ol>
             </div>
         </section>

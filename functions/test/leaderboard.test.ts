@@ -556,9 +556,9 @@ describe("leaderboard scoring", () => {
       {
         ...empty,
         opticalFlowAccuracy:
-          listRow(503, "aneev entry", clean(5)) + listRow(504, "Swarm entry", clean(1)),
+          listRow(501, "aneev entry", clean(5)) + listRow(502, "Swarm entry", clean(1)),
         opticalFlowRobustness:
-          listRow(503, "aneev entry", [5]) + listRow(504, "Swarm entry", [1]),
+          listRow(501, "aneev entry", [5]) + listRow(502, "Swarm entry", [1]),
       },
       () => Promise.resolve(detailPage(0, 0, 0)),
       first,
@@ -568,6 +568,77 @@ describe("leaderboard scoring", () => {
       ?.results["optical-flow"]?.rankChange).toBe(-1);
     expect(second.teams.find((team) => team.teamId === "RoCo-16")
       ?.results["optical-flow"]?.rankChange).toBe(1);
+  });
+
+  it("ranks every named method and tracks movement by its stable benchmark URL", async () => {
+    const clean = (value: number): number[] => {
+      const metrics = Array.from({ length: 13 }, () => 0);
+      metrics[12] = value;
+      return metrics;
+    };
+    const empty = {
+      stereoAccuracy: "",
+      stereoRobustness: "",
+      sceneFlowAccuracy: "",
+      sceneFlowRobustness: "",
+    };
+    const first = await buildLeaderboardSnapshot(
+      roster,
+      {
+        ...empty,
+        opticalFlowAccuracy:
+          listRow(531, "RoCo-12 Method A", clean(1)) +
+          listRow(532, "RoCo-12 Method B", clean(4)) +
+          listRow(533, "RoCo-16 Method C", clean(2)),
+        opticalFlowRobustness:
+          listRow(531, "RoCo-12 Method A", [1]) +
+          listRow(532, "RoCo-12 Method B", [4]) +
+          listRow(533, "RoCo-16 Method C", [2]),
+      },
+      () => Promise.resolve(detailPage(0, 0, 0)),
+      null,
+      new Date("2026-08-29T18:00:00.000Z"),
+    );
+    const second = await buildLeaderboardSnapshot(
+      roster,
+      {
+        ...empty,
+        opticalFlowAccuracy:
+          listRow(531, "RoCo-12 Method A", clean(1)) +
+          listRow(532, "RoCo-12 Method B", clean(4)) +
+          listRow(533, "RoCo-16 Method C", clean(2)) +
+          listRow(534, "RoCo-16 Method D", clean(0.5)),
+        opticalFlowRobustness:
+          listRow(531, "RoCo-12 Method A", [1]) +
+          listRow(532, "RoCo-12 Method B", [4]) +
+          listRow(533, "RoCo-16 Method C", [2]) +
+          listRow(534, "RoCo-16 Method D", [0.5]),
+      },
+      () => Promise.resolve(detailPage(0, 0, 0)),
+      first,
+      new Date("2026-08-29T18:05:00.000Z"),
+    );
+
+    const aneev = second.teams.find((team) => team.teamId === "RoCo-12");
+    const swarm = second.teams.find((team) => team.teamId === "RoCo-16");
+    expect(aneev?.submissionHistory["optical-flow"]?.map((result) => [
+      result.benchmarkMethod,
+      result.rankChange,
+    ])).toEqual([
+      ["RoCo-12 Method A", -1],
+      ["RoCo-12 Method B", -1],
+    ]);
+    expect(swarm?.submissionHistory["optical-flow"]?.map((result) => [
+      result.benchmarkMethod,
+      result.rankChange,
+    ])).toEqual([
+      ["RoCo-16 Method C", -1],
+      ["RoCo-16 Method D", 0],
+    ]);
+    expect(aneev?.results["optical-flow"]?.benchmarkMethod).toBe("RoCo-12 Method B");
+    expect(aneev?.results["optical-flow"]?.rankChange).toBe(-1);
+    expect(swarm?.results["optical-flow"]?.benchmarkMethod).toBe("RoCo-16 Method D");
+    expect(swarm?.results["optical-flow"]?.rankChange).toBe(0);
   });
 
   it("drops cached results and history when a team unregisters a track", async () => {

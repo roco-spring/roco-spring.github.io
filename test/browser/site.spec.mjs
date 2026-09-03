@@ -8,6 +8,27 @@ const SITE_PAGES = [
   "rules-faq.html"
 ];
 
+const LEADERBOARD_BASELINES = {
+  "optical-flow": {
+    spring: 0.9925,
+    medianDisagreement: 4.16,
+    robustSpringProxy: 6.03,
+    methodCount: 8
+  },
+  "stereo-matching": {
+    spring: 3.4545,
+    medianDisagreement: 16.18,
+    robustSpringProxy: 18.4505,
+    methodCount: 4
+  },
+  "scene-flow": {
+    methodCount: 2,
+    spring: { disparity1Abs: 7.466, disparity2Abs: 7.5935, flowEpe: 2.527 },
+    medianDisagreement: { disparity1Abs: 17.005, disparity2Abs: 0.215, flowEpe: 4.21 },
+    robustSpringProxy: { disparity1Abs: 24.471, disparity2Abs: 7.8085, flowEpe: 6.737 }
+  }
+};
+
 for (const path of SITE_PAGES) {
   test(`${path} renders shared chrome and flow canvas without page errors`, async ({ page }) => {
     const pageErrors = [];
@@ -50,22 +71,69 @@ test("Leaderboard tabs render the complete pending roster and expose live refres
   await expect(tabs.nth(3)).toHaveText("Cross-Task");
   await expect(tabs.nth(0)).toHaveAttribute("aria-selected", "true");
 
-  const visibleRows = page.locator('[role="tabpanel"]:not([hidden]) tbody tr');
-  await expect(visibleRows).toHaveCount(21);
-  await expect(visibleRows.locator(".leaderboard-pending-badge")).toHaveCount(21);
-  await expect(visibleRows.first().locator(".leaderboard-rank")).toHaveText("—");
-  await expect(visibleRows.first().locator(".rank-change")).toHaveText("— 0");
-  await expect(visibleRows.first().locator(".leaderboard-score")).toHaveText("—");
+  const visiblePanel = page.locator('[role="tabpanel"]:not([hidden])');
+  const participantRows = visiblePanel.locator("tbody tr:not(.leaderboard-row--baseline)");
+  const baselineRows = visiblePanel.locator("tbody tr.leaderboard-row--baseline");
+  await expect(visiblePanel.locator("thead th")).toHaveCount(8);
+  await expect(visiblePanel.getByRole("columnheader", { name: "Method Name" })).toBeVisible();
+  await expect(participantRows).toHaveCount(27);
+  await expect(participantRows.locator(".leaderboard-pending-badge")).toHaveCount(27);
+  await expect(participantRows.first().locator(".leaderboard-rank")).toHaveText("—");
+  await expect(participantRows.first().locator(".rank-change")).toHaveText("— 0");
+  await expect(participantRows.first().locator(".leaderboard-score")).toHaveText("—");
+  await expect(participantRows.first().locator(".leaderboard-method-placeholder")).toHaveText("—");
+  await expect(baselineRows).toHaveCount(12);
+  await expect(baselineRows.locator(".leaderboard-baseline-badge")).toHaveCount(12);
+  await expect(baselineRows.locator(".leaderboard-team-name"))
+    .toHaveText(Array.from({ length: 12 }, () => "Spring Team"));
+  await expect(baselineRows.locator(".leaderboard-method")).toHaveCount(12);
+  await expect(baselineRows.first().locator(".leaderboard-rank")).toHaveAttribute("aria-hidden", "true");
+  await expect(baselineRows.first().locator(".rank-change"))
+    .toHaveAttribute("aria-label", "Rank movement does not apply to baselines");
+  await expect(visiblePanel.locator(".leaderboard-panel-note"))
+    .toContainText("do not affect participant standings");
+
+  const opticalBaselineNames = (await baselineRows.locator(".leaderboard-method").allTextContents()).sort();
+  expect(opticalBaselineNames).toEqual([
+    "(Baseline) FlowFormer", "(Baseline) FlowNet2", "(Baseline) GMA", "(Baseline) GMFlow",
+    "(Baseline) M-FUSE (K)", "(Baseline) MS-RAFT+", "(Baseline) PWCNet", "(Baseline) RAFT",
+    "(Baseline) RAFT-3D (K)", "(Baseline) RoCo-Spring Team Baselines-Optical Flow",
+    "(Baseline) SEA-RAFT", "(Baseline) SPyNet"
+  ].sort());
+  const opticalBaselineScores = (await baselineRows.locator(".leaderboard-score").allTextContents())
+    .map(Number);
+  expect(opticalBaselineScores).toEqual([
+    0.4584, 0.6774, 0.7368, 0.8015, 0.8704, 1.1914, 1.2375, 1.3336,
+    1.7631, 1.9003, 1.9435, 2.7976
+  ]);
+  await expect(baselineRows.filter({ hasText: "(Baseline) MS-RAFT+" }).locator(".leaderboard-submitted"))
+    .toHaveAttribute("title", "2022-11-01T13:00:00Z");
+  await expect(baselineRows.filter({ hasText: "(Baseline) FlowNet2" }).locator(".leaderboard-submitted"))
+    .toHaveAttribute("title", "2022-05-01T09:29:00Z");
+  await expect(baselineRows.filter({ hasText: "Baselines-Optical Flow" }).locator(".leaderboard-method"))
+    .toHaveAttribute("title", "(Baseline) RoCo-Spring Team Baselines-Optical Flow");
 
   await tabs.nth(1).click();
-  await expect(visibleRows).toHaveCount(15);
+  await expect(participantRows).toHaveCount(21);
+  await expect(baselineRows).toHaveCount(7);
+  await expect(baselineRows.locator(".leaderboard-score"))
+    .toHaveText(["0.6884", "0.9689", "1.0830", "1.1176", "1.1783", "1.2609", "1.2792"]);
   await tabs.nth(1).press("ArrowRight");
   await expect(tabs.nth(2)).toHaveAttribute("aria-selected", "true");
   await expect(tabs.nth(2)).toBeFocused();
-  await expect(visibleRows).toHaveCount(15);
+  await expect(participantRows).toHaveCount(21);
+  await expect(baselineRows).toHaveCount(3);
+  await expect(baselineRows.locator(".leaderboard-score")).toHaveText(["0.9522", "1.0478", "1.0850"]);
+  await expect(baselineRows.first().locator(".leaderboard-submitted"))
+    .toHaveAttribute("title", "2022-11-08T16:15:00Z");
+  await expect(baselineRows.first().locator(".leaderboard-metric").nth(0))
+    .toHaveAttribute("title", /Spring components: d1/u);
+  await expect(baselineRows.first().locator(".leaderboard-metric").nth(1))
+    .toHaveAttribute("title", /RobustSpring proxy components: d1/u);
 
   await tabs.nth(3).click();
-  await expect(visibleRows).toHaveCount(12);
+  await expect(participantRows).toHaveCount(18);
+  await expect(baselineRows).toHaveCount(0);
   await expect(page.locator("[data-leaderboard-updated]")).not.toHaveText("Loading…");
   await expect(page.locator("#leaderboard-refresh-note")).toContainText("public Spring/RobustSpring results");
 
@@ -75,11 +143,28 @@ test("Leaderboard tabs render the complete pending roster and expose live refres
   await expect(page.locator("[data-leaderboard-refresh-status]")).toBeVisible();
 });
 
+test("leaderboard method and baseline columns stay contained on mobile", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/evaluation.html");
+
+  const tableWrap = page.locator('[role="tabpanel"]:not([hidden]) .leaderboard-table-wrap');
+  await expect(tableWrap).toBeVisible();
+  const dimensions = await tableWrap.evaluate((wrapper) => ({
+    pageClientWidth: document.documentElement.clientWidth,
+    pageScrollWidth: document.documentElement.scrollWidth,
+    wrapperClientWidth: wrapper.clientWidth,
+    wrapperScrollWidth: wrapper.scrollWidth
+  }));
+  expect(dimensions.pageScrollWidth).toBeLessThanOrEqual(dimensions.pageClientWidth + 1);
+  expect(dimensions.wrapperScrollWidth).toBeGreaterThan(dimensions.wrapperClientWidth);
+  await expect(page.locator('[role="tabpanel"]:not([hidden]) .leaderboard-scroll-hint')).toBeVisible();
+});
+
 test("live leaderboard renders scored results and only forces explicit user refreshes", async ({ page }) => {
   await page.goto("/evaluation.html");
   await page.waitForFunction(() => Boolean(window.RoCoLeaderboardLive));
 
-  await page.evaluate(async () => {
+  await page.evaluate(async (baselines) => {
     window.__leaderboardTestForces = [];
     window.__leaderboardTestForcedCalls = 0;
     await window.RoCoLeaderboardLive.installDataSource(async ({ force }) => {
@@ -87,26 +172,41 @@ test("live leaderboard renders scored results and only forces explicit user refr
       if (force) window.__leaderboardTestForcedCalls += 1;
       const stale = window.__leaderboardTestForcedCalls === 2;
       const cacheHit = window.__leaderboardTestForcedCalls > 2;
+      const turboFlow = {
+        rankChange: 2,
+        score: 0.4321,
+        springMetric: 0.8,
+        robustSpringMetric: 4.2,
+        springTerm: 0.806045,
+        robustSpringTerm: 0.696517,
+        submittedAt: "2026-08-29T17:59:00.000Z",
+        benchmarkMethod: "RoCo-99 TurboFlow",
+        benchmarkUrl: "https://spring-benchmark.org/999/"
+      };
+      const classicFlow = {
+        rankChange: -1,
+        score: 1.4321,
+        springMetric: 1.8,
+        robustSpringMetric: 6.2,
+        springTerm: 1.813602,
+        robustSpringTerm: 1.028192,
+        submittedAt: "2026-08-28T17:59:00.000Z",
+        benchmarkMethod: "RoCo-99 ClassicFlow",
+        benchmarkUrl: "https://spring-benchmark.org/998/"
+      };
       return {
         snapshot: {
           schemaVersion: 2,
           updatedAt: stale ? "2026-08-29T18:00:00.000Z" : "2026-08-29T18:05:00.000Z",
           sourceLabel: "Browser-tested live snapshot",
           syncStatus: stale ? "stale-cache" : ((force && !cacheHit) ? "fresh" : "cache-hit"),
+          baselines,
           teams: [{
             teamId: "RoCo-99",
             teamName: "Browser Racing",
             registeredTracks: ["optical-flow", "stereo-matching", "scene-flow"],
             results: {
-              "optical-flow": {
-                rankChange: 2,
-                score: 0.4321,
-                springMetric: 0.8,
-                robustSpringMetric: 4.2,
-                submittedAt: "2026-08-29T17:59:00.000Z",
-                benchmarkMethod: "RoCo-99 TurboFlow",
-                benchmarkUrl: "https://spring-benchmark.org/999/"
-              },
+              "optical-flow": turboFlow,
               "stereo-matching": {
                 rankChange: 0,
                 score: 0.5,
@@ -128,23 +228,34 @@ test("live leaderboard renders scored results and only forces explicit user refr
                 robustSpringMetric: 0.7,
                 submittedAt: "2026-08-29T17:59:00.000Z"
               }
+            },
+            submissionHistory: {
+              "optical-flow": [classicFlow, { ...turboFlow, rankChange: 0 }]
             }
           }]
         },
         syncState: stale ? "stale" : ((force && !cacheHit) ? "synchronized" : "cached")
       };
     });
-  });
+  }, LEADERBOARD_BASELINES);
 
-  const visibleRow = page.locator('[role="tabpanel"]:not([hidden]) tbody tr');
-  await expect(visibleRow).toHaveCount(1);
-  await expect(visibleRow.locator(".leaderboard-rank")).toHaveText("1");
-  await expect(visibleRow.locator(".rank-change")).toHaveText("▲ 2");
-  await expect(visibleRow.locator(".leaderboard-team-name")).toHaveText("Browser Racing");
-  await expect(visibleRow.locator(".leaderboard-score")).toHaveText("0.4321");
-  await expect(visibleRow.locator(".leaderboard-method")).toHaveAttribute(
-    "href",
-    "https://spring-benchmark.org/999/"
+  const visiblePanel = page.locator('[role="tabpanel"]:not([hidden])');
+  const participantRows = visiblePanel.locator("tbody tr:not(.leaderboard-row--baseline)");
+  const baselineRows = visiblePanel.locator("tbody tr.leaderboard-row--baseline");
+  await expect(participantRows).toHaveCount(2);
+  await expect(baselineRows).toHaveCount(12);
+  await expect(participantRows.locator(".leaderboard-rank")).toHaveText(["1", "2"]);
+  await expect(participantRows.locator(".rank-change")).toHaveText(["▲ 2", "▼ 1"]);
+  await expect(participantRows.locator(".leaderboard-team-name"))
+    .toHaveText(["Browser Racing", "Browser Racing"]);
+  await expect(participantRows.locator(".leaderboard-score")).toHaveText(["0.4321", "1.4321"]);
+  await expect(participantRows.locator(".leaderboard-method"))
+    .toHaveText(["RoCo-99 TurboFlow", "RoCo-99 ClassicFlow"]);
+  await expect(participantRows.locator(".leaderboard-method").nth(0)).toHaveAttribute(
+    "href", "https://spring-benchmark.org/999/"
+  );
+  await expect(participantRows.locator(".leaderboard-method").nth(1)).toHaveAttribute(
+    "href", "https://spring-benchmark.org/998/"
   );
   await expect.poll(() => page.evaluate(() => window.__leaderboardTestForces))
     .toEqual([false]);
@@ -174,12 +285,12 @@ test("live leaderboard renders scored results and only forces explicit user refr
     .toEqual([false, true, true, true]);
 });
 
-test("exact leaderboard ties use the same numeric team-ID key as rank-change history", async ({ page }) => {
+test("exact leaderboard ties use numeric team ID and then benchmark URL", async ({ page }) => {
   await page.goto("/evaluation.html");
   await page.waitForFunction(() => Boolean(window.RoCoLeaderboardLive));
 
   await page.evaluate(async () => {
-    const result = (teamId) => ({
+    const result = (teamId, resultId) => ({
       rankChange: 0,
       score: 1,
       springMetric: 1,
@@ -187,8 +298,8 @@ test("exact leaderboard ties use the same numeric team-ID key as rank-change his
       springTerm: 1,
       robustSpringTerm: 1,
       submittedAt: "2026-08-29T18:00:00.000Z",
-      benchmarkMethod: `${teamId} exact tie`,
-      benchmarkUrl: `https://spring-benchmark.org/${teamId === "RoCo-9" ? "901" : "999"}/`
+      benchmarkMethod: `${teamId} method ${resultId}`,
+      benchmarkUrl: `https://spring-benchmark.org/${resultId}/`
     });
     await window.RoCoLeaderboardLive.installDataSource(async () => ({
       syncState: "cached",
@@ -201,13 +312,16 @@ test("exact leaderboard ties use the same numeric team-ID key as rank-change his
             teamId: "RoCo-99",
             teamName: "Alpha Team",
             registeredTracks: ["optical-flow"],
-            results: { "optical-flow": result("RoCo-99") }
+            results: { "optical-flow": result("RoCo-99", 999) }
           },
           {
             teamId: "RoCo-9",
             teamName: "Zulu Team",
             registeredTracks: ["optical-flow"],
-            results: { "optical-flow": result("RoCo-9") }
+            results: { "optical-flow": result("RoCo-9", 901) },
+            submissionHistory: {
+              "optical-flow": [result("RoCo-9", 901), result("RoCo-9", 900)]
+            }
           }
         ]
       }
@@ -215,9 +329,12 @@ test("exact leaderboard ties use the same numeric team-ID key as rank-change his
   });
 
   const names = page.locator('[role="tabpanel"]:not([hidden]) .leaderboard-team-name');
-  await expect(names).toHaveText(["Zulu Team", "Alpha Team"]);
+  await expect(names).toHaveText(["Zulu Team", "Zulu Team", "Alpha Team"]);
+  await expect(page.locator('[role="tabpanel"]:not([hidden]) .leaderboard-method')).toHaveText([
+    "RoCo-9 method 900", "RoCo-9 method 901", "RoCo-99 method 999"
+  ]);
   await expect(page.locator('[role="tabpanel"]:not([hidden]) .leaderboard-rank'))
-    .toHaveText(["1", "2"]);
+    .toHaveText(["1", "2", "3"]);
 });
 
 test("homepage preview does not promote alphabetically sorted pending teams", async ({ page }) => {
@@ -242,9 +359,8 @@ test("registration portal starts with three slots, validates partial members, an
   await expect(page.locator("#public-auth")).toBeVisible({ timeout: 15_000 });
   await expect(page.locator(".portal-region-notice")).toBeVisible();
   await expect(page.locator(".portal-region-notice")).toHaveAttribute("role", "note");
-  await expect(page.locator(".portal-region-notice")).toContainText(
-    "If Google services are blocked or unavailable in your region"
-  );
+  await expect(page.locator(".portal-region-notice")).toContainText("Global security verification");
+  await expect(page.locator(".portal-region-notice")).toContainText("www.recaptcha.net");
   await expect(page.locator("#registration-members .member-slot")).toHaveCount(3);
   await expect(page.locator("#registration-members legend").first()).toContainText("Team member 1");
   await expect(page.locator("#registration-members legend").nth(2)).toContainText("Team member 3");

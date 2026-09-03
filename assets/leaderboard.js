@@ -31,6 +31,59 @@
         }
     ];
 
+    // These are all current Spring-team entries with complete values in both
+    // official Spring and RobustSpring table views. The smaller common-paper
+    // subset on evaluation.html still defines the fixed denominators; every
+    // reference score below is calculated against those same denominators.
+    const baselineMethods = Object.freeze({
+        "optical-flow": Object.freeze([
+            { method: "SEA-RAFT", resultId: 291, springMetric: 0.363, disagreement: 2.960, submittedAt: "2025-11-23T10:05:00Z" },
+            { method: "MS-RAFT+", resultId: 51, springMetric: 0.643, disagreement: 3.620, submittedAt: "2022-11-01T13:00:00Z" },
+            { method: "FlowFormer", resultId: 54, springMetric: 0.723, disagreement: 3.770, submittedAt: "2022-11-01T13:00:00Z" },
+            { method: "FlowNet2", resultId: 56, springMetric: 1.040, disagreement: 7.010, submittedAt: "2022-05-01T09:29:00Z" },
+            { method: "RoCo-Spring Team Baselines-Optical Flow", resultId: 460, springMetric: 1.493, disagreement: 4.360, submittedAt: "2026-08-14T14:16:00Z" },
+            { method: "RAFT", resultId: 52, springMetric: 1.476, disagreement: 5.640, submittedAt: "2022-11-01T13:00:00Z" },
+            { method: "GMA", resultId: 53, springMetric: 0.914, disagreement: 4.030, submittedAt: "2022-11-01T13:00:00Z" },
+            { method: "GMFlow", resultId: 58, springMetric: 0.945, disagreement: 2.980, submittedAt: "2022-11-01T13:00:00Z" },
+            { method: "RAFT-3D (K)", resultId: 71, springMetric: 2.528, disagreement: 5.030, submittedAt: "2022-11-08T16:15:00Z" },
+            { method: "M-FUSE (K)", resultId: 64, springMetric: 2.526, disagreement: 3.390, submittedAt: "2022-11-01T13:00:00Z" },
+            { method: "SPyNet", resultId: 55, springMetric: 4.162, disagreement: 4.290, submittedAt: "2022-11-01T13:00:00Z" },
+            { method: "PWCNet", resultId: 57, springMetric: 2.288, disagreement: 7.250, submittedAt: "2022-11-01T13:00:00Z" }
+        ]),
+        "stereo-matching": Object.freeze([
+            { method: "RAFT-Stereo", resultId: 66, springMetric: 3.025, disagreement: 16.570, submittedAt: "2022-11-01T13:00:00Z" },
+            { method: "ACVNet", resultId: 68, springMetric: 1.516, disagreement: 15.790, submittedAt: "2022-11-01T13:00:00Z" },
+            { method: "RoCo-Spring Team Baselines-Stereo", resultId: 458, springMetric: 3.875, disagreement: 18.908, submittedAt: "2026-08-13T00:24:00Z" },
+            { method: "LEAStereo", resultId: 60, springMetric: 3.884, disagreement: 21.900, submittedAt: "2022-11-01T13:00:00Z" },
+            { method: "GANet", resultId: 59, springMetric: 4.594, disagreement: 12.110, submittedAt: "2022-11-01T13:00:00Z" },
+            { method: "GANet (K)", resultId: 204, springMetric: 5.287, disagreement: 6.440, submittedAt: "2025-03-07T10:25:00Z" },
+            { method: "LEAStereo (K)", resultId: 205, springMetric: 6.145, disagreement: 8.240, submittedAt: "2025-03-07T11:32:00Z" }
+        ]),
+        "scene-flow": Object.freeze([
+            {
+                method: "RoCo-Spring Team Baselines-Scene Flow",
+                resultId: 462,
+                springComponents: { d1: 3.875, d2: 3.802, flow: 1.250 },
+                disagreementComponents: { d1: 18.908, d2: 18.590, flow: 6.813 },
+                submittedAt: "2026-08-16T02:54:00Z"
+            },
+            {
+                method: "M-FUSE (K)",
+                resultId: 64,
+                springComponents: { d1: 7.890, d2: 8.076, flow: 2.526 },
+                disagreementComponents: { d1: 21.900, d2: 0.290, flow: 3.390 },
+                submittedAt: "2022-11-01T13:00:00Z"
+            },
+            {
+                method: "RAFT-3D (K)",
+                resultId: 71,
+                springComponents: { d1: 7.042, d2: 7.111, flow: 2.528 },
+                disagreementComponents: { d1: 12.110, d2: 0.140, flow: 5.030 },
+                submittedAt: "2022-11-08T16:15:00Z"
+            }
+        ])
+    });
+
     let currentSnapshot = null;
     let selectedTrack = tracks[0].key;
     let loadSnapshot = loadPublishedSnapshot;
@@ -48,10 +101,7 @@
         return typeof value === "number" && Number.isFinite(value);
     }
 
-    function resultForTrack(team, trackKey) {
-        const taskResult = team.results?.[trackKey];
-        const result = taskResult && typeof taskResult === "object" ? taskResult : team;
-
+    function normalizeResult(result) {
         return {
             rankChange: isFiniteNumber(result.rankChange) ? result.rankChange : 0,
             score: isFiniteNumber(result.score) ? result.score : null,
@@ -67,6 +117,43 @@
         };
     }
 
+    function resultIdentity(result, index) {
+        if (typeof result.benchmarkUrl === "string" && result.benchmarkUrl.trim()) {
+            return `url:${result.benchmarkUrl.trim()}`;
+        }
+        const method = typeof result.benchmarkMethod === "string" ? result.benchmarkMethod : "";
+        const submittedAt = typeof result.submittedAt === "string" ? result.submittedAt : "";
+        return method || submittedAt ? `legacy:${method}\u0000${submittedAt}` : `entry:${index}`;
+    }
+
+    function resultsForTrack(team, trackKey) {
+        const current = team.results?.[trackKey];
+        if (trackKey === "cross-task") {
+            return current && typeof current === "object" ? [normalizeResult(current)] : [];
+        }
+
+        const history = Array.isArray(team.submissionHistory?.[trackKey])
+            ? team.submissionHistory[trackKey]
+            : [];
+        const candidates = [...history];
+        if (current && typeof current === "object") candidates.push(current);
+
+        // The backend history is already unique by immutable benchmark URL.
+        // Dedupe again at this untrusted display boundary and let `results`
+        // replace its history copy so its current rank movement wins.
+        const distinct = new Map();
+        candidates.forEach((result, index) => {
+            if (!result || typeof result !== "object") return;
+            distinct.set(resultIdentity(result, index), normalizeResult(result));
+        });
+
+        // Preserve compatibility with the original flattened snapshot shape.
+        if (distinct.size === 0 && isFiniteNumber(team.score)) {
+            distinct.set("legacy:team", normalizeResult(team));
+        }
+        return [...distinct.values()];
+    }
+
     function isRegisteredForTrack(team, trackKey) {
         const registeredTracks = Array.isArray(team.registeredTracks) ? team.registeredTracks : [];
         if (trackKey === "cross-task") {
@@ -78,30 +165,28 @@
     function rowsForTrack(snapshot, trackKey) {
         const rows = snapshot.teams
             .filter((team) => isRegisteredForTrack(team, trackKey))
-            .map((team) => ({
-                teamId: team.teamId,
-                teamName: team.teamName,
-                ...resultForTrack(team, trackKey)
-            }));
+            .flatMap((team) => {
+                const results = resultsForTrack(team, trackKey);
+                if (results.length === 0) {
+                    return [{
+                        teamId: team.teamId,
+                        teamName: team.teamName,
+                        ...normalizeResult({})
+                    }];
+                }
+                return results.map((result) => ({
+                    teamId: team.teamId,
+                    teamName: team.teamName,
+                    ...result
+                }));
+            });
 
         rows.sort((left, right) => {
             const leftScored = isFiniteNumber(left.score);
             const rightScored = isFiniteNumber(right.score);
             if (leftScored !== rightScored) return leftScored ? -1 : 1;
             if (!leftScored) return compareTeamIdentity(left, right);
-
-            const scoreDifference = left.score - right.score;
-            if (scoreDifference !== 0) return scoreDifference;
-
-            const robustDifference = numericDifference(left.robustSpringTerm, right.robustSpringTerm);
-            if (robustDifference !== 0) return robustDifference;
-
-            const springDifference = numericDifference(left.springTerm, right.springTerm);
-            if (springDifference !== 0) return springDifference;
-            // The backend uses the numeric organizer-issued team ID as its
-            // deterministic final key. Keeping the renderer identical makes
-            // displayed ranks and rank-change arrows agree on exact ties.
-            return left.teamId.localeCompare(right.teamId, undefined, { numeric: true });
+            return compareScoredRows(left, right);
         });
 
         let scoredRank = 0;
@@ -127,6 +212,136 @@
         if (isFiniteNumber(left)) return -1;
         if (isFiniteNumber(right)) return 1;
         return 0;
+    }
+
+    function compareScoredRows(left, right) {
+        const scoreDifference = numericDifference(left.score, right.score);
+        if (scoreDifference !== 0) return scoreDifference;
+
+        const robustDifference = numericDifference(left.robustSpringTerm, right.robustSpringTerm);
+        if (robustDifference !== 0) return robustDifference;
+
+        const springDifference = numericDifference(left.springTerm, right.springTerm);
+        if (springDifference !== 0) return springDifference;
+
+        // Baselines never affect participant ranks. On an otherwise exact tie,
+        // keep the participant first and then apply stable identity keys.
+        if (Boolean(left.isBaseline) !== Boolean(right.isBaseline)) {
+            return left.isBaseline ? 1 : -1;
+        }
+        const teamDifference = String(left.teamId).localeCompare(
+            String(right.teamId),
+            undefined,
+            { numeric: true }
+        );
+        if (teamDifference !== 0) return teamDifference;
+        return String(left.benchmarkUrl ?? "").localeCompare(
+            String(right.benchmarkUrl ?? ""),
+            undefined,
+            { numeric: true }
+        );
+    }
+
+    function roundMetric(value) {
+        return Number(value.toFixed(6));
+    }
+
+    function mean(values) {
+        return values.reduce((sum, value) => sum + value, 0) / values.length;
+    }
+
+    function isPositiveFiniteNumber(value) {
+        return isFiniteNumber(value) && value > 0;
+    }
+
+    function baselineRowsForTrack(snapshot, trackKey) {
+        const methods = baselineMethods[trackKey];
+        const baseline = snapshot.baselines?.[trackKey];
+        if (!methods || !baseline) return [];
+
+        if (trackKey !== "scene-flow") {
+            if (!isPositiveFiniteNumber(baseline.spring) ||
+                !isPositiveFiniteNumber(baseline.robustSpringProxy)) return [];
+            return methods.map((entry) => {
+                const robustSpringMetric = entry.springMetric + entry.disagreement;
+                const springTerm = entry.springMetric / baseline.spring;
+                const robustSpringTerm = robustSpringMetric / baseline.robustSpringProxy;
+                return {
+                    isBaseline: true,
+                    teamId: "Baseline",
+                    teamName: "Spring Team",
+                    rank: null,
+                    rankChange: 0,
+                    score: roundMetric(0.5 * springTerm + 0.5 * robustSpringTerm),
+                    springMetric: roundMetric(entry.springMetric),
+                    robustSpringMetric: roundMetric(robustSpringMetric),
+                    springTerm: roundMetric(springTerm),
+                    robustSpringTerm: roundMetric(robustSpringTerm),
+                    submittedAt: entry.submittedAt,
+                    benchmarkMethod: `(Baseline) ${entry.method}`,
+                    benchmarkUrl: `https://spring-benchmark.org/${entry.resultId}/`,
+                    springComponents: null,
+                    robustSpringComponents: null
+                };
+            });
+        }
+
+        const springBaseline = {
+            d1: baseline.spring?.disparity1Abs,
+            d2: baseline.spring?.disparity2Abs,
+            flow: baseline.spring?.flowEpe
+        };
+        const robustBaseline = {
+            d1: baseline.robustSpringProxy?.disparity1Abs,
+            d2: baseline.robustSpringProxy?.disparity2Abs,
+            flow: baseline.robustSpringProxy?.flowEpe
+        };
+        if (![...Object.values(springBaseline), ...Object.values(robustBaseline)]
+            .every(isPositiveFiniteNumber)) return [];
+
+        return methods.map((entry) => {
+            const robustSpringComponents = {
+                d1: roundMetric(entry.springComponents.d1 + entry.disagreementComponents.d1),
+                d2: roundMetric(entry.springComponents.d2 + entry.disagreementComponents.d2),
+                flow: roundMetric(entry.springComponents.flow + entry.disagreementComponents.flow)
+            };
+            const springTerm = mean([
+                entry.springComponents.d1 / springBaseline.d1,
+                entry.springComponents.d2 / springBaseline.d2,
+                entry.springComponents.flow / springBaseline.flow
+            ]);
+            const robustSpringTerm = mean([
+                robustSpringComponents.d1 / robustBaseline.d1,
+                robustSpringComponents.d2 / robustBaseline.d2,
+                robustSpringComponents.flow / robustBaseline.flow
+            ]);
+            return {
+                isBaseline: true,
+                teamId: "Baseline",
+                teamName: "Spring Team",
+                rank: null,
+                rankChange: 0,
+                score: roundMetric(0.5 * springTerm + 0.5 * robustSpringTerm),
+                springMetric: roundMetric(springTerm),
+                robustSpringMetric: roundMetric(robustSpringTerm),
+                springTerm: roundMetric(springTerm),
+                robustSpringTerm: roundMetric(robustSpringTerm),
+                submittedAt: entry.submittedAt,
+                benchmarkMethod: `(Baseline) ${entry.method}`,
+                benchmarkUrl: `https://spring-benchmark.org/${entry.resultId}/`,
+                springComponents: entry.springComponents,
+                robustSpringComponents
+            };
+        });
+    }
+
+    function displayRowsForTrack(snapshot, trackKey) {
+        const participantRows = rowsForTrack(snapshot, trackKey);
+        const pendingRows = participantRows.filter((row) => !isFiniteNumber(row.score));
+        const scoredRows = participantRows.filter((row) => isFiniteNumber(row.score));
+        scoredRows.push(...baselineRowsForTrack(snapshot, trackKey));
+        scoredRows.sort(compareScoredRows);
+        return [...scoredRows, ...pendingRows];
     }
 
     function formatNumber(value, digits) {
@@ -192,23 +407,29 @@
         const caption = element(
             "caption",
             "visually-hidden",
-            `${track.label} standings. Lower RbS-Score is better.`
+            `${track.label} standings. Lower RbS-Score is better. ` +
+            (baselineMethods[track.key]
+                ? "Rows labeled Baseline are unranked references and do not affect participant standings."
+                : "Only participant team aggregates are ranked.")
         );
         const head = document.createElement("thead");
         const headRow = document.createElement("tr");
         const body = document.createElement("tbody");
 
-        ["Rank", "Change", "Team", "RbS-Score", track.springLabel, track.robustLabel, "Spring Submission Time"]
+        ["Rank", "Change", "Team", "Method Name", "RbS-Score", track.springLabel, track.robustLabel, "Spring Submission Time"]
             .forEach((label) => {
                 const cell = element("th", "", label);
                 cell.scope = "col";
                 headRow.append(cell);
             });
 
-        rowsForTrack(snapshot, track.key).forEach((row) => {
+        displayRowsForTrack(snapshot, track.key).forEach((row) => {
             const tableRow = document.createElement("tr");
+            tableRow.classList.add("leaderboard-row");
             const isPending = !isFiniteNumber(row.score);
+            const isBaseline = row.isBaseline === true;
             if (isPending) tableRow.classList.add("leaderboard-row--pending");
+            if (isBaseline) tableRow.classList.add("leaderboard-row--baseline");
 
             const rankCell = element("td", "leaderboard-rank-cell");
             const rank = element(
@@ -216,31 +437,59 @@
                 "leaderboard-rank",
                 isFiniteNumber(row.rank) ? String(row.rank) : "—"
             );
-            if (!isPending && row.rank <= 3) rank.classList.add(`leaderboard-rank--${row.rank}`);
-            rankCell.append(rank);
+            if (isBaseline) {
+                rank.setAttribute("aria-hidden", "true");
+                rankCell.append(element("span", "visually-hidden", "Not ranked"), rank);
+            } else {
+                if (!isPending && row.rank <= 3) rank.classList.add(`leaderboard-rank--${row.rank}`);
+                rankCell.append(rank);
+            }
 
             const changeCell = element("td", "leaderboard-change-cell");
-            changeCell.append(buildRankChange(row.rankChange));
+            if (isBaseline) {
+                const noChange = element("span", "rank-change rank-change--baseline", "—");
+                noChange.setAttribute("aria-label", "Rank movement does not apply to baselines");
+                changeCell.append(noChange);
+            } else {
+                changeCell.append(buildRankChange(row.rankChange));
+            }
 
             const teamCell = element("th", "leaderboard-team-cell");
             teamCell.scope = "row";
             teamCell.append(element("strong", "leaderboard-team-name", row.teamName));
             const teamMeta = element("span", "leaderboard-team-meta");
-            teamMeta.append(element("span", "leaderboard-team-id", row.teamId));
-            if (isPending) {
+            if (isBaseline) {
+                teamMeta.append(
+                    element("span", "leaderboard-baseline-badge", "Baseline"),
+                    element("span", "leaderboard-team-id", "Unranked reference")
+                );
+            } else {
+                teamMeta.append(element("span", "leaderboard-team-id", row.teamId));
+            }
+            if (isPending && !isBaseline) {
                 teamMeta.append(element("span", "leaderboard-pending-badge", "Awaiting result"));
-            } else if (row.benchmarkMethod) {
+            }
+            teamCell.append(teamMeta);
+
+            const methodCell = element("td", "leaderboard-method-cell");
+            if (row.benchmarkMethod) {
                 const resultUrl = safeBenchmarkUrl(row.benchmarkUrl);
                 const method = element(resultUrl ? "a" : "span", "leaderboard-method", row.benchmarkMethod);
+                // Long official names stay compact in the table but remain
+                // available in full to pointer users and assistive technology.
+                method.title = row.benchmarkMethod;
                 if (resultUrl) {
                     method.href = resultUrl;
                     method.target = "_blank";
                     method.rel = "noopener noreferrer";
                     method.setAttribute("aria-label", `${row.benchmarkMethod} benchmark result (opens in a new tab)`);
                 }
-                teamMeta.append(method);
+                methodCell.append(method);
+            } else {
+                const noMethod = element("span", "leaderboard-method-placeholder", "—");
+                noMethod.setAttribute("aria-label", "No matched method");
+                methodCell.append(noMethod);
             }
-            teamCell.append(teamMeta);
 
             const scoreCell = element("td", "leaderboard-score", formatNumber(row.score, 4));
             const springCell = element("td", "leaderboard-metric", formatNumber(row.springMetric, 3));
@@ -256,6 +505,7 @@
                 rankCell,
                 changeCell,
                 teamCell,
+                methodCell,
                 scoreCell,
                 springCell,
                 robustCell,
@@ -332,13 +582,13 @@
                 "leaderboard-panel-note",
                 track.key === "cross-task"
                     ? "Cross-Task standings include teams registered for all three quantitative tracks."
-                    : "Scored teams are ordered by RbS-Score; teams awaiting a matched public result follow alphabetically."
+                    : "Participant methods are ranked by RbS-Score; teams awaiting a matched public result follow alphabetically. Rows labeled Baseline are score-sorted, unranked Spring-Team references with complete Spring and RobustSpring metrics; they do not affect participant standings."
             );
             note.id = `${panelId}-note`;
             const scrollHint = element(
                 "p",
                 "leaderboard-scroll-hint",
-                "Swipe or scroll horizontally to see every column."
+                "Scroll horizontally to see every column."
             );
             panel.append(note, scrollHint, buildTable(snapshot, track, panelId));
             tabs.append(tab);
@@ -373,6 +623,13 @@
                     element("strong", "", row.teamName),
                     element("small", "", row.teamId)
                 );
+                if (row.benchmarkMethod) {
+                    identity.append(element(
+                        "small",
+                        "leaderboard-preview-method",
+                        row.benchmarkMethod
+                    ));
+                }
                 item.append(identity);
                 item.append(
                     isFiniteNumber(row.score)

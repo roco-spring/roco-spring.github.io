@@ -8,13 +8,15 @@ import {
     signOut,
     updatePassword
 } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-auth.js";
+import { getToken as getAppCheckToken } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-app-check.js";
 import { httpsCallable } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-functions.js";
-import { auth, authPersistenceReady, functions } from "./firebase-config.js";
+import { appCheck, auth, authPersistenceReady, functions } from "./firebase-config.js";
 import { TRACKS, isValidEmail, normalizeEmail, validateTeamInput } from "./team-validation.js";
 
 // The callable performs only Firebase Auth and Firestore work. Google side
 // effects run asynchronously, so a multi-minute browser wait is never useful.
 const REGISTER_TEAM_TIMEOUT_MS = 75000;
+const APP_CHECK_TIMEOUT_MS = 20000;
 const REGISTRATION_ATTEMPT_STORAGE_KEY = "roco.registrationAttempt.v1";
 const REGISTRATION_FINGERPRINT_PATTERN = /^[0-9a-f]{64}$/u;
 const IDEMPOTENCY_KEY_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;
@@ -573,11 +575,20 @@ async function handleRegistration(event) {
     setFormBusy(elements.registrationForm, true);
     setStatus(
         elements.registrationStatus,
-        "Creating the secure team account and organizer record…",
+        "Completing security verification…",
         "loading"
     );
 
     try {
+        // Obtain a real token before allocating a replay UUID or invoking the
+        // callable. Firebase otherwise substitutes a dummy token when browser
+        // attestation fails, which turns the useful client error into HTTP 401.
+        await requireRegistrationAppCheckToken();
+        setStatus(
+            elements.registrationStatus,
+            "Security verification completed. Creating the team account and organizer record…",
+            "loading"
+        );
         const attempt = await getOrCreateRegistrationAttempt(requestPayload);
         const result = await callRegisterTeam({
             ...requestPayload,
@@ -605,13 +616,39 @@ async function handleRegistration(event) {
         setRegistrationSpamNotice(emailStatus !== "failed");
         elements.loginEmail.focus();
     } catch (error) {
-        if (errorCode(error) === "functions/failed-precondition") {
-            // A failed saga/idempotency record is terminal; a deliberate retry needs a fresh key.
+        const code = errorCode(error);
+        if (["functions/already-exists", "functions/failed-precondition"].includes(code)) {
+            // These conflicts are terminal for the replay UUID. Keep the same
+            // public flow and wording for both so the form does not disclose
+            // whether an arbitrary private address already has an account.
             clearRegistrationAttempt();
         }
         setStatus(elements.registrationStatus, safeErrorMessage(error, "registration"), "error");
     } finally {
         setFormBusy(elements.registrationForm, false);
+    }
+}
+
+async function requireRegistrationAppCheckToken() {
+    let timeout;
+    const timeoutError = new Error("Registration security verification timed out.");
+    timeoutError.code = "registration/security-verification-timeout";
+
+    try {
+        const result = await Promise.race([
+            getAppCheckToken(appCheck, false),
+            new Promise((_resolve, reject) => {
+                timeout = window.setTimeout(() => reject(timeoutError), APP_CHECK_TIMEOUT_MS);
+            })
+        ]);
+
+        if (!isPlainObject(result) || typeof result.token !== "string" || result.token === "") {
+            const error = new Error("Registration security verification returned no token.");
+            error.code = "registration/security-verification-invalid";
+            throw error;
+        }
+    } finally {
+        window.clearTimeout(timeout);
     }
 }
 
@@ -1367,11 +1404,15 @@ function safeErrorMessage(error, context) {
         if (code === "registration/invalid-response") {
             return "The registration service returned an incomplete response. Your form and saved request identifier have been kept; retry with the same details to check the result without creating a duplicate team. If this continues, contact roco-spring-org@googlegroups.com.";
         }
-        if (["functions/unauthenticated", "functions/permission-denied"].includes(code)) {
-            return "Security verification could not be completed. Refresh the page and try again.";
+        if (
+            code.startsWith("appCheck/")
+            || code.startsWith("registration/security-verification-")
+            || ["functions/unauthenticated", "functions/permission-denied"].includes(code)
+        ) {
+            return "Security verification did not complete, so your form was not submitted. Allow the official reCAPTCHA service at www.recaptcha.net in your browser or privacy extension, then try again. If it still fails, contact roco-spring-org@googlegroups.com.";
         }
         if (["functions/already-exists", "functions/failed-precondition"].includes(code)) {
-            return "Registration could not be completed. If an account may already exist, use sign in or password reset; otherwise contact the organizers.";
+            return "Registration could not be completed. If you may have registered before, use Sign in or password reset; otherwise contact the organizers.";
         }
         if (code === "functions/resource-exhausted") {
             return "Registration is temporarily limited. Please wait before trying again.";

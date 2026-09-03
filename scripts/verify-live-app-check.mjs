@@ -85,7 +85,7 @@ const QUANTITATIVE_TRACKS = new Set([
 ]);
 const REGISTRATION_TRACKS = new Set([...QUANTITATIVE_TRACKS, "exploration"]);
 const KNOWN_PUBLIC_TEAM_IDS = new Set(
-    Array.from({ length: 25 }, (_value, index) => `RoCo-${index + 8}`)
+    Array.from({ length: 32 }, (_value, index) => `RoCo-${index + 8}`)
 );
 
 function isPlainObject(value) {
@@ -186,7 +186,7 @@ function verifyLiveLeaderboardSnapshot(snapshot) {
         || !["fresh", "cache-hit"].includes(snapshot.syncStatus)
         || !isDeepStrictEqual(snapshot.baselines, EXPECTED_LEADERBOARD_BASELINES)
         || !Array.isArray(snapshot.teams)
-        || snapshot.teams.length < 25
+        || snapshot.teams.length < 32
         || snapshot.teams.length > 10_000) {
         throw new Error("The live leaderboard snapshot schema is invalid.");
     }

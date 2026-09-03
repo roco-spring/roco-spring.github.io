@@ -116,10 +116,12 @@ const REFRESH_LEASE_MS = 90 * 1_000;
 const FETCH_TIMEOUT_MS = 5_000;
 const MAX_LIST_BYTES = 2 * 1024 * 1024;
 const MAX_DETAIL_BYTES = 512 * 1024;
-// The current roster has 51 possible quantitative groups. A 192-detail budget
+// The current roster has 69 possible quantitative groups. A 192-detail budget
 // supports up to 64 all-three-track teams while retaining recent history now.
 const MAX_DETAIL_REQUESTS = 192;
 const DETAIL_FETCH_CONCURRENCY = 24;
+// Retain ten immutable method results per team and track so progress remains
+// useful without allowing the shared Firestore cache document to grow forever.
 const MAX_HISTORY_PER_TRACK = 10;
 const CACHE_COLLECTION = "publicLeaderboard";
 const CACHE_DOCUMENT = "current-v1";
@@ -709,20 +711,63 @@ function boundedDetailIds(
     .slice(0, MAX_DETAIL_REQUESTS);
 }
 
-function rankMap(snapshot: PublicLeaderboardSnapshot | null, track: LeaderboardTrack): Map<string, number> {
-  if (!snapshot) return new Map();
-  const scored = snapshot.teams
-    .flatMap((team) => {
+interface RankedResult {
+  key: string;
+  teamId: string;
+  result: PublicLeaderboardResult;
+}
+
+function resultRankKey(
+  teamId: string,
+  track: LeaderboardTrack,
+  result: PublicLeaderboardResult,
+): string {
+  // A quantitative leaderboard ranks submissions, not teams. The official
+  // benchmark URL is immutable and lets one team keep several named methods.
+  return track === "cross-task" ? teamId : `${teamId}:${result.benchmarkUrl}`;
+}
+
+function rankedResults(
+  snapshot: PublicLeaderboardSnapshot | null,
+  track: LeaderboardTrack,
+): RankedResult[] {
+  if (!snapshot) return [];
+  const rows = snapshot.teams.flatMap((team) => {
+    if (track === "cross-task") {
       const result = team.results[track];
-      return result ? [{ teamId: team.teamId, result }] : [];
-    })
-    .sort((left, right) =>
-      left.result.score - right.result.score ||
-      left.result.robustSpringTerm - right.result.robustSpringTerm ||
-      left.result.springTerm - right.result.springTerm ||
-      left.teamId.localeCompare(right.teamId, undefined, { numeric: true }),
-    );
-  return new Map(scored.map((row, index) => [row.teamId, index + 1]));
+      return result ? [{ key: team.teamId, teamId: team.teamId, result }] : [];
+    }
+
+    // New snapshots retain every displayed method in submissionHistory. The
+    // results fallback keeps older compatible caches and direct test callers
+    // rankable without duplicating their latest entry.
+    const byUrl = new Map<string, PublicLeaderboardResult>();
+    for (const result of team.submissionHistory[track] ?? []) {
+      byUrl.set(result.benchmarkUrl, result);
+    }
+    const latest = team.results[track];
+    if (latest) byUrl.set(latest.benchmarkUrl, latest);
+    return [...byUrl.values()].map((result) => ({
+      key: resultRankKey(team.teamId, track, result),
+      teamId: team.teamId,
+      result,
+    }));
+  });
+  return rows.sort((left, right) =>
+    left.result.score - right.result.score ||
+    left.result.robustSpringTerm - right.result.robustSpringTerm ||
+    left.result.springTerm - right.result.springTerm ||
+    left.teamId.localeCompare(right.teamId, undefined, { numeric: true }) ||
+    left.result.benchmarkUrl.localeCompare(
+      right.result.benchmarkUrl,
+      undefined,
+      { numeric: true },
+    ),
+  );
+}
+
+function rankMap(snapshot: PublicLeaderboardSnapshot | null, track: LeaderboardTrack): Map<string, number> {
+  return new Map(rankedResults(snapshot, track).map((row, index) => [row.key, index + 1]));
 }
 
 function applyRankChanges(
@@ -744,11 +789,39 @@ function applyRankChanges(
       track,
     );
     for (const team of teams) {
-      const result = team.results[track];
-      const newRank = newRanks.get(team.teamId);
-      const oldRank = oldRanks.get(team.teamId);
-      if (result && newRank !== undefined && oldRank !== undefined) {
-        result.rankChange = oldRank - newRank;
+      if (track === "cross-task") {
+        const result = team.results[track];
+        if (!result) continue;
+        const newRank = newRanks.get(team.teamId);
+        const oldRank = oldRanks.get(team.teamId);
+        if (newRank !== undefined && oldRank !== undefined) {
+          result.rankChange = oldRank - newRank;
+        }
+        continue;
+      }
+
+      for (const result of team.submissionHistory[track] ?? []) {
+        const key = resultRankKey(team.teamId, track, result);
+        const newRank = newRanks.get(key);
+        const oldRank = oldRanks.get(key);
+        result.rankChange = newRank !== undefined && oldRank !== undefined
+          ? oldRank - newRank
+          : 0;
+      }
+
+      // `results` remains the backward-compatible latest-method projection.
+      // Mirror the exact history entry so both projections report one movement.
+      const latest = team.results[track];
+      if (latest) {
+        const historyEntry = team.submissionHistory[track]?.find(
+          (result) => result.benchmarkUrl === latest.benchmarkUrl,
+        );
+        const key = resultRankKey(team.teamId, track, latest);
+        const newRank = newRanks.get(key);
+        const oldRank = oldRanks.get(key);
+        latest.rankChange = historyEntry?.rankChange ?? (
+          newRank !== undefined && oldRank !== undefined ? oldRank - newRank : 0
+        );
       }
     }
   }

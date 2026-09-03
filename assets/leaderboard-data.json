@@ -1,7 +1,7 @@
 {
   "schemaVersion": 2,
-  "updatedAt": "2026-08-29T19:09:32+02:00",
-  "sourceLabel": "Fallback snapshot · roster verified 29 Aug 2026 · no public result matches at publication",
+  "updatedAt": "2026-09-03T09:48:03.117Z",
+  "sourceLabel": "Fallback snapshot · roster verified 3 Sep 2026 · no complete public result matches at publication",
   "scoringConvention": "organizer-approved-additive-proxy",
   "syncStatus": "static-fallback",
   "baselines": {
@@ -209,6 +209,55 @@
       "teamId": "RoCo-32",
       "teamName": "XLR8",
       "registeredTracks": ["optical-flow", "stereo-matching", "scene-flow", "exploration"],
+      "results": {},
+      "submissionHistory": {}
+    },
+    {
+      "teamId": "RoCo-33",
+      "teamName": "Epoch Labs",
+      "registeredTracks": ["optical-flow", "stereo-matching", "scene-flow", "exploration"],
+      "results": {},
+      "submissionHistory": {}
+    },
+    {
+      "teamId": "RoCo-34",
+      "teamName": "Pamboo",
+      "registeredTracks": ["optical-flow", "stereo-matching", "scene-flow", "exploration"],
+      "results": {},
+      "submissionHistory": {}
+    },
+    {
+      "teamId": "RoCo-35",
+      "teamName": "Team'5",
+      "registeredTracks": ["optical-flow", "stereo-matching", "scene-flow", "exploration"],
+      "results": {},
+      "submissionHistory": {}
+    },
+    {
+      "teamId": "RoCo-36",
+      "teamName": "c-mike",
+      "registeredTracks": ["optical-flow", "stereo-matching", "scene-flow", "exploration"],
+      "results": {},
+      "submissionHistory": {}
+    },
+    {
+      "teamId": "RoCo-37",
+      "teamName": "Innovators",
+      "registeredTracks": ["optical-flow", "stereo-matching", "scene-flow", "exploration"],
+      "results": {},
+      "submissionHistory": {}
+    },
+    {
+      "teamId": "RoCo-38",
+      "teamName": "Four And Furios",
+      "registeredTracks": ["optical-flow", "stereo-matching", "scene-flow", "exploration"],
+      "results": {},
+      "submissionHistory": {}
+    },
+    {
+      "teamId": "RoCo-39",
+      "teamName": "PocketChange",
+      "registeredTracks": ["exploration"],
       "results": {},
       "submissionHistory": {}
     }

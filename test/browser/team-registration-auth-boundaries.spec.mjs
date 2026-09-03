@@ -19,6 +19,9 @@ const FIREBASE_MODULES = {
     export function initializeAppCheck(app, options) {
       return { app, options };
     }
+    export function getToken(_appCheck, forceRefresh) {
+      return globalThis.__rocoFirebaseHarness.getAppCheckToken(forceRefresh);
+    }
   `,
   "firebase-auth.js": `
     const harness = globalThis.__rocoFirebaseHarness;
@@ -99,6 +102,8 @@ async function installFirebaseHarness(page) {
     const passwordResets = [];
     const passwordOperations = [];
     let reauthenticationFailureCode = null;
+    let appCheckFailureCode = null;
+    let appCheckTokenRequests = 0;
     let nextCallableId = 1;
 
     function emitAuth(user) {
@@ -109,6 +114,27 @@ async function installFirebaseHarness(page) {
     globalThis.__rocoFirebaseHarness = {
       auth,
       firebaseConfig: null,
+
+      getAppCheckToken(forceRefresh) {
+        appCheckTokenRequests += 1;
+        if (forceRefresh !== false) {
+          return Promise.reject(new Error("Expected the cached App Check token path."));
+        }
+        if (appCheckFailureCode) {
+          const error = new Error("Stubbed App Check failure.");
+          error.code = appCheckFailureCode;
+          return Promise.reject(error);
+        }
+        return Promise.resolve({ token: "browser-harness-app-check-token" });
+      },
+
+      setAppCheckFailure(code) {
+        appCheckFailureCode = code;
+      },
+
+      appCheckTokenRequestCount() {
+        return appCheckTokenRequests;
+      },
 
       observeAuth(observer) {
         observers.add(observer);
@@ -267,6 +293,13 @@ async function installFirebaseHarness(page) {
       status: 200,
       contentType: "application/javascript; charset=utf-8",
       body
+    });
+  });
+  await page.route("https://www.recaptcha.net/recaptcha/enterprise.js*", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/javascript; charset=utf-8",
+      body: "globalThis.grecaptcha = { enterprise: {} };"
     });
   });
 }
@@ -753,6 +786,61 @@ test("a registration retry survives reload, stores no plaintext participant data
       await expect(page.locator(`#register-member-${memberIndex}-${field}`)).toHaveValue("");
     }
   }
+});
+
+test("registration proves App Check before creating a replay ID or calling the backend", async ({ page }) => {
+  await openPortal(page);
+  await fillRegistrationForm(page, "Attestation Browser Team");
+  await page.evaluate(() => {
+    window.__rocoFirebaseHarness.setAppCheckFailure("appCheck/recaptcha-error");
+  });
+
+  await page.getByRole("button", { name: "Register team" }).click();
+
+  await expect(page.locator("#registration-status")).toContainText(
+    "Security verification did not complete"
+  );
+  await expect(page.locator("#registration-status")).toContainText("www.recaptcha.net");
+  await expect(page.locator("#register-team-name")).toHaveValue("Attestation Browser Team");
+  expect(await page.evaluate(() => ({
+    attestationRequests: window.__rocoFirebaseHarness.appCheckTokenRequestCount(),
+    callableRequests: window.__rocoFirebaseHarness.pendingCallCount("registerTeam", null),
+    replayState: sessionStorage.getItem("roco.registrationAttempt.v1")
+  }))).toEqual({
+    attestationRequests: 1,
+    callableRequests: 0,
+    replayState: null
+  });
+
+  await page.evaluate(() => {
+    window.__rocoFirebaseHarness.setAppCheckFailure(null);
+  });
+  await page.getByRole("button", { name: "Register team" }).click();
+  await waitForCall(page, "registerTeam", null);
+  await resolveCall(page, "registerTeam", null, { teamId: "RoCo-84", emailStatus: "sent" });
+  await expect(page.locator("#login-status")).toContainText("Registration completed for RoCo-84");
+});
+
+test("a duplicate response stays non-confirming and clears its replay ID", async ({ page }) => {
+  await openPortal(page);
+  await fillRegistrationForm(page, "Duplicate Browser Team");
+  await page.getByRole("button", { name: "Register team" }).click();
+  await waitForCall(page, "registerTeam", null);
+
+  await page.evaluate(() => {
+    window.__rocoFirebaseHarness.rejectCall("registerTeam", null, "functions/already-exists");
+  });
+
+  await expect(page.locator("#register-tab-panel")).toBeVisible();
+  await expect(page.locator("#register-team-name")).toHaveValue("Duplicate Browser Team");
+  await expect(page.locator("#registration-status")).toContainText(
+    "Registration could not be completed"
+  );
+  await expect(page.locator("#registration-status")).toContainText("Sign in or password reset");
+  await expect(page.locator("#registration-status")).not.toContainText("already exists");
+  expect(await page.evaluate(() => sessionStorage.getItem(
+    "roco.registrationAttempt.v1"
+  ))).toBeNull();
 });
 
 test("a terminal registration failure clears the replay UUID before a deliberate retry", async ({ page }) => {
