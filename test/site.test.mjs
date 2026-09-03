@@ -229,6 +229,9 @@ test("leaderboard UI is data-driven, documents the additive proxy, and is wired 
     assert.match(evaluation, /assets\/leaderboard\.js/u);
     assert.match(index, /assets\/leaderboard-live\.js/u);
     assert.match(evaluation, /assets\/leaderboard-live\.js/u);
+    assert.match(liveAdapter, /https:\/\/www\.recaptcha\.net\/recaptcha\/enterprise\.js\?render=explicit/u);
+    assert.match(liveAdapter, /loadGlobalRecaptcha\(\)\s*\.then\(\(\) => Promise\.all/u);
+    assert.doesNotMatch(liveAdapter, /www\.google\.com\/recaptcha\/enterprise\.js/u);
 
     for (const label of ["Optical Flow", "Stereo Matching", "Scene Flow", "Cross-Task"]) {
         assert.ok(script.includes(`label: "${label}"`), label);
