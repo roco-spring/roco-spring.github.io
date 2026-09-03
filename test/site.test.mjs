@@ -767,3 +767,9 @@ test("Firebase deploys use a bounded backend-discovery timeout", async () => {
         "node \"$RESOURCE_DIR/node_modules/typescript/bin/tsc\" -p \"$RESOURCE_DIR/tsconfig.json\""
     ]);
 });
+
+test("Firebase discovery defers the generated Google API client bundle", async () => {
+    const googleAuth = await source("functions/src/google-auth.ts");
+    assert.doesNotMatch(googleAuth, /^import\s+\{\s*google\s*\}\s+from\s+["']googleapis["']/mu);
+    assert.match(googleAuth, /const\s+\{\s*google\s*\}\s*=\s*await\s+import\(["']googleapis["']\)/u);
+});

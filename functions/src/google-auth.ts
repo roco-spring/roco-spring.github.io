@@ -1,4 +1,3 @@
-import { google } from "googleapis";
 import { GOOGLE_OAUTH_CLIENT_ID } from "./config.js";
 import { AppError } from "./errors.js";
 import {
@@ -143,6 +142,11 @@ export async function createGoogleApiClients(
   refreshToken: string,
   fetchImplementation: FetchImplementation = globalThis.fetch,
 ) {
+  // `googleapis` is a large generated package. Load it only when the private
+  // reconciler actually needs Google clients, rather than during Firebase's
+  // deployment-time discovery of every exported Function.
+  const { google } = await import("googleapis");
+
   // Generated API requests are each bounded and never receive a refresh token.
   // OAuth exchange and scope inspection above are also single-attempt and
   // independently bounded, so google-auth-library cannot introduce hidden
