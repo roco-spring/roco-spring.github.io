@@ -5,6 +5,7 @@ import test from "node:test";
 
 const ROOT = path.resolve(import.meta.dirname, "..");
 const HTML_FILES = [
+    "call-for-papers.html",
     "index.html",
     "participate.html",
     "tasks-data.html",
@@ -423,7 +424,7 @@ test("homepage includes the requested sponsor and project-specific acknowledgeme
     assert.doesNotMatch(index, /https:\/\/imprs-is\.mpg\.de\//u);
 });
 
-test("Noah Berenguel Senn appears in the requested organizer position", async () => {
+test("Noah Berenguel Senn and Steffen Jung appear in the requested organizer positions", async () => {
     const index = await source("index.html");
     const organizerSection = index.match(
         /<div class="organizer-grid content-card">([\s\S]*?)<\/section>/u
@@ -431,7 +432,14 @@ test("Noah Berenguel Senn appears in the requested organizer position", async ()
 
     assert.match(
         organizerSection,
-        /Katrin Bauer[\s\S]*Noah Berenguel Senn[\s\S]*Henrique Morimitsu/u
+        /Katrin Bauer[\s\S]*Noah Berenguel Senn[\s\S]*Steffen Jung[\s\S]*Henrique Morimitsu/u
+    );
+    const organizerNames = [...organizerSection.matchAll(/<img class="organizer-photo"[^>]+alt="([^"]+)">/gu)]
+        .map((match) => match[1]);
+    assert.equal(
+        organizerNames.indexOf("Steffen Jung"),
+        organizerNames.indexOf("Noah Berenguel Senn") + 1,
+        "Steffen must remain immediately after Noah"
     );
     assert.match(
         organizerSection,
@@ -445,6 +453,50 @@ test("Noah Berenguel Senn appears in the requested organizer position", async ()
         access(path.join(ROOT, "img/berenguel-senn.jpg")),
         "Noah Berenguel Senn portrait"
     );
+    assert.match(
+        organizerSection,
+        /<img class="organizer-photo" src="img\/jung\.jpg" alt="Steffen Jung">/u
+    );
+    assert.match(
+        organizerSection,
+        /href="https:\/\/jung\.vision\/" target="_blank"\s*rel="noopener noreferrer">Steffen Jung<\/a><\/strong><span>University of Mannheim<\/span>/u
+    );
+    await assert.doesNotReject(
+        access(path.join(ROOT, "img/jung.jpg")),
+        "Steffen Jung portrait"
+    );
+});
+
+test("Call for Papers is a dedicated tab with four concise tracks and exact submission rules", async () => {
+    const callForPapers = (await source("call-for-papers.html")).replace(/\s+/gu, " ");
+    const participate = (await source("participate.html")).replace(/\s+/gu, " ");
+    const rules = (await source("rules-faq.html")).replace(/\s+/gu, " ");
+    const chrome = (await source("assets/site-chrome.html")).replace(/\s+/gu, " ");
+
+    assert.match(callForPapers, /<title>Call for Papers — RoCo-Spring<\/title>/u);
+    assert.match(
+        chrome,
+        /Participate<\/a> <a href="call-for-papers\.html">Call for Papers<\/a> <a href="tasks-data\.html">Tasks &amp; Data<\/a>/u
+    );
+    assert.match(chrome, /<footer[\s\S]*href="call-for-papers\.html">Call for Papers<\/a>/u);
+    for (const track of ["Optical Flow", "Stereo Matching", "Scene Flow", "Exploration Track"]) {
+        assert.match(callForPapers, new RegExp(`<h3>${track}<\\/h3>`, "u"), track);
+    }
+    assert.equal((callForPapers.match(/class="track-card(?: track-card--exploration)?"/gu) ?? []).length, 4);
+    assert.match(
+        callForPapers,
+        /href="https:\/\/media\.neurips\.cc\/Conferences\/NeurIPS2026\/Formatting_Instructions_For_NeurIPS_2026\.zip"[^>]*>NeurIPS 2026 paper template<\/a>/u
+    );
+    assert.match(callForPapers, /main paper must be 4–6 pages/u);
+    assert.match(callForPapers, /References and an optional appendix may follow and do not count/u);
+    assert.match(callForPapers, /Every quantitative or Exploration Track entry must be accompanied by a workshop paper/u);
+    assert.match(callForPapers, /\\usepackage\[sglblindworkshop\]\{neurips_2026\}/u);
+    assert.match(callForPapers, /Submissions are single-blind; author identities remain visible to reviewers/u);
+    assert.match(callForPapers, /exact registered <strong>team number<\/strong> and <strong>team name<\/strong> in the paper abstract/u);
+    assert.match(participate, /exact team number and registered team name in the abstract/u);
+    assert.match(participate, /href="call-for-papers\.html#submission-requirements">Call for Papers<\/a>/u);
+    assert.equal((rules.match(/href="call-for-papers\.html#reproducibility"/gu) ?? []).length, 2);
+    assert.match(rules, /href="call-for-papers\.html">Call for Papers<\/a>/u);
 });
 
 test("keynote speaker names and portraits link to their verified homepages", async () => {
@@ -514,20 +566,22 @@ test("OpenReview submission calls to action are branded, safe, and present at al
     const index = await source("index.html");
     const participate = await source("participate.html");
     const evaluation = await source("evaluation.html");
+    const canonicalCallForPapers = await source("call-for-papers.html");
     const style = await source("assets/style.css");
 
     const homeActions = index.match(/<div class="hero-actions">[\s\S]*?<\/div>/u)?.[0] ?? "";
     const stepNine = participate.match(
         /<li class="step-card">[\s\S]*?<div class="step-number" aria-hidden="true">9<\/div>[\s\S]*?<\/li>/u
     )?.[0] ?? "";
-    const callForPapers = evaluation.match(
+    const evaluationPapers = evaluation.match(
         /<section class="section" id="call-for-papers">[\s\S]*?<\/section>/u
     )?.[0] ?? "";
 
     for (const [location, html] of [
         ["home hero", homeActions],
         ["Participate Step 9", stepNine],
-        ["Call for Papers", callForPapers]
+        ["Leaderboard paper signpost", evaluationPapers],
+        ["Call for Papers", canonicalCallForPapers]
     ]) {
         assert.match(html, /class="button openreview"/u, location);
         assert.ok(html.includes(`href="${openReviewUrl}"`), location);
@@ -539,8 +593,9 @@ test("OpenReview submission calls to action are branded, safe, and present at al
         );
     }
 
-    assert.match(evaluation, /<div class="eyebrow">Call for Papers<\/div>/u);
-    assert.match(evaluation, /<h3 id="reproducibility">Reproducibility Package<\/h3>/u);
+    assert.match(canonicalCallForPapers, /<div class="eyebrow">Call for Papers<\/div>/u);
+    assert.match(canonicalCallForPapers, /<section class="section" id="reproducibility">/u);
+    assert.doesNotMatch(evaluation, /id="reproducibility"/u);
     assert.match(style, /\.button\.openreview\s*\{[\s\S]*?background: #8c1b13;/u);
     assert.match(style, /\.button\.openreview:hover[^{]*\{[\s\S]*?background: #7d1803;/u);
     assert.match(style, /\.openreview-wordmark\s*\{[\s\S]*?font-family: "Noto Sans", sans-serif;/u);
@@ -560,15 +615,15 @@ test("registration page includes the exact introduction and required controls", 
     assert.match(html, /Member names and contact details remain private\./u);
 });
 
-test("registration page documents and preloads global security verification", async () => {
+test("registration page documents regional access and preloads global security verification", async () => {
     const html = (await source("team-registration.html")).replace(/\s+/gu, " ");
     assert.match(
         html,
-        /class="portal-region-notice" role="note">\s*<strong>Global security verification:<\/strong> Registration uses Google's official <code>www\.recaptcha\.net<\/code> endpoint for regions where <code>www\.google\.com<\/code> is unavailable\. Browser privacy extensions must allow this endpoint for registration\.\s*<\/p>/u
+        /class="portal-region-notice" role="note">\s*<strong>Regional access notice:<\/strong> Registration and sign-in rely on Google services\. Registration uses Google's official <code>www\.recaptcha\.net<\/code> endpoint for regions where <code>www\.google\.com<\/code> is unavailable, and browser privacy extensions must allow this endpoint\. If Google services remain inaccessible in your region, use a trusted VPN where permitted, then reload this page before registering or signing in\.\s*<\/p>/u
     );
     assert.ok(
         html.indexOf("Team Registration and Account")
-        < html.indexOf("Global security verification:")
+        < html.indexOf("Regional access notice:")
     );
     const enterpriseLoader = 'src="https://www.recaptcha.net/recaptcha/enterprise.js?render=explicit"';
     assert.ok(html.includes(enterpriseLoader));

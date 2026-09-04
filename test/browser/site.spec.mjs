@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 
 const SITE_PAGES = [
+  "call-for-papers.html",
   "index.html",
   "participate.html",
   "tasks-data.html",
@@ -359,8 +360,9 @@ test("registration portal starts with three slots, validates partial members, an
   await expect(page.locator("#public-auth")).toBeVisible({ timeout: 15_000 });
   await expect(page.locator(".portal-region-notice")).toBeVisible();
   await expect(page.locator(".portal-region-notice")).toHaveAttribute("role", "note");
-  await expect(page.locator(".portal-region-notice")).toContainText("Global security verification");
+  await expect(page.locator(".portal-region-notice")).toContainText("Regional access notice");
   await expect(page.locator(".portal-region-notice")).toContainText("www.recaptcha.net");
+  await expect(page.locator(".portal-region-notice")).toContainText("trusted VPN");
   await expect(page.locator("#registration-members .member-slot")).toHaveCount(3);
   await expect(page.locator("#registration-members legend").first()).toContainText("Team member 1");
   await expect(page.locator("#registration-members legend").nth(2)).toContainText("Team member 3");
@@ -414,7 +416,8 @@ test("OpenReview submission buttons are consistent, accessible, and officially b
       path: "/participate.html",
       scope: ".step-card:has(.step-number:text-is('9'))"
     },
-    { path: "/evaluation.html", scope: "#call-for-papers" }
+    { path: "/evaluation.html", scope: "#call-for-papers" },
+    { path: "/call-for-papers.html", scope: ".page-header" }
   ];
   const expectedUrl = "https://openreview.net/group?id=NeurIPS.cc/2026/Workshop/RoCo-Spring";
 
@@ -451,7 +454,12 @@ test("OpenReview submission buttons are consistent, accessible, and officially b
 
 test("OpenReview submission buttons wrap without mobile overflow", async ({ page }) => {
   await page.setViewportSize({ width: 360, height: 800 });
-  for (const path of ["/index.html", "/participate.html", "/evaluation.html"]) {
+  for (const path of [
+    "/index.html",
+    "/participate.html",
+    "/evaluation.html",
+    "/call-for-papers.html"
+  ]) {
     await page.goto(path);
     await expect(page.getByRole("link", { name: "OpenReview Submission", exact: true })).toBeVisible();
     const widths = await page.evaluate(() => ({
@@ -630,7 +638,7 @@ test("homepage portraits and funding logos stay compact at desktop and mobile si
     }
 
     const organizerPortraits = page.locator(".organizer-photo");
-    await expect(organizerPortraits).toHaveCount(8);
+    await expect(organizerPortraits).toHaveCount(9);
     await expect
       .poll(() => organizerPortraits.evaluateAll((images) =>
         images.every((image) => image.complete && image.naturalWidth > 0)
@@ -643,6 +651,9 @@ test("homepage portraits and funding logos stay compact at desktop and mobile si
       expect(box.height).toBeLessThanOrEqual(52);
       expect(Math.abs(box.width - box.height)).toBeLessThanOrEqual(1);
     }
+    const steffenLink = page.getByRole("link", { name: "Steffen Jung", exact: true });
+    await expect(steffenLink).toHaveAttribute("href", "https://jung.vision/");
+    await expect(page.locator('img.organizer-photo[alt="Steffen Jung"]')).toHaveJSProperty("complete", true);
 
     const logoImages = page.locator("#sponsors img");
     await logoImages.first().scrollIntoViewIfNeeded();
@@ -659,6 +670,42 @@ test("homepage portraits and funding logos stay compact at desktop and mobile si
       expect(box.width).toBeLessThanOrEqual(220);
       expect(box.height).toBeLessThanOrEqual(48);
     }
+
+    const dimensions = await page.evaluate(() => ({
+      clientWidth: document.documentElement.clientWidth,
+      scrollWidth: document.documentElement.scrollWidth
+    }));
+    expect(dimensions.scrollWidth).toBeLessThanOrEqual(dimensions.clientWidth + 1);
+  }
+});
+
+test("Call for Papers tab is active and presents the four tracks without overflow", async ({ page }) => {
+  for (const viewport of [
+    { width: 1280, height: 900 },
+    { width: 768, height: 1024 },
+    { width: 390, height: 844 }
+  ]) {
+    await page.setViewportSize(viewport);
+    await page.goto("/call-for-papers.html");
+
+    const navLink = page.locator("header.site-header").getByRole("link", {
+      name: "Call for Papers",
+      exact: true
+    });
+    if (viewport.width <= 860) {
+      await page.getByRole("button", { name: "Open menu" }).click();
+    }
+    await expect(navLink).toBeVisible();
+    await expect(navLink).toHaveAttribute("aria-current", "page");
+    await expect(page.locator("header.site-header").getByRole("link", {
+      name: "Sponsors",
+      exact: true
+    })).toBeVisible();
+    await expect(page.locator("#paper-tracks .track-card")).toHaveCount(4);
+    await expect(page.locator("#submission-requirements")).toContainText("4–6 pages");
+    await expect(page.locator("#submission-requirements")).toContainText("single-blind");
+    await expect(page.locator("#submission-requirements")).toContainText("team number");
+    await expect(page.locator("#submission-requirements")).toContainText("team name");
 
     const dimensions = await page.evaluate(() => ({
       clientWidth: document.documentElement.clientWidth,

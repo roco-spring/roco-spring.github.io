@@ -15,6 +15,7 @@ import {
 
 const COMMIT = "a".repeat(40);
 const REQUIRED_PUBLICATION_FILES = Object.freeze([
+    "call-for-papers.html",
     "evaluation.html",
     "index.html",
     "participate.html",
@@ -35,7 +36,8 @@ const REQUIRED_PUBLICATION_FILES = Object.freeze([
     "assets/team-registration-fallback.js",
     "assets/team-registration.js",
     "assets/team-validation.js",
-    "assets/timeline.js"
+    "assets/timeline.js",
+    "img/jung.jpg"
 ]);
 
 function checkRun(name, overrides = {}) {

@@ -1639,6 +1639,54 @@ td {
     font-size: 0.95rem;
 }
 
+.organizer-name-link {
+    border-radius: 4px;
+    color: inherit;
+    text-decoration-color: rgba(93, 124, 255, 0.38);
+    text-decoration-thickness: 1px;
+    text-underline-offset: 3px;
+    transition: color 0.18s ease, text-decoration-color 0.18s ease;
+}
+
+.organizer-name-link:hover {
+    color: #2437a6;
+    text-decoration-color: currentColor;
+}
+
+.organizer-name-link:focus-visible {
+    outline: 3px solid rgba(0, 125, 180, 0.66);
+    outline-offset: 3px;
+}
+
+.cfp-track-grid .track-card {
+    min-height: 220px;
+}
+
+.cfp-track-grid .track-card h3 {
+    margin: 0 0 12px;
+}
+
+.cfp-team-notice {
+    margin: 0 0 24px;
+}
+
+.cfp-team-notice h3,
+.cfp-team-notice p {
+    margin: 0;
+}
+
+.cfp-team-notice p {
+    margin-top: 8px;
+}
+
+.cfp-requirements-list {
+    margin-top: 0;
+}
+
+.cfp-deadline-table {
+    min-width: 560px;
+}
+
 .faq-list {
     display: grid;
     gap: 12px;
@@ -1725,7 +1773,7 @@ details p {
     }
 }
 
-@media (max-width: 680px) {
+@media (max-width: 860px) {
     .site-header {
         flex-wrap: wrap;
         align-items: center;

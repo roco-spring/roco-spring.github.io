@@ -414,26 +414,18 @@
 
         <section class="section" id="call-for-papers">
             <div class="section-heading">
-                <div class="eyebrow">Call for Papers</div>
-                <h2>Paper Requirements</h2>
+                <div class="eyebrow">Papers</div>
+                <h2>Share Your Challenge Work</h2>
             </div>
 
             <div class="content-card">
                 <p>
-                    Each quantitative or exploration entry must submit a 4–6 page single-blind
-                    workshop paper. The paper should describe the method, implementation details,
-                    training and pretraining data, compute budget, results, ablations, and
-                    limitations.
-                </p>
-                <p>
-                    Papers will be reviewed by the organizers and additional external reviewers with expertise in
-                    Optical Flow, Stereo Matching, Scene Flow, robustness, and benchmark design. Acceptance will depend on
-                    technical soundness, clarity, reproducibility, and relevance to robust dense correspondence, not
-                    only on leaderboard rank.
-                    All accepted papers will be forwarded for the official PMLR volume of NeurIPS workshop proceedings.
+                    Track scope, NeurIPS 2026 formatting, page limits, review policy, team identification,
+                    and reproducibility requirements are collected in the Call for Papers.
                 </p>
 
                 <div class="call-for-papers-actions">
+                    <a class="button secondary" href="call-for-papers.html">Read the Call for Papers</a>
                     <a class="button openreview"
                         href="https://openreview.net/group?id=NeurIPS.cc/2026/Workshop/RoCo-Spring"
                         target="_blank" rel="noopener noreferrer">
@@ -441,41 +433,6 @@
                         <span>Submission</span>
                     </a>
                 </div>
-
-                <h3 id="reproducibility">Reproducibility Package</h3>
-                <p>
-                    With the camera-ready deadline, each entry must submit a reproducibility package
-                    together with the paper. Award eligibility requires an accepted workshop paper
-                    and a complete package that meets the requirements below.
-                </p>
-                <ul class="feature-list">
-                    <li>
-                        <strong>Dataset declaration.</strong> List every dataset used for training,
-                        pretraining, fine-tuning, and validation (not only Spring and RobustSpring).
-                    </li>
-                    <li>
-                        <strong>Training scripts.</strong> Provide runnable scripts or commands that
-                        reproduce training end to end.
-                    </li>
-                    <li>
-                        <strong>Evaluation scripts.</strong> Provide runnable scripts that reproduce
-                        the metrics and results reported in the paper on the declared data splits.
-                    </li>
-                    <li>
-                        <strong>Resource requirements.</strong> Document hardware and runtime needs
-                        for both training and evaluation, including GPU type, GPU count, peak memory,
-                        and wall-clock time.
-                    </li>
-                    <li>
-                        <strong>README.</strong> Include a detailed, concise setup guide that explains
-                        how to install dependencies and rerun training and evaluation. Pin the
-                        environment either with a <code>pyproject.toml</code> following the
-                        <a href="https://packaging.python.org/en/latest/guides/writing-pyproject-toml/" target="_blank"
-                            rel="noopener noreferrer">Python packaging guide</a>,
-                        or with explicit conda instructions that list every library and version
-                        required to recreate the environment.
-                    </li>
-                </ul>
             </div>
         </section>
     </main>

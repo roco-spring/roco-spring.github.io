@@ -16,6 +16,7 @@ const DEFAULT_MAX_ATTEMPTS = 40;
 const DEFAULT_POLL_DELAY_MS = 15_000;
 const EXPECTED_CHECKS = Object.freeze(["verify", "deploy"]);
 const PUBLISHED_FILES = Object.freeze([
+    "call-for-papers.html",
     "evaluation.html",
     "index.html",
     "participate.html",
@@ -36,7 +37,8 @@ const PUBLISHED_FILES = Object.freeze([
     "assets/team-registration-fallback.js",
     "assets/team-registration.js",
     "assets/team-validation.js",
-    "assets/timeline.js"
+    "assets/timeline.js",
+    "img/jung.jpg"
 ]);
 
 class ReleasePublicationError extends Error {

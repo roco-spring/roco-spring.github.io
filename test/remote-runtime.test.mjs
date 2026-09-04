@@ -5,6 +5,7 @@ import test from "node:test";
 
 const ROOT = path.resolve(import.meta.dirname, "..");
 const PRODUCTION_HTML = [
+    "call-for-papers.html",
     "index.html",
     "participate.html",
     "tasks-data.html",

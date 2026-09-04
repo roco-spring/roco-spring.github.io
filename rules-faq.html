@@ -34,6 +34,8 @@
             <div class="rule-list content-card">
                 <div>Each team must register once and use exactly one team ID.</div>
                 <div>Each submitted archive must follow the task format and include the team ID.</div>
+                <div>Every challenge-team paper must include the exact registered team name and team number in its
+                    abstract.</div>
                 <div>Test ground truth is private.</div>
                 <div>Participants must not infer, reconstruct, scrape, or obtain test labels.</div>
                 <div>All training data, pretraining data, model checkpoints, and external resources must be declared.
@@ -46,7 +48,7 @@
                 <div>Final submissions are frozen after the deadline.</div>
                 <div>Award candidates must have an accepted workshop paper and submit a complete reproducibility package
                     (training and evaluation scripts, dataset declaration, resource requirements, and environment
-                    setup). See the <a href="evaluation.html#reproducibility">reproducibility requirements</a> for
+                    setup). See the <a href="call-for-papers.html#reproducibility">reproducibility requirements</a> for
                     details.</div>
             </div>
 
@@ -66,8 +68,12 @@
 
             <div class="content-card">
                 <ul class="feature-list">
-                    <li>Workshop papers are 4–6 pages.</li>
-                    <li>Reviewing is single-blind.</li>
+                    <li>Use the official NeurIPS 2026 paper format.</li>
+                    <li>Main papers are 4–6 pages; references and an optional appendix do not count toward that
+                        limit.</li>
+                    <li>Reviewing is single-blind, so author identities remain visible to reviewers. Use the
+                        template's <code>sglblindworkshop</code> option.</li>
+                    <li>Challenge teams must put their exact registered team name and team number in the abstract.</li>
                     <li>Acceptance depends on technical soundness, clarity, reproducibility, and relevance to robust
                         dense correspondence, not only leaderboard rank.</li>
                     <li>Accepted papers may be forwarded for the official PMLR volume of NeurIPS workshop proceedings.
@@ -110,8 +116,10 @@
                 <details>
                     <summary>Do I need to submit a paper?</summary>
                     <p>
-                        Yes. Each quantitative or exploration entry must submit a 4–6 page
-                        single-blind workshop paper.
+                        Yes. Each quantitative or Exploration Track entry must submit a single-blind workshop paper
+                        in the official NeurIPS 2026 format. The main paper is 4–6 pages; references and an optional
+                        appendix may follow. Challenge teams must include their exact registered team name and team
+                        number in the abstract. See the <a href="call-for-papers.html">Call for Papers</a>.
                     </p>
                 </details>
 
@@ -123,7 +131,7 @@
                         requirements, and a README with a pinned environment—either via
                         <code>pyproject.toml</code> or explicit conda instructions with library
                         versions. See the
-                        <a href="evaluation.html#reproducibility">reproducibility requirements</a>
+                        <a href="call-for-papers.html#reproducibility">reproducibility requirements</a>
                         for the full checklist.
                     </p>
                 </details>
