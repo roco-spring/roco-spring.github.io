@@ -84,8 +84,13 @@
         ])
     });
 
+    const initialParameters = new URL(location.href).searchParams;
     let currentSnapshot = null;
-    let selectedTrack = tracks[0].key;
+    let selectedTrack = tracks.find((track) => track.key === initialParameters.get("track"))?.key
+        ?? tracks[0].key;
+    let searchQuery = (initialParameters.get("team") ?? "").slice(0, 240);
+    let selectedView = ["all", "submissions", "baselines"].includes(initialParameters.get("view"))
+        ? initialParameters.get("view") : "all";
     let loadSnapshot = loadPublishedSnapshot;
     let refreshGeneration = 0;
     let initialRefreshPromise;
@@ -196,8 +201,12 @@
             const rightScored = isFiniteNumber(right.score);
             if (leftScored !== rightScored) return leftScored ? -1 : 1;
             if (!leftScored) {
-                // Keep team order alphabetical, then use immutable result
-                // URLs to order multiple pending methods from the same team.
+                // A public submitted method should be easy to find before
+                // teams that have not submitted anything. Both groups remain
+                // alphabetical, with stable URLs ordering each team's methods.
+                const leftSubmitted = Boolean(left.benchmarkMethod && safeBenchmarkUrl(left.benchmarkUrl));
+                const rightSubmitted = Boolean(right.benchmarkMethod && safeBenchmarkUrl(right.benchmarkUrl));
+                if (leftSubmitted !== rightSubmitted) return leftSubmitted ? -1 : 1;
                 return compareTeamIdentity(left, right) || String(left.benchmarkUrl ?? "")
                     .localeCompare(String(right.benchmarkUrl ?? ""), undefined, { numeric: true });
             }
@@ -359,6 +368,49 @@
         return [...scoredRows, ...pendingRows];
     }
 
+    function normalizeSearchText(value) {
+        return String(value ?? "").normalize("NFKD").replace(/\p{Mark}/gu, "")
+            .toLowerCase().replace(/[\s_\p{Dash_Punctuation}\u2212]+/gu, "");
+    }
+
+    function parsedSearchQuery() {
+        const teamIds = new Set();
+        const normalizedQuery = searchQuery.normalize("NFKC").trim();
+        if (/^\d+$/u.test(normalizedQuery)) {
+            teamIds.add(normalizedQuery.replace(/^0+(?=\d)/u, ""));
+            return { teamIds, terms: [] };
+        }
+        // Handle full team IDs separately from free text so RoCo-14, RoCo14,
+        // and "roco 14" all find team 14 without also matching team 140.
+        const remaining = normalizedQuery.replace(
+            /(?<![\p{Letter}\p{Number}])roco[\s_\p{Dash_Punctuation}\u2212]*(\d+)(?![\p{Letter}\p{Number}])/giu,
+            (_match, digits) => {
+                teamIds.add(digits.replace(/^0+(?=\d)/u, ""));
+                return " ";
+            }
+        );
+        return {
+            teamIds,
+            terms: remaining.trim().split(/[\s|,:;]+/u).map(normalizeSearchText).filter(Boolean)
+        };
+    }
+
+    function filteredRowsForTrack(snapshot, trackKey) {
+        const query = parsedSearchQuery();
+        // Filtering is deliberately after rank calculation: finding one team
+        // must show its actual standing, not promote it to rank 1.
+        return displayRowsForTrack(snapshot, trackKey).filter((row) => {
+            if (selectedView === "baselines" && !row.isBaseline) return false;
+            if (selectedView === "submissions" && (row.isBaseline || !row.benchmarkMethod)) return false;
+            if (query.teamIds.size > 0) {
+                const teamNumber = String(row.teamId).match(/^RoCo-(\d+)$/iu)?.[1];
+                if (!teamNumber || !query.teamIds.has(teamNumber)) return false;
+            }
+            const fields = [row.teamId, row.teamName, row.benchmarkMethod].map(normalizeSearchText);
+            return query.terms.every((term) => fields.some((field) => field.includes(term)));
+        });
+    }
+
     function formatNumber(value, digits) {
         if (isFiniteNumber(value)) {
             return value.toLocaleString(undefined, {
@@ -438,11 +490,13 @@
                 headRow.append(cell);
             });
 
-        displayRowsForTrack(snapshot, track.key).forEach((row) => {
+        const visibleRows = filteredRowsForTrack(snapshot, track.key);
+        visibleRows.forEach((row) => {
             const tableRow = document.createElement("tr");
             tableRow.classList.add("leaderboard-row");
             const isPending = !isFiniteNumber(row.score);
             const isBaseline = row.isBaseline === true;
+            if (!isBaseline) tableRow.dataset.teamId = row.teamId;
             if (isPending) tableRow.classList.add("leaderboard-row--pending");
             if (isBaseline) tableRow.classList.add("leaderboard-row--baseline");
 
@@ -482,10 +536,13 @@
                 teamMeta.append(element("span", "leaderboard-team-id", row.teamId));
             }
             if (isPending && !isBaseline) {
+                const pendingLabel = !row.benchmarkMethod ? "No submission yet"
+                    : isFiniteNumber(row.springMetric) && row.robustSpringMetric === null
+                        ? "Awaiting robustness results" : "Awaiting benchmark results";
                 teamMeta.append(element(
                     "span",
                     "leaderboard-pending-badge",
-                    row.benchmarkMethod ? "Awaiting benchmark results" : "Awaiting result"
+                    pendingLabel
                 ));
             }
             teamCell.append(teamMeta);
@@ -534,6 +591,13 @@
             );
             body.append(tableRow);
         });
+        if (visibleRows.length === 0) {
+            const emptyRow = element("tr", "leaderboard-empty-row");
+            const emptyCell = element("td", "", "No entries match your filters. Try another team number, name, or method.");
+            emptyCell.colSpan = 8;
+            emptyRow.append(emptyCell);
+            body.append(emptyRow);
+        }
 
         head.append(headRow);
         table.append(caption, head, body);
@@ -549,12 +613,91 @@
     }
 
     function renderFullLeaderboard(root, snapshot, rootIndex) {
+        const focusedControl = root.contains(document.activeElement) ? document.activeElement : null;
+        const restoreSearchFocus = focusedControl?.classList.contains("leaderboard-search-input");
+        const restoreViewFocus = focusedControl?.classList.contains("leaderboard-view-select");
+        const selection = restoreSearchFocus ? {
+            start: focusedControl.selectionStart,
+            end: focusedControl.selectionEnd,
+            direction: focusedControl.selectionDirection
+        } : null;
         const shell = element("div", "leaderboard-shell");
         const tabs = element("div", "leaderboard-tabs");
+        const toolbar = element("div", "leaderboard-toolbar");
         const panels = element("div", "leaderboard-panels");
         const prefix = `leaderboard-${rootIndex}`;
         tabs.setAttribute("role", "tablist");
         tabs.setAttribute("aria-label", "Choose a leaderboard");
+
+        const searchLabel = element("label", "leaderboard-search");
+        searchLabel.append(element("span", "", "Find a team or method"));
+        const searchInput = element("input", "leaderboard-search-input");
+        searchInput.id = `${prefix}-search`;
+        searchInput.type = "search";
+        searchInput.maxLength = 240;
+        searchInput.autocomplete = "off";
+        searchInput.placeholder = "RoCo-14, team name, or method";
+        searchInput.value = searchQuery;
+        searchLabel.append(searchInput);
+
+        const viewLabel = element("label", "leaderboard-view");
+        viewLabel.append(element("span", "", "Show"));
+        const viewSelect = element("select", "leaderboard-view-select");
+        viewSelect.id = `${prefix}-view`;
+        for (const [value, label] of [["all", "All entries"], ["submissions", "Submitted methods"], ["baselines", "Baselines"]]) {
+            const option = element("option", "", label);
+            option.value = value;
+            viewSelect.append(option);
+        }
+        viewSelect.value = selectedView;
+        viewLabel.append(viewSelect);
+
+        const clearButton = element("button", "button secondary leaderboard-clear-filter", "Clear filters");
+        clearButton.type = "button";
+        const filterStatus = element("p", "leaderboard-filter-status");
+        filterStatus.id = `${prefix}-filter-status`;
+        filterStatus.setAttribute("role", "status");
+        filterStatus.setAttribute("aria-live", "polite");
+        filterStatus.setAttribute("aria-atomic", "true");
+        searchInput.setAttribute("aria-describedby", filterStatus.id);
+        toolbar.append(searchLabel, viewLabel, clearButton, filterStatus);
+
+        const updateFilterStatus = () => {
+            const track = tracks.find((candidate) => candidate.key === selectedTrack);
+            const total = displayRowsForTrack(snapshot, selectedTrack).length;
+            const visible = filteredRowsForTrack(snapshot, selectedTrack).length;
+            filterStatus.textContent = `Showing ${visible} of ${total} ${total === 1 ? "entry" : "entries"} in ${track.label}.`;
+            clearButton.hidden = selectedView === "all" && !searchQuery.trim();
+        };
+        const updateFilteredTables = () => {
+            // Keep the controls themselves mounted while typing, preserving
+            // focus/caret and each table's current horizontal scroll position.
+            tracks.forEach((track) => {
+                const panel = panels.querySelector(`[data-track="${track.key}"]`);
+                const previousTable = panel.querySelector(".leaderboard-table-wrap");
+                const scrollLeft = previousTable.scrollLeft;
+                const table = buildTable(snapshot, track, panel.id);
+                previousTable.replaceWith(table);
+                table.scrollLeft = scrollLeft;
+            });
+            updateFilterStatus();
+        };
+        searchInput.addEventListener("input", () => {
+            searchQuery = searchInput.value;
+            updateFilteredTables();
+        });
+        viewSelect.addEventListener("change", () => {
+            selectedView = viewSelect.value;
+            updateFilteredTables();
+        });
+        clearButton.addEventListener("click", () => {
+            searchQuery = "";
+            selectedView = "all";
+            searchInput.value = "";
+            viewSelect.value = "all";
+            updateFilteredTables();
+            searchInput.focus({ preventScroll: true });
+        });
 
         const selectTrack = (trackKey, moveFocus) => {
             selectedTrack = trackKey;
@@ -567,6 +710,7 @@
             panels.querySelectorAll("[role=tabpanel]").forEach((panel) => {
                 panel.hidden = panel.dataset.track !== trackKey;
             });
+            updateFilterStatus();
         };
 
         tracks.forEach((track, trackIndex) => {
@@ -603,7 +747,7 @@
                 "leaderboard-panel-note",
                 track.key === "cross-task"
                     ? "Cross-Task standings include teams registered for all three quantitative tracks."
-                    : "Participant methods are ranked by RbS-Score; teams and methods awaiting complete benchmark results follow alphabetically by team. Rows labeled Baseline are score-sorted, unranked Spring-Team references with complete Spring and RobustSpring metrics; they do not affect participant standings."
+                    : "Participant methods are ranked by RbS-Score. Methods awaiting benchmark results follow, then teams with no submission; both groups are alphabetical by team. Rows labeled Baseline are score-sorted, unranked Spring-Team references with complete Spring and RobustSpring metrics; they do not affect participant standings."
             );
             note.id = `${panelId}-note`;
             const scrollHint = element(
@@ -620,9 +764,17 @@
             }
         });
 
-        shell.append(tabs, panels);
+        shell.append(tabs, toolbar, panels);
         root.replaceChildren(shell);
         selectTrack(selectedTrack, false);
+        // A background refresh rebuilds the snapshot, so restore the search
+        // caret rather than interrupting someone who is finding their team.
+        if (restoreSearchFocus) {
+            searchInput.focus({ preventScroll: true });
+            searchInput.setSelectionRange(selection.start, selection.end, selection.direction);
+        } else if (restoreViewFocus) {
+            viewSelect.focus({ preventScroll: true });
+        }
     }
 
     function renderPreview(root, snapshot) {
@@ -630,6 +782,8 @@
         tracks.forEach((track) => {
             const allRows = rowsForTrack(snapshot, track.key);
             const rows = allRows.filter((row) => isFiniteNumber(row.score)).slice(0, 3);
+            const pendingMethods = allRows.filter((row) => !isFiniteNumber(row.score)
+                && row.benchmarkMethod && safeBenchmarkUrl(row.benchmarkUrl)).length;
             const card = element("article", "leaderboard-preview-card");
             const heading = element("h3", "", track.label);
             const list = element("ol", "leaderboard-preview-list");
@@ -661,7 +815,7 @@
             });
 
             const link = element("a", "leaderboard-preview-link", "View full standings →");
-            link.href = "evaluation.html#leaderboards";
+            link.href = `evaluation.html?track=${track.key}#leaderboards`;
             card.append(heading);
             if (rows.length) {
                 card.append(list);
@@ -674,6 +828,12 @@
                     "leaderboard-preview-empty",
                     `No complete benchmark results yet · ${teamCount} registered ${noun}`
                 ));
+            }
+            if (pendingMethods > 0) {
+                const pendingLink = element("a", "leaderboard-preview-pending-link",
+                    `${pendingMethods} ${pendingMethods === 1 ? "method" : "methods"} awaiting results`);
+                pendingLink.href = `evaluation.html?track=${track.key}&view=submissions#leaderboards`;
+                card.append(pendingLink);
             }
             card.append(link);
             grid.append(card);

@@ -103,7 +103,7 @@ test("Leaderboard tabs render the published scored and pending methods with the 
     await expect(teamRows.locator(".leaderboard-team-name")).toHaveText(Array(names.length).fill(teamName));
     await expect(teamRows.locator(".leaderboard-method")).toHaveText(names);
     await expect(teamRows.locator(".leaderboard-pending-badge"))
-      .toHaveText(Array(names.length).fill("Awaiting benchmark results"));
+      .toHaveText(Array(names.length).fill("Awaiting robustness results"));
     for (let index = 0; index < names.length; index += 1) {
       await expect(teamRows.nth(index).locator(".leaderboard-method"))
         .toHaveAttribute("href", `https://spring-benchmark.org/${links[index]}/`);
@@ -431,7 +431,7 @@ test("canonical method labels retain distinct results across refresh, tracks, an
     await expect(card.locator(".leaderboard-preview-team strong"))
       .toHaveText(Array(3).fill("Registered Racing"));
     await expect(card.getByRole("link", { name: "View full standings →" }))
-      .toHaveAttribute("href", "evaluation.html#leaderboards");
+      .toHaveAttribute("href", `evaluation.html?track=${track}#leaderboards`);
   }
   expect(await page.evaluate(() => document.documentElement.scrollWidth))
     .toBeLessThanOrEqual(391);
@@ -497,19 +497,20 @@ test("incomplete public methods remain visible without a rank until complete met
   const rows = page.locator('[role="tabpanel"]:not([hidden]) tbody tr');
   await expect(rows).toHaveCount(5);
   await expect(rows.locator(".leaderboard-team-name"))
-    .toHaveText(["VSAI", "Road Racing", "Alpha Pending", "Road Racing", "WAFT Team"]);
+    .toHaveText(["VSAI", "Road Racing", "Road Racing", "WAFT Team", "Alpha Pending"]);
   await expect(rows.locator(".leaderboard-rank")).toHaveText(["1", "2", "—", "—", "—"]);
   await expect(rows.locator(".leaderboard-score")).toHaveText(["0.2000", "0.3000", "—", "—", "—"]);
   await expect(rows.locator(".leaderboard-method-placeholder")).toHaveCount(1);
   for (const [name, resultId, clean] of [["CAR-WAFT", 471, "0.900"], ["WAFT+", 488, "1.100"]]) {
     const row = rows.filter({ has: page.getByRole("link", { name: `${name} benchmark result (opens in a new tab)`, exact: true }) });
-    await expect(row.locator(".leaderboard-pending-badge")).toHaveText("Awaiting benchmark results");
+    await expect(row.locator(".leaderboard-pending-badge")).toHaveText("Awaiting robustness results");
     await expect(row.locator(".leaderboard-method"))
       .toHaveAttribute("href", `https://spring-benchmark.org/${resultId}/`);
     await expect(row.locator(".leaderboard-metric")).toHaveText([clean, "—"]);
     await expect(row.locator(".leaderboard-submitted"))
       .toHaveAttribute("title", "2026-09-07T12:00:00.000Z");
   }
+  await expect(rows.last().locator(".leaderboard-pending-badge")).toHaveText("No submission yet");
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(391);
 
   await page.getByRole("button", { name: "Refresh standings" }).click();
@@ -530,6 +531,165 @@ test("incomplete public methods remain visible without a rank until complete met
   await expect(page.locator('.leaderboard-preview-card[aria-labelledby="preview-stereo-matching"] .leaderboard-preview-empty'))
     .toHaveText("No complete benchmark results yet · 1 registered team");
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(391);
+});
+
+for (const width of [390, 1440]) {
+  test(`leaderboard team links and submission filters reveal RoCo-14 and RoCo-29 at ${width}px`, async ({ page }) => {
+    const pageErrors = [];
+    page.on("pageerror", (error) => pageErrors.push(error.message));
+    await page.setViewportSize({ width, height: 900 });
+    await page.goto("/evaluation.html?track=optical-flow&team=RoCo-14#leaderboards");
+
+    const search = page.getByLabel("Find a team or method", { exact: true });
+    const view = page.getByRole("combobox", { name: "Show", exact: true });
+    const panel = page.locator('[role="tabpanel"]:not([hidden])');
+    const participantRows = panel.locator("tbody tr[data-team-id]:not(.leaderboard-row--baseline)");
+    const status = page.locator(".leaderboard-filter-status");
+    await expect(page.getByRole("tab", { name: "Optical Flow", exact: true }))
+      .toHaveAttribute("aria-selected", "true");
+    await expect(search).toHaveValue("RoCo-14");
+    await expect(participantRows).toHaveCount(1);
+    await expect(participantRows).toHaveAttribute("data-team-id", "RoCo-14");
+    await expect(participantRows.locator(".leaderboard-team-name")).toHaveText("ZXUv2.0");
+    await expect(participantRows.locator(".leaderboard-method")).toHaveText("CAR-WAFT");
+    await expect(participantRows.locator(".leaderboard-method"))
+      .toHaveAttribute("href", "https://spring-benchmark.org/471/");
+    await expect(participantRows.locator(".leaderboard-metric")).toHaveText(["0.298", "—"]);
+    await expect(participantRows.locator(".leaderboard-score")).toHaveText("—");
+    await expect(participantRows.locator(".leaderboard-pending-badge"))
+      .toHaveText("Awaiting robustness results");
+    await expect(status).toHaveText("Showing 1 of 45 entries in Optical Flow.");
+
+    await page.goto("/evaluation.html?track=optical-flow&team=RoCo-29#leaderboards");
+    await expect(search).toHaveValue("RoCo-29");
+    await expect(participantRows).toHaveCount(1);
+    await expect(participantRows).toHaveAttribute("data-team-id", "RoCo-29");
+    await expect(participantRows.locator(".leaderboard-team-name")).toHaveText("VSAI");
+    await expect(participantRows.locator(".leaderboard-method")).toHaveText("Method 1");
+    await expect(participantRows.locator(".leaderboard-method"))
+      .toHaveAttribute("href", "https://spring-benchmark.org/474/");
+    await expect(participantRows.locator(".leaderboard-rank")).toHaveText("1");
+    await expect(participantRows.locator(".leaderboard-score")).toHaveText("1.1038");
+
+    await page.getByRole("button", { name: "Clear filters", exact: true }).click();
+    await expect(search).toHaveValue("");
+    await expect(view).toHaveValue("all");
+    await expect(participantRows).toHaveCount(33);
+    // Evaluated methods awaiting robustness are visible before empty teams.
+    await expect(participantRows.locator(".leaderboard-team-id").first()).toHaveText("RoCo-29");
+    await expect(participantRows.nth(4).locator(".leaderboard-team-id")).toHaveText("RoCo-14");
+    await expect(participantRows.nth(5).locator(".leaderboard-pending-badge")).toHaveText("No submission yet");
+    await view.selectOption({ label: "Submitted methods" });
+    await expect(participantRows).toHaveCount(5);
+    await expect(participantRows.locator(".leaderboard-method")).toHaveCount(5);
+    await expect(panel.locator("tbody tr.leaderboard-row--baseline")).toHaveCount(0);
+    await expect(status).toHaveText("Showing 5 of 45 entries in Optical Flow.");
+    await expect(participantRows.locator('a[href="https://spring-benchmark.org/471/"]')).toHaveCount(1);
+    await expect(participantRows.locator('a[href="https://spring-benchmark.org/474/"]')).toHaveCount(1);
+
+    await view.selectOption({ label: "Baselines" });
+    await expect(panel.locator("tbody tr.leaderboard-row--baseline")).toHaveCount(12);
+    await expect(participantRows).toHaveCount(0);
+    await expect(status).toHaveText("Showing 12 of 45 entries in Optical Flow.");
+
+    const dimensions = await search.evaluate((input) => ({
+      page: document.documentElement.clientWidth,
+      content: document.documentElement.scrollWidth,
+      inputWidth: input.getBoundingClientRect().width,
+      toolbarWidth: input.closest(".leaderboard-toolbar").getBoundingClientRect().width
+    }));
+    expect(dimensions.content).toBeLessThanOrEqual(dimensions.page + 1);
+    expect(dimensions.inputWidth).toBeGreaterThan(100);
+    expect(dimensions.toolbarWidth).toBeLessThanOrEqual(dimensions.page);
+    expect(pageErrors).toEqual([]);
+  });
+}
+
+test("leaderboard filters preserve exact team identities, global ranks, track state, and the search caret", async ({ page }) => {
+  await page.goto("/evaluation.html");
+  await page.waitForFunction(() => Boolean(window.RoCoLeaderboardLive));
+  await page.evaluate(async () => {
+    const result = (benchmarkMethod, id, score) => ({
+      rankChange: 0, score, springMetric: score, robustSpringMetric: score,
+      springTerm: score, robustSpringTerm: score,
+      submittedAt: "2026-09-07T12:00:00.000Z", benchmarkMethod,
+      benchmarkUrl: `https://spring-benchmark.org/${id}/`
+    });
+    const teams = [
+      { teamId: "RoCo-140", teamName: "Fast Team", score: 1, method: "FastFlow", id: 900 },
+      { teamId: "RoCo-14", teamName: "Road Racing", score: 2, method: "CAR-WAFT", id: 471 },
+      { teamId: "RoCo-29", teamName: "VSAI", score: 3, method: "WAFT+", id: 474 }
+    ].map((team) => ({
+      teamId: team.teamId, teamName: team.teamName,
+      registeredTracks: ["optical-flow", "stereo-matching"],
+      results: {
+        "optical-flow": result(team.method, team.id, team.score),
+        "stereo-matching": result(`${team.method} Stereo`, team.id + 100, team.score)
+      }
+    }));
+    teams.push({ teamId: "RoCo-30", teamName: "Empty Team", registeredTracks: ["optical-flow"], results: {} });
+    window.__filterRefreshes = 0;
+    await window.RoCoLeaderboardLive.installDataSource(async ({ force }) => {
+      if (force) window.__filterRefreshes += 1;
+      return { syncState: "synchronized", snapshot: {
+        schemaVersion: 2, updatedAt: "2026-09-07T12:05:00.000Z",
+        sourceLabel: "Team filter test", teams
+      } };
+    });
+  });
+
+  const search = page.getByLabel("Find a team or method", { exact: true });
+  const view = page.getByRole("combobox", { name: "Show", exact: true });
+  const panel = page.locator('[role="tabpanel"]:not([hidden])');
+  const rows = panel.locator("tbody tr[data-team-id]");
+  for (const query of ["RoCo-14", "RoCo14", "roco 14", "14", "014", "Road Racing", "CAR-WAFT"]) {
+    await search.fill(query);
+    await expect(rows).toHaveCount(1);
+    await expect(rows).toHaveAttribute("data-team-id", "RoCo-14");
+    // Search is a view of the standings, so the second-ranked team stays #2.
+    await expect(rows.locator(".leaderboard-rank")).toHaveText("2");
+  }
+  await search.fill("WAFT+");
+  await expect(rows).toHaveCount(1);
+  await expect(rows).toHaveAttribute("data-team-id", "RoCo-29");
+  await expect(rows.locator(".leaderboard-rank")).toHaveText("3");
+
+  await search.fill("");
+  await search.pressSequentially("RoCo14");
+  await expect(search).toBeFocused();
+  await expect(search).toHaveValue("RoCo14");
+  await view.selectOption({ label: "Submitted methods" });
+  await search.focus();
+  await search.evaluate((input) => input.setSelectionRange(2, 5, "backward"));
+  await page.evaluate(() => window.RoCoLeaderboard.refresh({ force: true, announce: true }));
+  await expect.poll(() => page.evaluate(() => window.__filterRefreshes)).toBe(1);
+  await expect(search).toBeFocused();
+  await expect(search).toHaveValue("RoCo14");
+  expect(await search.evaluate((input) => [input.selectionStart, input.selectionEnd, input.selectionDirection]))
+    .toEqual([2, 5, "backward"]);
+  await expect(view).toHaveValue("submissions");
+  await expect(rows.locator(".leaderboard-rank")).toHaveText("2");
+
+  await page.getByRole("tab", { name: "Stereo Matching", exact: true }).click();
+  await expect(search).toHaveValue("RoCo14");
+  await expect(view).toHaveValue("submissions");
+  await expect(rows).toHaveCount(1);
+  await expect(rows.locator(".leaderboard-method")).toHaveText("CAR-WAFT Stereo");
+  await expect(rows.locator(".leaderboard-rank")).toHaveText("2");
+  await expect(page.locator(".leaderboard-filter-status"))
+    .toHaveText("Showing 1 of 3 entries in Stereo Matching.");
+
+  await search.fill("NoSuchTeamOrMethod");
+  await expect(rows).toHaveCount(0);
+  await expect(panel.locator(".leaderboard-empty-row"))
+    .toHaveText("No entries match your filters. Try another team number, name, or method.");
+  await expect(page.locator(".leaderboard-filter-status"))
+    .toHaveText("Showing 0 of 3 entries in Stereo Matching.");
+  await page.getByRole("button", { name: "Clear filters", exact: true }).click();
+  await expect(search).toHaveValue("");
+  await expect(view).toHaveValue("all");
+  await expect(rows).toHaveCount(3);
+  await expect(page.getByRole("button", { name: "Clear filters", exact: true })).toBeHidden();
 });
 
 test("exact leaderboard ties use numeric team ID and then benchmark URL", async ({ page }) => {
@@ -597,11 +757,33 @@ test("homepage preview does not promote alphabetically sorted pending teams", as
   await expect(optical.locator(".leaderboard-preview-team strong")).toHaveText("VSAI");
   await expect(optical.locator(".leaderboard-preview-method")).toHaveText("Method 1");
   await expect(optical.locator(".leaderboard-preview-score")).toHaveText("1.1038");
+  await expect(optical.locator(".leaderboard-preview-pending-link"))
+    .toHaveText("4 methods awaiting results");
+  await expect(optical.locator(".leaderboard-preview-pending-link"))
+    .toHaveAttribute("href", "evaluation.html?track=optical-flow&view=submissions#leaderboards");
   for (const [track, count] of [["stereo-matching", 23], ["scene-flow", 23], ["cross-task", 20]]) {
     const card = page.locator(`.leaderboard-preview-card[aria-labelledby="preview-${track}"]`);
     await expect(card.locator(".leaderboard-preview-empty"))
       .toHaveText(`No complete benchmark results yet · ${count} registered teams`);
+    if (track === "cross-task") {
+      await expect(card.locator(".leaderboard-preview-pending-link")).toHaveCount(0);
+    } else {
+      await expect(card.locator(".leaderboard-preview-pending-link"))
+        .toHaveText("1 method awaiting results");
+      await expect(card.locator(".leaderboard-preview-pending-link"))
+        .toHaveAttribute("href", `evaluation.html?track=${track}&view=submissions#leaderboards`);
+    }
   }
+  await optical.locator(".leaderboard-preview-pending-link").click();
+  await expect(page.getByRole("tab", { name: "Optical Flow", exact: true }))
+    .toHaveAttribute("aria-selected", "true");
+  await expect(page.getByRole("combobox", { name: "Show", exact: true })).toHaveValue("submissions");
+  const submittedRows = page.locator('[role="tabpanel"]:not([hidden]) tbody tr[data-team-id]');
+  await expect(submittedRows).toHaveCount(5);
+  await expect(submittedRows.filter({ has: page.locator('a[href="https://spring-benchmark.org/471/"]') }))
+    .toHaveAttribute("data-team-id", "RoCo-14");
+  await expect(submittedRows.filter({ has: page.locator('a[href="https://spring-benchmark.org/474/"]') }))
+    .toHaveAttribute("data-team-id", "RoCo-29");
 });
 
 test("registration portal starts with three slots, validates partial members, and switches tabs", async ({ page }) => {

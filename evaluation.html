@@ -7,7 +7,7 @@
     <title>Leaderboard — RoCo-Spring</title>
     <meta name="description"
         content="RbS-Score metric, leaderboards, baselines, and submission instructions for RoCo-Spring.">
-    <link rel="stylesheet" href="assets/style.css">
+    <link rel="stylesheet" href="assets/style.css?v=45fd9392b86a">
     <script src="assets/site-layout.js" defer></script>
 </head>
 
@@ -32,8 +32,8 @@
                     <div class="eyebrow">Current Standings</div>
                     <h2>RoCo-Spring Leaderboard</h2>
                     <p>
-                        Lower RbS-Scores rank higher. Teams and methods awaiting complete benchmark results
-                        appear after scored methods in alphabetical order by team.
+                        Lower RbS-Scores rank higher. Search by team ID, team name, or method below.
+                        Submitted methods appear before teams that have not submitted yet.
                     </p>
                 </div>
 
@@ -60,24 +60,33 @@
                 Refresh requests the latest registered-team roster and public Spring/RobustSpring results.
                 Successful results are cached briefly to protect the benchmark service.
             </p>
-            <p class="leaderboard-integrity-note" role="note">
-                The organizer-approved matcher uses an exact RoCo team ID first, then a unique normalized team-name
-                substring. Private or unmatched benchmark entries remain pending instead of being assigned arbitrarily.
-                The Team column uses the registered team name; Method Name omits the team ID and repeated team name.
-                Entries without a method name receive a stable label such as Method 1 or Method 2 within their team.
-                Each method links to its original Spring result, and multiple methods from the same team remain separate.
-                Methods awaiting complete benchmark results show their available metrics but remain unranked.
-                Automatic matches are provisional: ranked and award-eligible entries must use the same method,
-                checkpoint, inference settings, and clean outputs in both uploads, subject to organizer verification.
-                The public benchmark cannot prove that cross-upload identity. “Spring Submission Time” is the original
-                Spring result time; a separate RobustSpring upload time is not exposed publicly.
-            </p>
             <p class="leaderboard-refresh-status" role="status" aria-live="polite" aria-atomic="true"
                 data-leaderboard-refresh-status></p>
 
             <div class="leaderboard-loading" data-leaderboard-root data-mode="full" aria-live="polite">
                 Loading published standings…
             </div>
+
+            <!-- Keep the standings easy to reach; detailed policies remain available below. -->
+            <details class="leaderboard-matching-details">
+                <summary>How team matching and pending results work</summary>
+                <p class="leaderboard-integrity-note" role="note">
+                    The organizer-approved matcher uses an exact RoCo team ID first, then a unique normalized team-name
+                    substring. Private or unmatched benchmark entries remain pending instead of being assigned arbitrarily.
+                    The Team column uses the registered team name; Method Name omits the team ID and repeated team name.
+                    Entries without a method name receive a stable label such as Method 1 or Method 2 within their team.
+                    Each method links to its original Spring result, and multiple methods from the same team remain separate.
+                    Methods awaiting complete benchmark results show their available metrics but remain unranked.
+                    “Awaiting robustness results” means the clean evaluation is available, but the required
+                    robustness metrics have not been published by Spring. “No submission yet” means no matching
+                    evaluated method is currently visible. Choose “Submitted methods” to hide baseline references
+                    and teams without submissions, or use “All entries” to compare everything together.
+                    Automatic matches are provisional: ranked and award-eligible entries must use the same method,
+                    checkpoint, inference settings, and clean outputs in both uploads, subject to organizer verification.
+                    The public benchmark cannot prove that cross-upload identity. “Spring Submission Time” is the original
+                    Spring result time; a separate RobustSpring upload time is not exposed publicly.
+                </p>
+            </details>
 
             <noscript>
                 <p class="leaderboard-unavailable">
@@ -444,8 +453,8 @@
     <footer id="site-footer"></footer>
 
     <script src="assets/flow.js"></script>
-    <script src="assets/leaderboard.js"></script>
-    <script type="module" src="assets/leaderboard-live.js"></script>
+    <script src="assets/leaderboard.js?v=ff4fd615ead5"></script>
+    <script type="module" src="assets/leaderboard-live.js?v=e15c6c970e7f"></script>
 </body>
 
 </html>

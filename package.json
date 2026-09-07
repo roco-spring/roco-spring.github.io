@@ -6,6 +6,7 @@
   "type": "module",
   "scripts": {
     "build": "npm --prefix functions run build",
+    "assets:version": "node scripts/version-leaderboard-assets.mjs",
     "test": "npm run test:site && npm --prefix functions test && npm run test:rules && npm run test:browser",
     "test:site": "node --test test/*.test.mjs",
     "test:rules": "node scripts/firebase-safe.mjs emulators:exec --only firestore --project demo-roco-spring-rules \"node --test test/emulator/firestore-rules.test.mjs\"",

@@ -3912,6 +3912,90 @@ details p {
     padding: 18px 20px 22px;
 }
 
+/* Filtering only changes which rows are shown; published ranks stay intact. */
+.leaderboard-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 12px;
+    padding: 18px 20px 0;
+}
+
+.leaderboard-search,
+.leaderboard-view {
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+    min-width: 0;
+    color: rgba(255, 255, 255, 0.8);
+    font-size: 0.8rem;
+    font-weight: 750;
+}
+
+.leaderboard-search {
+    flex: 1 1 260px;
+}
+
+.leaderboard-view {
+    flex: 0 1 200px;
+}
+
+.leaderboard-search-input,
+.leaderboard-view-select {
+    box-sizing: border-box;
+    width: 100%;
+    min-width: 0;
+    min-height: 46px;
+    margin: 0;
+    padding: 10px 13px;
+    border: 1px solid rgba(138, 223, 255, 0.25);
+    border-radius: 12px;
+    color: white;
+    background: #142139;
+    font: inherit;
+    font-size: 0.9rem;
+    transition: border-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.leaderboard-search-input::placeholder {
+    color: rgba(255, 255, 255, 0.52);
+}
+
+.leaderboard-search-input:focus-visible,
+.leaderboard-view-select:focus-visible {
+    border-color: #8adfff;
+    outline: 2px solid rgba(138, 223, 255, 0.65);
+    outline-offset: 2px;
+}
+
+.leaderboard-filter-status {
+    flex: 1 0 100%;
+    margin: 0;
+    color: #a6dff5;
+    font-size: 0.78rem;
+    font-variant-numeric: tabular-nums;
+}
+
+.leaderboard-clear-filter[hidden],
+.leaderboard-row[hidden] {
+    display: none;
+}
+
+.leaderboard-matching-details {
+    margin-top: 18px;
+    border-color: rgba(138, 223, 255, 0.22);
+    background: rgba(7, 13, 31, 0.8);
+}
+
+.leaderboard-matching-details summary {
+    min-height: 24px;
+    color: #a6dff5;
+}
+
+.leaderboard-matching-details[open] summary {
+    margin-bottom: 12px;
+}
+
 .leaderboard-panel[hidden] {
     display: none;
 }
@@ -4074,6 +4158,8 @@ details p {
 }
 
 .leaderboard-team-id {
+    flex-shrink: 0;
+    white-space: nowrap;
     color: rgba(255, 255, 255, 0.72);
     font-size: 0.72rem;
     font-weight: 700;
@@ -4208,6 +4294,19 @@ a.leaderboard-method:focus-visible {
 
 .leaderboard-preview-updated {
     margin: -14px 0 14px;
+}
+
+.leaderboard-preview-pending-link {
+    display: block;
+    margin: 12px 0;
+    color: #a6dff5;
+    font-size: 0.82rem;
+    text-underline-offset: 3px;
+}
+
+.leaderboard-preview-pending-link:hover,
+.leaderboard-preview-pending-link:focus-visible {
+    color: white;
 }
 
 .leaderboard-preview-grid {
@@ -4376,6 +4475,14 @@ a.leaderboard-method:focus-visible {
         padding: 15px 14px 17px;
     }
 
+    .leaderboard-toolbar {
+        padding: 15px 14px 0;
+    }
+
+    .leaderboard-view {
+        flex-grow: 1;
+    }
+
     .leaderboard-scroll-hint {
         display: block;
     }
@@ -4400,6 +4507,8 @@ a.leaderboard-method:focus-visible {
     }
 
     .leaderboard-tab,
+    .leaderboard-search-input,
+    .leaderboard-view-select,
     .leaderboard-table tbody tr,
     .leaderboard-preview-card {
         transition: none;
