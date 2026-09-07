@@ -179,6 +179,85 @@ test("live leaderboard proof accepts only a fresh or valid-cache public snapshot
     }), /omitted a known public team/u);
 });
 
+test("live leaderboard proof validates optional pending methods without accepting private or scored fields", () => {
+    const pending = {
+        benchmarkMethod: "WAFT+",
+        benchmarkUrl: "https://spring-benchmark.org/488/",
+        submittedAt: "2026-09-07T12:00:00.000Z",
+        matchBasis: "team-id",
+        springMetric: 0.9,
+        robustSpringMetric: null
+    };
+    const snapshotWithPending = (entry) => ({
+        ...LIVE_LEADERBOARD_SNAPSHOT,
+        teams: LIVE_LEADERBOARD_SNAPSHOT.teams.map((team, index) => index === 0 ? {
+            ...team,
+            registeredTracks: ["optical-flow", "stereo-matching", "scene-flow"],
+            pendingSubmissions: {
+                "optical-flow": [entry], "stereo-matching": [entry], "scene-flow": [entry]
+            }
+        } : team)
+    });
+    assert.doesNotThrow(() => verifyLiveLeaderboardSnapshot(snapshotWithPending(pending)));
+    assert.doesNotThrow(() => verifyLiveLeaderboardSnapshot(snapshotWithPending({
+        ...pending, benchmarkMethod: "Method 1", springMetric: null, robustSpringMetric: 0,
+        matchBasis: "team-name"
+    })));
+
+    for (const patch of [
+        { score: 0.1 }, { primaryContactEmail: "private@example.org" },
+        { benchmarkMethod: "" }, { benchmarkMethod: "A".repeat(241) }, { benchmarkMethod: "WAFT\n" },
+        { benchmarkUrl: "https://example.org/488/" },
+        { benchmarkUrl: "https://spring-benchmark.org/488/?private=1" },
+        { benchmarkUrl: "https://user:password@spring-benchmark.org/488/" },
+        { submittedAt: null }, { submittedAt: "2026-09-07" }, { matchBasis: "cross-task" },
+        { springMetric: -1 }, { springMetric: Number.NaN }, { springMetric: Number.POSITIVE_INFINITY },
+        { robustSpringMetric: "0.9" }, { robustSpringMetric: 1e9 + 1 }
+    ]) {
+        assert.throws(() => verifyLiveLeaderboardSnapshot(snapshotWithPending({ ...pending, ...patch })),
+            /pending submission projection is invalid/u);
+    }
+    const missingMetric = { ...pending };
+    delete missingMetric.robustSpringMetric;
+    assert.throws(() => verifyLiveLeaderboardSnapshot(snapshotWithPending(missingMetric)),
+        /pending submission projection is invalid/u);
+});
+
+test("live leaderboard pending lists are bounded, unique, and limited to registered quantitative tracks", () => {
+    const pending = {
+        benchmarkMethod: "Method 1",
+        benchmarkUrl: "https://spring-benchmark.org/474/",
+        submittedAt: "2026-09-07T12:00:00.000Z",
+        matchBasis: "team-id",
+        springMetric: 0.9,
+        robustSpringMetric: null
+    };
+    const snapshotWithPending = (pendingSubmissions) => ({
+        ...LIVE_LEADERBOARD_SNAPSHOT,
+        teams: LIVE_LEADERBOARD_SNAPSHOT.teams.map((team, index) => index === 0
+            ? { ...team, pendingSubmissions } : team)
+    });
+    assert.doesNotThrow(() => verifyLiveLeaderboardSnapshot(snapshotWithPending({})));
+    for (const collection of [
+        null,
+        { "cross-task": [pending] },
+        { exploration: [pending] },
+        { "stereo-matching": [pending] },
+        { "optical-flow": pending },
+        { "optical-flow": [pending, pending] },
+        { "optical-flow": Array.from({ length: 11 }, (_, index) => ({
+            ...pending, benchmarkUrl: `https://spring-benchmark.org/${474 + index}/`
+        })) }
+    ]) {
+        assert.throws(() => verifyLiveLeaderboardSnapshot(snapshotWithPending(collection)),
+            /team projection is invalid|pending submissions/u);
+    }
+    const missingRequiredTeamField = snapshotWithPending({});
+    delete missingRequiredTeamField.teams[0].results;
+    assert.throws(() => verifyLiveLeaderboardSnapshot(missingRequiredTeamField),
+        /team projection is invalid/u);
+});
+
 test("live App Check probe rejects a live page configured for another project", () => {
     assert.doesNotThrow(() => verifyProductionProjectId("roco-spring-registration-2026"));
     assert.throws(

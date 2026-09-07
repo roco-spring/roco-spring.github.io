@@ -6,6 +6,14 @@ import {
 import { logger } from "firebase-functions";
 import { AppError, safeErrorCategory } from "./errors.js";
 import type { TrackId } from "./config.js";
+import {
+  extractBenchmarkMethodName,
+  matchBenchmarkTeam,
+  planUnnamedMethodAssignments,
+  reconstructUnnamedMethodAssignments,
+} from "./leaderboard-methods.js";
+
+export { matchBenchmarkTeam } from "./leaderboard-methods.js";
 
 export const QUANTITATIVE_TRACKS = [
   "optical-flow",
@@ -125,6 +133,10 @@ const DETAIL_FETCH_CONCURRENCY = 24;
 const MAX_HISTORY_PER_TRACK = 10;
 const CACHE_COLLECTION = "publicLeaderboard";
 const CACHE_DOCUMENT = "current-v1";
+// Naming lives independently of the rolling result history. A removed or
+// renamed submission must never cause another method to reuse its number.
+const METHOD_NAMES_COLLECTION = "publicLeaderboardMethodNames";
+type MethodAssignments = Map<string, Record<string, number>>;
 const LIVE_SOURCE_LABEL = "Live Spring and RobustSpring public benchmark snapshot";
 // Public challenge submissions opened at midnight on 25 June in Berlin
 // (CEST, UTC+02:00). Older benchmark methods cannot belong to RoCo-Spring.
@@ -160,6 +172,16 @@ export interface PublicLeaderboardResult {
 export interface PublicLeaderboardTeam extends LeaderboardRosterTeam {
   results: Partial<Record<LeaderboardTrack, PublicLeaderboardResult>>;
   submissionHistory: Partial<Record<QuantitativeTrack, PublicLeaderboardResult[]>>;
+  pendingSubmissions?: Partial<Record<QuantitativeTrack, PublicPendingSubmission[]>>;
+}
+
+export interface PublicPendingSubmission {
+  benchmarkMethod: string;
+  benchmarkUrl: string;
+  submittedAt: string;
+  matchBasis: "team-id" | "team-name";
+  springMetric: number | null;
+  robustSpringMetric: number | null;
 }
 
 export interface PublicLeaderboardSnapshot {
@@ -201,6 +223,12 @@ interface ScoredCandidate {
   team: LeaderboardRosterTeam;
   track: QuantitativeTrack;
   result: PublicLeaderboardResult;
+}
+
+interface PendingCandidate {
+  team: LeaderboardRosterTeam;
+  track: QuantitativeTrack;
+  result: PublicPendingSubmission;
 }
 
 type DetailLoader = (submissionId: string) => Promise<string>;
@@ -298,47 +326,6 @@ export function normalizeLeaderboardIdentity(value: string): string {
     .replace(/[^a-z0-9]+/gu, "");
 }
 
-function escapedRegularExpression(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
-}
-
-function methodContainsTeamId(methodName: string, teamId: string): boolean {
-  const match = /^RoCo-(\d+)$/iu.exec(teamId.trim());
-  if (!match) return false;
-  const number = escapedRegularExpression(match[1] ?? "");
-  return new RegExp(`(?:^|[^a-z0-9])roco[\\s_-]*${number}(?![a-z0-9])`, "iu").test(
-    methodName,
-  );
-}
-
-function explicitBenchmarkTeam(
-  methodName: string,
-  teams: readonly LeaderboardRosterTeam[],
-): LeaderboardRosterTeam | null | "ambiguous" {
-  const matches = teams.filter((team) => methodContainsTeamId(methodName, team.teamId));
-  if (matches.length > 1) return "ambiguous";
-  return matches[0] ?? null;
-}
-
-export function matchBenchmarkTeam(
-  methodName: string,
-  teams: readonly LeaderboardRosterTeam[],
-): { team: LeaderboardRosterTeam; basis: "team-id" | "team-name" } | null {
-  const idMatch = explicitBenchmarkTeam(methodName, teams);
-  if (idMatch === "ambiguous") return null;
-  if (idMatch) return { team: idMatch, basis: "team-id" };
-
-  const normalizedMethod = normalizeLeaderboardIdentity(methodName);
-  const nameMatches = teams.filter((team) => {
-    const normalizedName = normalizeLeaderboardIdentity(team.teamName);
-    // Very short normalized names produce unsafe substring matches.
-    return normalizedName.length >= 4 && normalizedMethod.includes(normalizedName);
-  });
-  return nameMatches.length === 1
-    ? { team: nameMatches[0]!, basis: "team-name" }
-    : null;
-}
-
 function pairedRows(
   accuracyHtml: string,
   robustnessHtml: string,
@@ -346,25 +333,24 @@ function pairedRows(
   track: QuantitativeTrack,
   excludeTaskProjections: boolean,
 ): MatchedPair[] {
-  const accuracyById = new Map(
-    parseBenchmarkRows(accuracyHtml).map((row) => [row.submissionId, row]),
+  const robustnessById = new Map(
+    parseBenchmarkRows(robustnessHtml).map((row) => [row.submissionId, row]),
   );
   const pairs: MatchedPair[] = [];
-  for (const robustness of parseBenchmarkRows(robustnessHtml)) {
-    const accuracy = accuracyById.get(robustness.submissionId);
-    if (!accuracy) continue;
+  for (const accuracy of parseBenchmarkRows(accuracyHtml)) {
+    // A clean-only entry is visible as pending even before it appears in the
+    // robustness listing. Empty metrics never produce a scored candidate.
+    const robustness = robustnessById.get(accuracy.submissionId) ?? { ...accuracy, metrics: [] };
     if (excludeTaskProjections && (accuracy.taskProjection || robustness.taskProjection)) continue;
     // Resolve an explicit RoCo identifier against the complete roster first.
     // If that team did not register this track, reject the row; never let its
     // remaining text fall through and name-match a different registered team.
-    const explicitTeam = explicitBenchmarkTeam(accuracy.methodName, teams);
-    if (explicitTeam === "ambiguous") continue;
-    if (explicitTeam && !explicitTeam.registeredTracks.includes(track)) continue;
-    const matchingTeams = teams.filter((team) => team.registeredTracks.includes(track));
-    const match = explicitTeam
-      ? { team: explicitTeam, basis: "team-id" as const }
-      : matchBenchmarkTeam(accuracy.methodName, matchingTeams);
-    if (!match) continue;
+    const match = matchBenchmarkTeam(accuracy.methodName, teams);
+    const robustMatch = matchBenchmarkTeam(robustness.methodName, teams);
+    if (!match || !match.team.registeredTracks.includes(track)) continue;
+    // Listing views may update at different instants. Never combine two
+    // titles that claim different ownership for the same submission URL.
+    if (!robustMatch || robustMatch.team.teamId !== match.team.teamId) continue;
     pairs.push({
       team: match.team,
       matchBasis: match.basis,
@@ -604,7 +590,9 @@ function sceneFlowCandidate(
   };
 }
 
-function isChallengeSubmission(candidate: ScoredCandidate): boolean {
+function isChallengeSubmission(candidate: {
+  result: { submittedAt: string | null; matchBasis: string };
+}): boolean {
   // An exact participant identifier is an organizer-issued ownership signal,
   // so its valid publication timestamp need not be post-launch. Heuristic
   // team-name matches still require a post-launch timestamp to avoid claiming
@@ -652,7 +640,7 @@ function numericSubmissionId(submissionId: string): number {
 }
 
 function boundedDetailIds(
-  scalarCandidates: readonly ScoredCandidate[],
+  scalarCandidates: readonly (ScoredCandidate | PendingCandidate)[],
   scenePairs: readonly MatchedPair[],
 ): string[] {
   interface DetailDescriptor {
@@ -709,6 +697,105 @@ function boundedDetailIds(
     );
   return [...new Set([...primary, ...history].map((descriptor) => descriptor.submissionId))]
     .slice(0, MAX_DETAIL_REQUESTS);
+}
+
+function pendingCandidate(
+  pair: MatchedPair,
+  track: QuantitativeTrack,
+  detailHtml = "",
+): PendingCandidate | null {
+  let clean: number | null;
+  if (track === "scene-flow") {
+    const components = parseSceneFlowCleanMetrics(detailHtml);
+    const baseline = LEADERBOARD_BASELINES[track].spring;
+    clean = components ? mean([
+      components.d1 / baseline.d1,
+      components.d2 / baseline.d2,
+      components.flow / baseline.flow,
+    ]) : null;
+  } else {
+    clean = valueAt(pair.accuracy, track === "optical-flow" ? 12 : 10);
+  }
+  // A failed benchmark run has no valid clean metric. It cannot replace a
+  // usable result or be presented as an evaluated method awaiting robustness.
+  if (clean === null) return null;
+  return {
+    team: pair.team,
+    track,
+    result: {
+      benchmarkMethod: pair.methodName,
+      benchmarkUrl: `${SPRING_ORIGIN}/${pair.submissionId}/`,
+      submittedAt: parseSubmissionTimestamp(detailHtml) ?? "",
+      matchBasis: pair.matchBasis,
+      springMetric: roundMetric(clean),
+      robustSpringMetric: null,
+    },
+  };
+}
+
+function assignDisplayMethodNames(
+  candidates: readonly (ScoredCandidate | PendingCandidate)[],
+  roster: readonly LeaderboardRosterTeam[],
+  previous: PublicLeaderboardSnapshot | null,
+  assignments: MethodAssignments,
+): void {
+  const byTeam = new Map<string, Array<ScoredCandidate | PendingCandidate>>();
+  const activeTeams = new Map(roster.map((team) => [team.teamId, team]));
+  const currentNames = new Map<string, string | null>();
+  for (const candidate of candidates) {
+    const group = byTeam.get(candidate.team.teamId) ?? [];
+    group.push(candidate);
+    byTeam.set(candidate.team.teamId, group);
+    currentNames.set(`${candidate.team.teamId}:${candidate.result.benchmarkUrl}`,
+      extractBenchmarkMethodName(candidate.result.benchmarkMethod, candidate.team));
+  }
+  // Include retained results when upgrading the existing cache from full
+  // benchmark titles. The registry itself survives history pruning and rename.
+  for (const team of previous?.teams ?? []) {
+    // Removed teams are not published. Leave their durable registry untouched
+    // so reactivation cannot reset numbers or reuse a historic assignment.
+    if (!activeTeams.has(team.teamId)) continue;
+    for (const track of QUANTITATIVE_TRACKS) {
+      const retained = [...(team.submissionHistory[track] ?? [])];
+      const latest = team.results[track];
+      if (latest) retained.push(latest);
+      for (const result of retained) {
+        const group = byTeam.get(team.teamId) ?? [];
+        group.push({ team, track, result });
+        byTeam.set(team.teamId, group);
+      }
+    }
+  }
+  for (const [teamId, group] of byTeam) {
+    const sources = group.map((candidate) => {
+      const key = `${teamId}:${candidate.result.benchmarkUrl}`;
+      return {
+        submissionId: candidate.result.benchmarkUrl.match(/\/(\d+)\/$/u)![1]!,
+        // Registry presence marks the one-time raw-title cache migration.
+        // Never strip a display name twice (a team could itself be 'Method').
+        methodName: currentNames.has(key) ? currentNames.get(key)! :
+          assignments.has(teamId) ? candidate.result.benchmarkMethod :
+            extractBenchmarkMethodName(candidate.result.benchmarkMethod, candidate.team),
+      };
+    });
+    const planned = planUnnamedMethodAssignments(assignments.get(teamId) ?? {}, sources);
+    assignments.set(teamId, planned);
+    group.forEach((candidate, index) => {
+      const source = sources[index]!;
+      const label = source.methodName ?? `Method ${planned[source.submissionId]}`;
+      // Keep participant-written labels within the public cache contract. A
+      // long named method stays named; its source link preserves the full title.
+      const characters = [...label].map((character) => {
+        const codePoint = character.codePointAt(0) ?? 0;
+        return codePoint <= 0x1f || codePoint === 0x7f ? " " : character;
+      });
+      let display = characters.join("").trim();
+      if (display.length > 240) {
+        display = display.slice(0, 239).replace(/[\uD800-\uDBFF]$/u, "") + "…";
+      }
+      candidate.result.benchmarkMethod = display;
+    });
+  }
 }
 
 interface RankedResult {
@@ -852,16 +939,20 @@ function addCrossTaskResults(teams: PublicLeaderboardTeam[]): void {
   }
 }
 
-export async function buildLeaderboardSnapshot(
+export async function buildLeaderboardUpdate(
   roster: readonly LeaderboardRosterTeam[],
   pages: BenchmarkPageSet,
   detailLoader: DetailLoader,
   previous: PublicLeaderboardSnapshot | null,
   now: Date,
-): Promise<PublicLeaderboardSnapshot> {
+  previousAssignments: MethodAssignments = new Map(),
+): Promise<{ snapshot: PublicLeaderboardSnapshot; methodAssignments: MethodAssignments }> {
   // Only reconstructed public fields from a previous cache may influence rank
   // changes or history. This also makes direct callers safe in tests/tools.
   const safePrevious = previous ? reconstructPublicLeaderboardSnapshot(previous) : null;
+  const methodAssignments = new Map([...previousAssignments].map(([teamId, values]) =>
+    [teamId, { ...values }],
+  ));
   const opticalPairs = pairedRows(
     pages.opticalFlowAccuracy,
     pages.opticalFlowRobustness,
@@ -885,6 +976,7 @@ export async function buildLeaderboardSnapshot(
   );
 
   const scalarCandidates: ScoredCandidate[] = [];
+  const pendingCandidates: PendingCandidate[] = [];
   for (const [pairs, track] of [
     [opticalPairs, "optical-flow"],
     [stereoPairs, "stereo-matching"],
@@ -892,10 +984,14 @@ export async function buildLeaderboardSnapshot(
     for (const pair of pairs) {
       const candidate = scalarCandidate(pair, track);
       if (candidate) scalarCandidates.push(candidate);
+      else {
+        const pending = pendingCandidate(pair, track);
+        if (pending) pendingCandidates.push(pending);
+      }
     }
   }
 
-  const detailIds = boundedDetailIds(scalarCandidates, scenePairs);
+  const detailIds = boundedDetailIds([...scalarCandidates, ...pendingCandidates], scenePairs);
   const detailHtml = new Map<string, string>();
   const loadedDetails = await mapWithConcurrency(
     detailIds,
@@ -910,6 +1006,10 @@ export async function buildLeaderboardSnapshot(
       candidate.result.submittedAt = parseSubmissionTimestamp(detailHtml.get(submissionId) ?? "");
     }
   }
+  for (const candidate of pendingCandidates) {
+    const submissionId = candidate.result.benchmarkUrl.match(/\/(\d+)\/$/u)?.[1];
+    candidate.result.submittedAt = parseSubmissionTimestamp(detailHtml.get(submissionId ?? "") ?? "") ?? "";
+  }
 
   const allCandidates = [...scalarCandidates];
   for (const pair of scenePairs) {
@@ -917,11 +1017,17 @@ export async function buildLeaderboardSnapshot(
     if (!detail) continue;
     const candidate = sceneFlowCandidate(pair, detail);
     if (candidate) allCandidates.push(candidate);
+    else {
+      const pending = pendingCandidate(pair, "scene-flow", detail);
+      if (pending) pendingCandidates.push(pending);
+    }
   }
 
   // A name coincidence with an older public method is not a challenge entry.
   // Unparseable timestamps are also rejected instead of being guessed.
   const eligibleCandidates = allCandidates.filter(isChallengeSubmission);
+  const eligiblePending = pendingCandidates.filter(isChallengeSubmission);
+  assignDisplayMethodNames([...eligibleCandidates, ...eligiblePending], roster, safePrevious, methodAssignments);
   const selected = new Map<string, ScoredCandidate>();
   for (const candidate of eligibleCandidates) {
     const key = `${candidate.team.teamId}:${candidate.track}`;
@@ -946,7 +1052,42 @@ export async function buildLeaderboardSnapshot(
     const team = publicTeamById.get(candidate.team.teamId);
     if (team) team.results[candidate.track] = candidate.result;
   }
+  for (const candidate of eligiblePending) {
+    const team = publicTeamById.get(candidate.team.teamId);
+    if (!team) continue;
+    team.pendingSubmissions ??= {};
+    const pending = team.pendingSubmissions[candidate.track] ?? [];
+    pending.push(candidate.result);
+    team.pendingSubmissions[candidate.track] = pending.sort((left, right) =>
+      left.submittedAt.localeCompare(right.submittedAt) ||
+      left.benchmarkUrl.localeCompare(right.benchmarkUrl, undefined, { numeric: true }),
+    ).slice(-MAX_HISTORY_PER_TRACK);
+  }
   const previousTeams = new Map(safePrevious?.teams.map((team) => [team.teamId, team]) ?? []);
+  const trackPages = [
+    ["optical-flow", [pages.opticalFlowAccuracy, pages.opticalFlowRobustness]],
+    ["stereo-matching", [pages.stereoAccuracy, pages.stereoRobustness]],
+    ["scene-flow", [pages.sceneFlowAccuracy, pages.sceneFlowRobustness]],
+  ] as const;
+  const observedUrls = new Map<QuantitativeTrack, Set<string>>(trackPages.map(([track, html]) => [track, new Set(
+    html.flatMap((page) => parseBenchmarkRows(page).map((row) =>
+      `${SPRING_ORIGIN}/${row.submissionId}/`,
+    )),
+  )]));
+  // The detail-fetch budget intentionally defers older submissions. Deferral
+  // alone is not evidence that a previously validated score became invalid.
+  const deferredUrls = new Set(scalarCandidates.filter((candidate) => {
+    const id = candidate.result.benchmarkUrl.match(/\/(\d+)\/$/u)![1]!;
+    return !detailHtml.has(id);
+  }).map((candidate) =>
+    `${candidate.team.teamId}:${candidate.track}:${candidate.result.benchmarkUrl}`,
+  ));
+  for (const pair of scenePairs) {
+    if (!detailHtml.has(pair.submissionId) && valueAt(pair.accuracy, 0) !== null &&
+        [1, 4, 6].every((index) => valueAt(pair.robustness, index) !== null)) {
+      deferredUrls.add(`${pair.team.teamId}:scene-flow:${SPRING_ORIGIN}/${pair.submissionId}/`);
+    }
+  }
   for (const team of teams) {
     for (const track of QUANTITATIVE_TRACKS) {
       // A registration update may remove a track. Its old result/history must
@@ -955,8 +1096,17 @@ export async function buildLeaderboardSnapshot(
       const previousTeam = previousTeams.get(team.teamId);
       const previousResult = previousTeam?.results[track];
       const currentResult = team.results[track];
-      const retained = previousTeam?.submissionHistory?.[track] ??
-        (previousResult ? [previousResult] : []);
+      const retained = (previousTeam?.submissionHistory?.[track] ??
+        (previousResult ? [previousResult] : [])).filter((result) =>
+        // Keep genuinely absent historical results, but never preserve an
+        // obsolete score/owner when the source now lists it as pending,
+        // failed, conflicting, or belonging to another registered team.
+        !observedUrls.get(track)?.has(result.benchmarkUrl) ||
+        deferredUrls.has(`${team.teamId}:${track}:${result.benchmarkUrl}`) ||
+        eligibleCandidates.some((candidate) => candidate.track === track &&
+          candidate.team.teamId === team.teamId &&
+          candidate.result.benchmarkUrl === result.benchmarkUrl),
+      );
       const current = eligibleCandidates
         .filter((candidate) =>
           candidate.team.teamId === team.teamId && candidate.track === track,
@@ -980,7 +1130,7 @@ export async function buildLeaderboardSnapshot(
   }
   addCrossTaskResults(teams);
   applyRankChanges(teams, safePrevious);
-  return {
+  return { snapshot: {
     schemaVersion: 2,
     updatedAt: now.toISOString(),
     sourceLabel: LIVE_SOURCE_LABEL,
@@ -988,7 +1138,19 @@ export async function buildLeaderboardSnapshot(
     baselines: LEADERBOARD_BASELINE_METADATA,
     syncStatus: "fresh",
     teams,
-  };
+  }, methodAssignments };
+}
+
+// Public-data tooling can build a snapshot without persisting anything. The
+// refresh operation below also commits the independent method-name registry.
+export async function buildLeaderboardSnapshot(
+  roster: readonly LeaderboardRosterTeam[],
+  pages: BenchmarkPageSet,
+  detailLoader: DetailLoader,
+  previous: PublicLeaderboardSnapshot | null,
+  now: Date,
+): Promise<PublicLeaderboardSnapshot> {
+  return (await buildLeaderboardUpdate(roster, pages, detailLoader, previous, now)).snapshot;
 }
 
 function recordValue(value: unknown): Record<string, unknown> | null {
@@ -1122,7 +1284,41 @@ function reconstructPublicTeam(value: unknown): PublicLeaderboardTeam | null {
       submissionHistory[track] = reconstructed as PublicLeaderboardResult[];
     }
   }
-  return { teamId, teamName, registeredTracks, results, submissionHistory };
+  const team: PublicLeaderboardTeam = { teamId, teamName, registeredTracks, results, submissionHistory };
+  if (record.pendingSubmissions !== undefined) {
+    const rawPending = recordValue(record.pendingSubmissions);
+    if (!rawPending || Object.keys(rawPending).some((track) =>
+      !QUANTITATIVE_TRACKS.includes(track as QuantitativeTrack) ||
+      !registeredTracks.includes(track as TrackId),
+    )) return null;
+    team.pendingSubmissions = {};
+    for (const track of QUANTITATIVE_TRACKS) {
+      if (!Object.hasOwn(rawPending, track)) continue;
+      const values = rawPending[track];
+      if (!Array.isArray(values) || values.length > MAX_HISTORY_PER_TRACK) return null;
+      const pending: PublicPendingSubmission[] = [];
+      for (const value of values) {
+        const entry = recordValue(value);
+        if (!entry) return null;
+        const benchmarkMethod = safePublicText(entry.benchmarkMethod, 240);
+        const benchmarkUrl = typeof entry.benchmarkUrl === "string" ? entry.benchmarkUrl : "";
+        const submittedAt = canonicalTimestamp(entry.submittedAt);
+        const matchBasis = entry.matchBasis;
+        const springMetric = safePublicMetric(entry.springMetric);
+        const robustSpringMetric = safePublicMetric(entry.robustSpringMetric);
+        if (!benchmarkMethod || !/^https:\/\/spring-benchmark\.org\/\d{1,9}\/$/u.test(benchmarkUrl) ||
+            !submittedAt || (matchBasis !== "team-id" && matchBasis !== "team-name") ||
+            (entry.springMetric !== null && springMetric === null) ||
+            (entry.robustSpringMetric !== null && robustSpringMetric === null) ||
+            pending.some((prior) => prior.benchmarkUrl === benchmarkUrl)) return null;
+        // Reconstruct only public fields; private cache extras cannot leak.
+        pending.push({ benchmarkMethod, benchmarkUrl, submittedAt, matchBasis,
+          springMetric, robustSpringMetric });
+      }
+      team.pendingSubmissions[track] = pending;
+    }
+  }
+  return team;
 }
 
 export function reconstructPublicLeaderboardSnapshot(
@@ -1352,17 +1548,39 @@ export async function refreshLeaderboardOperation(
 
   try {
     const [roster, pages] = await Promise.all([loadActiveRoster(db), loadBenchmarkPages()]);
-    const snapshot = await buildLeaderboardSnapshot(
+    const storedNames = await mapWithConcurrency(roster, DETAIL_FETCH_CONCURRENCY, async (team) => {
+      const document = await db.collection(METHOD_NAMES_COLLECTION).doc(team.teamId).get();
+      if (!document.exists) return null;
+      const values = reconstructUnnamedMethodAssignments(document.get("assignments"));
+      if (document.get("version") !== 1 || !values) {
+        throw new AppError("internal", "The method-name registry requires recovery.", "internal");
+      }
+      return [team.teamId, values] as const;
+    });
+    const previousAssignments: MethodAssignments = new Map(storedNames.filter(
+      (entry): entry is NonNullable<typeof entry> => entry !== null,
+    ));
+    const { snapshot, methodAssignments } = await buildLeaderboardUpdate(
       roster,
       pages,
       loadBenchmarkDetail,
       decision.cached,
       now,
+      previousAssignments,
     );
     await db.runTransaction(async (transaction) => {
       const current = await transaction.get(cacheReference);
       if (current.get("refreshLeaseId") !== leaseId) {
         throw new AppError("aborted", "Leaderboard refresh ownership expired.", "transient");
+      }
+      // Commit numbering and visible results atomically under the same lease.
+      // A failed or superseded refresh never consumes an unnamed method number.
+      for (const [teamId, assignments] of methodAssignments) {
+        if (JSON.stringify(previousAssignments.get(teamId)) === JSON.stringify(assignments)) continue;
+        transaction.set(db.collection(METHOD_NAMES_COLLECTION).doc(teamId), {
+          version: 1,
+          assignments,
+        });
       }
       transaction.set(cacheReference, {
         snapshot,

@@ -107,12 +107,88 @@ test("published leaderboard snapshot contains the exact public team roster", asy
         ["RoCo-36", ["c-mike", ["optical-flow", "stereo-matching", "scene-flow", "exploration"]]],
         ["RoCo-37", ["Innovators", ["optical-flow", "stereo-matching", "scene-flow", "exploration"]]],
         ["RoCo-38", ["Four And Furios", ["optical-flow", "stereo-matching", "scene-flow", "exploration"]]],
-        ["RoCo-39", ["PocketChange", ["exploration"]]]
+        ["RoCo-39", ["PocketChange", ["exploration"]]],
+        ["RoCo-40", ["shashank test", ["optical-flow", "exploration"]]],
+        ["RoCo-41", ["batman", ["optical-flow", "exploration"]]],
+        ["RoCo-42", ["Geodesic Physical Intelligence", ["optical-flow", "stereo-matching", "scene-flow", "exploration"]]],
+        ["RoCo-43", ["gun-py", ["optical-flow", "stereo-matching", "scene-flow", "exploration"]]]
+    ]);
+    const scoredResult = {
+        rankChange: 0,
+        score: 1.103783,
+        springMetric: 1.411,
+        robustSpringMetric: 4.739,
+        springTerm: 1.421662,
+        robustSpringTerm: 0.785904,
+        submittedAt: "2026-09-03T16:56:00.000Z",
+        benchmarkMethod: "Method 1",
+        benchmarkUrl: "https://spring-benchmark.org/474/",
+        matchBasis: "team-id"
+    };
+    // These source rows have clean metrics but no RobustSpring result yet.
+    // Exact objects guard both attribution and the public-only data boundary.
+    const expectedPending = new Map([
+        ["RoCo-14", {
+            "optical-flow": [{
+                benchmarkMethod: "CAR-WAFT",
+                benchmarkUrl: "https://spring-benchmark.org/471/",
+                submittedAt: "2026-08-27T22:35:00.000Z",
+                matchBasis: "team-id",
+                springMetric: 0.298,
+                robustSpringMetric: null
+            }]
+        }],
+        ["RoCo-19", {
+            "optical-flow": [{
+                benchmarkMethod: "SEARAFT-Finetune",
+                benchmarkUrl: "https://spring-benchmark.org/475/",
+                submittedAt: "2026-09-04T10:49:00.000Z",
+                matchBasis: "team-id",
+                springMetric: 2.651,
+                robustSpringMetric: null
+            }, {
+                benchmarkMethod: "WAFT",
+                benchmarkUrl: "https://spring-benchmark.org/484/",
+                submittedAt: "2026-09-07T03:15:00.000Z",
+                matchBasis: "team-id",
+                springMetric: 0.384,
+                robustSpringMetric: null
+            }, {
+                benchmarkMethod: "WAFT+",
+                benchmarkUrl: "https://spring-benchmark.org/488/",
+                submittedAt: "2026-09-07T06:10:00.000Z",
+                matchBasis: "team-id",
+                springMetric: 0.364,
+                robustSpringMetric: null
+            }],
+            "stereo-matching": [{
+                benchmarkMethod: "RAFTStereo_Scale040_new",
+                benchmarkUrl: "https://spring-benchmark.org/482/",
+                submittedAt: "2026-09-06T06:15:00.000Z",
+                matchBasis: "team-id",
+                springMetric: 1.077,
+                robustSpringMetric: null
+            }],
+            "scene-flow": [{
+                benchmarkMethod: "DEFOM2K-DPFlow",
+                benchmarkUrl: "https://spring-benchmark.org/473/",
+                submittedAt: "2026-09-03T04:01:00.000Z",
+                matchBasis: "team-id",
+                springMetric: 0.154587,
+                robustSpringMetric: null
+            }]
+        }]
     ]);
 
+    assert.deepEqual(Object.keys(snapshot).sort(), [
+        "baselines", "schemaVersion", "scoringConvention", "sourceLabel",
+        "syncStatus", "teams", "updatedAt"
+    ]);
     assert.equal(snapshot.schemaVersion, 2);
     assert.equal(snapshot.scoringConvention, "organizer-approved-additive-proxy");
     assert.equal(snapshot.syncStatus, "static-fallback");
+    assert.equal(snapshot.sourceLabel, "Live Spring and RobustSpring public benchmark snapshot");
+    assert.equal(new Date(snapshot.updatedAt).toISOString(), snapshot.updatedAt);
     assert.deepEqual(snapshot.baselines, {
         "optical-flow": {
             spring: 0.9925,
@@ -140,9 +216,13 @@ test("published leaderboard snapshot contains the exact public team roster", asy
         assert.ok(expected, team.teamId);
         assert.equal(team.teamName, expected[0], team.teamId);
         assert.deepEqual(team.registeredTracks, expected[1], team.teamId);
-        assert.deepEqual(team.results, {}, team.teamId);
-        assert.deepEqual(team.submissionHistory, {}, team.teamId);
+        const expectedResults = team.teamId === "RoCo-29" ? { "optical-flow": scoredResult } : {};
+        const expectedHistory = team.teamId === "RoCo-29" ? { "optical-flow": [scoredResult] } : {};
+        assert.deepEqual(team.results, expectedResults, team.teamId);
+        assert.deepEqual(team.submissionHistory, expectedHistory, team.teamId);
+        assert.deepEqual(team.pendingSubmissions, expectedPending.get(team.teamId), team.teamId);
         assert.deepEqual(Object.keys(team).sort(), [
+            ...(expectedPending.has(team.teamId) ? ["pendingSubmissions"] : []),
             "registeredTracks",
             "results",
             "submissionHistory",
@@ -155,7 +235,7 @@ test("published leaderboard snapshot contains the exact public team roster", asy
         ["optical-flow", "stereo-matching", "scene-flow"]
             .every((track) => team.registeredTracks.includes(track))
     );
-    assert.equal(crossTaskTeams.length, 18);
+    assert.equal(crossTaskTeams.length, 20);
 });
 
 test("leaderboard baselines are per-method additive-proxy medians", async () => {

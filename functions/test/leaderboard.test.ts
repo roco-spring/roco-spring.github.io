@@ -14,6 +14,7 @@ import {
   LEADERBOARD_BASELINES,
   benchmarkPageHasExpectedSchema,
   buildLeaderboardSnapshot,
+  buildLeaderboardUpdate,
   matchBenchmarkTeam,
   normalizeLeaderboardIdentity,
   parseBenchmarkRows,
@@ -24,6 +25,7 @@ import {
   reconstructPublicLeaderboardSnapshot,
   refreshLeaderboardOperation,
   type LeaderboardRosterTeam,
+  type PublicLeaderboardSnapshot,
 } from "../src/leaderboard.js";
 import { FakeFirestore } from "./helpers/fake-firestore.js";
 
@@ -46,6 +48,25 @@ function benchmarkTable(metricSortKeys: readonly string[], row: string): string 
     `<th><a href="/benchmark${key ? `?display=test&amp;s=${key}` : ""}">metric</a></th>`,
   ).join("");
   return `<table><tr><th></th><th>Name</th>${headers}</tr>${row}</table>`;
+}
+
+// A missing disagreement models a real clean Spring entry whose robustness
+// evaluation has not appeared yet; it must remain visible without a score.
+function opticalPages(entries: readonly {
+  id: number;
+  name: string;
+  disagreement?: number;
+}[]) {
+  const clean = Array.from({ length: 13 }, (_value, index) => index === 12 ? 1 : 0);
+  return {
+    opticalFlowAccuracy: entries.map((entry) => listRow(entry.id, entry.name, clean)).join(""),
+    opticalFlowRobustness: entries.filter((entry) => entry.disagreement !== undefined)
+      .map((entry) => listRow(entry.id, entry.name, [entry.disagreement!])).join(""),
+    stereoAccuracy: "",
+    stereoRobustness: "",
+    sceneFlowAccuracy: "",
+    sceneFlowRobustness: "",
+  };
 }
 
 function detailPage(
@@ -254,7 +275,7 @@ describe("leaderboard scoring", () => {
     );
     const team = snapshot.teams.find((candidate) => candidate.teamId === "RoCo-12");
     expect(team?.results["optical-flow"]).toMatchObject({
-      benchmarkMethod: "aneev regressed",
+      benchmarkMethod: "regressed",
       springMetric: 3,
       robustSpringMetric: 7,
     });
@@ -262,7 +283,7 @@ describe("leaderboard scoring", () => {
     // global fetch bound, while the current table uses the latest one.
     expect(team?.submissionHistory["optical-flow"]).toHaveLength(2);
     expect(team?.submissionHistory["optical-flow"]?.map((result) => result.benchmarkMethod))
-      .toEqual(["aneev first", "aneev regressed"]);
+      .toEqual(["first", "regressed"]);
   });
 
   it("excludes scene-flow projection rows from scalar task matching", async () => {
@@ -290,7 +311,7 @@ describe("leaderboard scoring", () => {
       new Date("2026-08-29T18:00:00.000Z"),
     );
     expect(snapshot.teams.find((team) => team.teamId === "RoCo-12")?.results["optical-flow"])
-      .toMatchObject({ benchmarkMethod: "aneev scalar", springMetric: 2 });
+      .toMatchObject({ benchmarkMethod: "scalar", springMetric: 2 });
   });
 
   it("rejects an explicit ID registered for another track before trying a team name", async () => {
@@ -522,7 +543,7 @@ describe("leaderboard scoring", () => {
       new Date("2026-08-29T18:00:00.000Z"),
     );
     const team = snapshot.teams.find((candidate) => candidate.teamId === "RoCo-12");
-    expect(team?.results["optical-flow"]?.benchmarkMethod).toBe("aneev valid");
+    expect(team?.results["optical-flow"]?.benchmarkMethod).toBe("valid");
     expect(team?.submissionHistory["optical-flow"]).toHaveLength(1);
   });
 
@@ -625,19 +646,19 @@ describe("leaderboard scoring", () => {
       result.benchmarkMethod,
       result.rankChange,
     ])).toEqual([
-      ["RoCo-12 Method A", -1],
-      ["RoCo-12 Method B", -1],
+      ["Method A", -1],
+      ["Method B", -1],
     ]);
     expect(swarm?.submissionHistory["optical-flow"]?.map((result) => [
       result.benchmarkMethod,
       result.rankChange,
     ])).toEqual([
-      ["RoCo-16 Method C", -1],
-      ["RoCo-16 Method D", 0],
+      ["Method C", -1],
+      ["Method D", 0],
     ]);
-    expect(aneev?.results["optical-flow"]?.benchmarkMethod).toBe("RoCo-12 Method B");
+    expect(aneev?.results["optical-flow"]?.benchmarkMethod).toBe("Method B");
     expect(aneev?.results["optical-flow"]?.rankChange).toBe(-1);
-    expect(swarm?.results["optical-flow"]?.benchmarkMethod).toBe("RoCo-16 Method D");
+    expect(swarm?.results["optical-flow"]?.benchmarkMethod).toBe("Method D");
     expect(swarm?.results["optical-flow"]?.rankChange).toBe(0);
   });
 
@@ -680,6 +701,205 @@ describe("leaderboard scoring", () => {
     expect(current.teams[0]?.results["optical-flow"]).toBeUndefined();
     expect(current.teams[0]?.submissionHistory["optical-flow"]).toBeUndefined();
     expect(reconstructPublicLeaderboardSnapshot(current)).not.toBeNull();
+  });
+});
+
+describe("canonical method names and durable unnamed-method numbering", () => {
+  const teamRoster: LeaderboardRosterTeam[] = [{
+    teamId: "RoCo-29", teamName: "VSAI",
+    registeredTracks: ["optical-flow", "stereo-matching", "scene-flow"],
+  }];
+  const now = new Date("2026-09-07T12:00:00.000Z");
+  const details = () => Promise.resolve(detailPage(1, 2, 3));
+
+  it("extracts participant examples and publishes incomplete methods under canonical registered teams", async () => {
+    const examples: LeaderboardRosterTeam[] = [
+      { teamId: "RoCo-14", teamName: "CAR", registeredTracks: ["optical-flow"] },
+      { teamId: "RoCo-19", teamName: "WAFT Team", registeredTracks: ["optical-flow"] },
+      ...teamRoster,
+    ];
+    const pages = opticalPages([
+      { id: 471, name: "RoCo-14 CAR-WAFT" },
+      { id: 488, name: "RoCo-19-WAFT+" },
+      { id: 474, name: "RoCo-29", disagreement: 2 },
+    ]);
+    // Failed evaluations expose no usable clean EPE at its required position.
+    pages.opticalFlowAccuracy += listRow(483, "RoCo-29", Array.from({ length: 13 }, () => Number.NaN));
+    const update = await buildLeaderboardUpdate(examples, pages, details, null, now);
+    const team14 = update.snapshot.teams.find((team) => team.teamId === "RoCo-14")!;
+    const team19 = update.snapshot.teams.find((team) => team.teamId === "RoCo-19")!;
+    const team29 = update.snapshot.teams.find((team) => team.teamId === "RoCo-29")!;
+    expect(team14.teamName).toBe("CAR");
+    expect(team14.results).toEqual({});
+    expect(team14.pendingSubmissions?.["optical-flow"]).toEqual([{
+      benchmarkMethod: "CAR-WAFT", benchmarkUrl: "https://spring-benchmark.org/471/",
+      submittedAt: "2026-08-29T16:30:00.000Z", matchBasis: "team-id",
+      springMetric: 1, robustSpringMetric: null,
+    }]);
+    expect(team19.teamName).toBe("WAFT Team");
+    expect(team19.pendingSubmissions?.["optical-flow"]?.[0]?.benchmarkMethod).toBe("WAFT+");
+    expect(team29.teamName).toBe("VSAI");
+    expect(team29.results["optical-flow"]).toMatchObject({
+      benchmarkMethod: "Method 1", benchmarkUrl: "https://spring-benchmark.org/474/",
+      springMetric: 1, robustSpringMetric: 3,
+    });
+    expect(update.methodAssignments.get("RoCo-29")).toEqual({ "474": 1 });
+    expect(JSON.stringify(update.snapshot)).not.toContain("https://spring-benchmark.org/483/");
+  });
+
+  it("keeps method numbers across table reordering and late discovery of older IDs", async () => {
+    const first = await buildLeaderboardUpdate(teamRoster, opticalPages([
+      { id: 500, name: "VSAI RoCo-29", disagreement: 2 },
+      { id: 474, name: "RoCo-29", disagreement: 2 },
+    ]), details, null, now);
+    const second = await buildLeaderboardUpdate(teamRoster, opticalPages([
+      { id: 474, name: "RoCo-29", disagreement: 2 },
+      { id: 500, name: "RoCo-29 VSAI", disagreement: 2 },
+      { id: 470, name: "VSAI RoCo-29", disagreement: 2 },
+    ]), details, first.snapshot, now, first.methodAssignments);
+    expect(first.methodAssignments.get("RoCo-29")).toEqual({ "474": 1, "500": 2 });
+    expect(second.methodAssignments.get("RoCo-29")).toEqual({ "474": 1, "500": 2, "470": 3 });
+    expect(Object.fromEntries(second.snapshot.teams[0]!.submissionHistory["optical-flow"]!
+      .map((result) => [result.benchmarkUrl, result.benchmarkMethod]))).toEqual({
+      "https://spring-benchmark.org/470/": "Method 3",
+      "https://spring-benchmark.org/474/": "Method 1",
+      "https://spring-benchmark.org/500/": "Method 2",
+    });
+  });
+
+  it("preserves numbering through disappearance, ten-row history pruning, and later named renames", async () => {
+    const initial = await buildLeaderboardUpdate(teamRoster, opticalPages(
+      Array.from({ length: 12 }, (_value, index) => ({
+        id: 600 + index, name: "RoCo-29", disagreement: 2,
+      })),
+    ), details, null, now);
+    expect(initial.snapshot.teams[0]!.submissionHistory["optical-flow"]).toHaveLength(10);
+    expect(initial.snapshot.teams[0]!.submissionHistory["optical-flow"]!
+      .some((result) => result.benchmarkUrl === "https://spring-benchmark.org/600/")).toBe(false);
+    expect(initial.methodAssignments.get("RoCo-29")?.["600"]).toBe(1);
+
+    const absent = await buildLeaderboardUpdate(teamRoster, opticalPages([]), details,
+      initial.snapshot, now, initial.methodAssignments);
+    expect(absent.methodAssignments).toEqual(initial.methodAssignments);
+    const renamed = await buildLeaderboardUpdate(teamRoster, opticalPages([
+      { id: 600, name: "RoCo-29 VSAI FasterFlow+", disagreement: 2 },
+      { id: 612, name: "VSAI RoCo-29" },
+    ]), details, absent.snapshot, now, absent.methodAssignments);
+    expect(renamed.snapshot.teams[0]!.results["optical-flow"]?.benchmarkMethod).toBe("FasterFlow+");
+    expect(renamed.snapshot.teams[0]!.pendingSubmissions?.["optical-flow"]?.[0]?.benchmarkMethod)
+      .toBe("Method 13");
+    expect(renamed.methodAssignments.get("RoCo-29")?.["600"]).toBe(1);
+    const unnamedAgain = await buildLeaderboardUpdate(teamRoster, opticalPages([
+      { id: 600, name: "RoCo-29", disagreement: 2 },
+      { id: 613, name: "RoCo-29" },
+    ]), details, renamed.snapshot, now, renamed.methodAssignments);
+    expect(unnamedAgain.snapshot.teams[0]!.results["optical-flow"]?.benchmarkMethod).toBe("Method 1");
+    expect(unnamedAgain.snapshot.teams[0]!.pendingSubmissions?.["optical-flow"]?.[0]?.benchmarkMethod)
+      .toBe("Method 14");
+    expect(initial.methodAssignments.get("RoCo-29")?.["612"]).toBeUndefined();
+  });
+
+  it("uses one stable number when a pending submission becomes scored in all three tasks", async () => {
+    const first = await buildLeaderboardUpdate(teamRoster, opticalPages([
+      { id: 474, name: "VSAI RoCo-29" },
+    ]), details, null, now);
+    const stereoClean = Array.from({ length: 11 }, (_value, index) => index === 10 ? 2 : 0);
+    const second = await buildLeaderboardUpdate(teamRoster, {
+      ...opticalPages([{ id: 474, name: "RoCo-29", disagreement: 2 }]),
+      stereoAccuracy: listRow(474, "RoCo-29 VSAI", stereoClean),
+      stereoRobustness: listRow(474, "RoCo-29 VSAI", [0, 3]),
+      sceneFlowAccuracy: listRow(474, "VSAI RoCo-29", [1]),
+      sceneFlowRobustness: listRow(474, "VSAI RoCo-29", [0, 1, 0, 0, 2, 0, 3]),
+    }, details, first.snapshot, now, first.methodAssignments);
+    expect(first.snapshot.teams[0]!.pendingSubmissions?.["optical-flow"]?.[0]?.benchmarkMethod)
+      .toBe("Method 1");
+    expect(second.methodAssignments.get("RoCo-29")).toEqual({ "474": 1 });
+    expect(second.snapshot.teams[0]!.pendingSubmissions).toBeUndefined();
+    for (const track of ["optical-flow", "stereo-matching", "scene-flow"] as const) {
+      expect(second.snapshot.teams[0]!.results[track]).toMatchObject({
+        benchmarkMethod: "Method 1", benchmarkUrl: "https://spring-benchmark.org/474/",
+        rankChange: 0,
+      });
+      expect(second.snapshot.teams[0]!.submissionHistory[track]).toHaveLength(1);
+    }
+    expect(second.snapshot.teams[0]!.results["cross-task"]?.score).toEqual(expect.any(Number));
+  });
+
+  it("bounds a long named method without assigning an unnamed number or invalidating the snapshot", async () => {
+    const update = await buildLeaderboardUpdate(teamRoster, opticalPages([
+      { id: 474, name: `RoCo-29 ${"NamedFlow+".repeat(40)}`, disagreement: 2 },
+    ]), details, null, now);
+    const result = update.snapshot.teams[0]!.results["optical-flow"]!;
+    expect(result.benchmarkMethod).toHaveLength(240);
+    expect(result.benchmarkMethod).toMatch(/^NamedFlow\+.*…$/u);
+    expect(result.benchmarkUrl).toBe("https://spring-benchmark.org/474/");
+    expect(update.methodAssignments.get("RoCo-29")).toEqual({});
+    expect(reconstructPublicLeaderboardSnapshot(update.snapshot)).not.toBeNull();
+  });
+
+  it("moves a renamed source URL to its new explicit registered owner without preserving the old owner", async () => {
+    const first = await buildLeaderboardUpdate(roster, opticalPages([
+      { id: 474, name: "RoCo-12 OpticalMethod", disagreement: 2 },
+    ]), details, null, now);
+    const moved = await buildLeaderboardUpdate(roster, opticalPages([
+      { id: 474, name: "RoCo-16 OpticalMethod", disagreement: 2 },
+    ]), details, first.snapshot, now, first.methodAssignments);
+    const oldOwner = moved.snapshot.teams.find((team) => team.teamId === "RoCo-12")!;
+    const newOwner = moved.snapshot.teams.find((team) => team.teamId === "RoCo-16")!;
+    expect(oldOwner.results["optical-flow"]).toBeUndefined();
+    expect(oldOwner.submissionHistory["optical-flow"]).toBeUndefined();
+    expect(newOwner.teamName).toBe("Swarm");
+    expect(newOwner.results["optical-flow"]).toMatchObject({
+      benchmarkMethod: "OpticalMethod", benchmarkUrl: "https://spring-benchmark.org/474/",
+    });
+    expect(newOwner.submissionHistory["optical-flow"]).toHaveLength(1);
+  });
+
+  it("removes a cached score when its current source becomes pending, failed, or conflicting", async () => {
+    const first = await buildLeaderboardUpdate(roster, opticalPages([
+      { id: 474, name: "RoCo-12 OpticalMethod", disagreement: 2 },
+    ]), details, null, now);
+    const pending = opticalPages([{ id: 474, name: "RoCo-12 OpticalMethod" }]);
+    const failed = { ...pending, opticalFlowAccuracy: listRow(
+      474, "RoCo-12 OpticalMethod", Array.from({ length: 13 }, () => Number.NaN),
+    ) };
+    const conflicting = {
+      ...pending, opticalFlowRobustness: listRow(474, "RoCo-16 OpticalMethod", [2]),
+    };
+    for (const pages of [pending, failed, conflicting]) {
+      const update = await buildLeaderboardUpdate(roster, pages, details,
+        first.snapshot, now, first.methodAssignments);
+      const team = update.snapshot.teams.find((candidate) => candidate.teamId === "RoCo-12")!;
+      expect(team.results["optical-flow"]).toBeUndefined();
+      expect(team.submissionHistory["optical-flow"]).toBeUndefined();
+      if (pages === pending) {
+        expect(team.pendingSubmissions?.["optical-flow"]?.[0]?.benchmarkMethod).toBe("OpticalMethod");
+      } else {
+        expect(team.pendingSubmissions).toBeUndefined();
+      }
+    }
+  });
+
+  it("migrates legacy full titles and does not strip an already canonical label twice", async () => {
+    const legacy = (await buildLeaderboardUpdate(teamRoster, opticalPages([
+      { id: 474, name: "RoCo-29", disagreement: 2 },
+    ]), details, null, now)).snapshot;
+    legacy.teams[0]!.results["optical-flow"]!.benchmarkMethod = "VSAI RoCo-29";
+    legacy.teams[0]!.submissionHistory["optical-flow"]![0]!.benchmarkMethod = "VSAI RoCo-29";
+    const migrated = await buildLeaderboardUpdate(teamRoster, opticalPages([
+      { id: 500, name: "RoCo-29", disagreement: 2 },
+    ]), details, legacy, now);
+    expect(migrated.methodAssignments.get("RoCo-29")).toEqual({ "474": 1, "500": 2 });
+
+    const ambiguousRoster = [{ ...teamRoster[0]!, teamName: "Method" }];
+    const first = await buildLeaderboardUpdate(ambiguousRoster, opticalPages([
+      { id: 600, name: "RoCo-29", disagreement: 2 },
+    ]), details, null, now);
+    expect(first.snapshot.teams[0]!.results["optical-flow"]?.benchmarkMethod).toBe("Method 1");
+    const retained = await buildLeaderboardUpdate(ambiguousRoster, opticalPages([]), details,
+      first.snapshot, now, first.methodAssignments);
+    expect(retained.snapshot.teams[0]!.submissionHistory["optical-flow"]?.[0]?.benchmarkMethod)
+      .toBe("Method 1");
   });
 });
 
@@ -741,6 +961,55 @@ describe("leaderboard callable input", () => {
       matchBasis: "team-id",
     };
     expect(reconstructPublicLeaderboardSnapshot(malformed)).toBeNull();
+  });
+
+  it("reconstructs only public pending fields and rejects invalid pending identities or track projections", async () => {
+    const { snapshot } = await buildLeaderboardUpdate(roster, opticalPages([
+      { id: 471, name: "RoCo-12 CAR-WAFT" },
+    ]), () => Promise.resolve(detailPage(1, 2, 3)), null, new Date("2026-09-07T12:00:00.000Z"));
+    const pending = snapshot.teams[0]!.pendingSubmissions!["optical-flow"]![0]!;
+    const injected = structuredClone(snapshot);
+    Object.assign(injected.teams[0]!.pendingSubmissions!["optical-flow"]![0]!, {
+      primaryContactEmail: "private@example.org", score: 0.01, internalToken: "must-not-leak",
+    });
+    const rebuilt = reconstructPublicLeaderboardSnapshot(injected);
+    expect(rebuilt?.teams[0]!.pendingSubmissions?.["optical-flow"]).toEqual([pending]);
+    expect(JSON.stringify(rebuilt)).not.toMatch(/primaryContactEmail|internalToken|must-not-leak|private@example/u);
+
+    for (const patch of [
+      { benchmarkMethod: "" }, { benchmarkMethod: "bad\nname" },
+      { benchmarkUrl: "https://evil.example/471/" },
+      { benchmarkUrl: "https://spring-benchmark.org/471/?private=1" },
+      { submittedAt: null }, { submittedAt: "invalid" },
+      { matchBasis: "cross-task" }, { springMetric: -1 },
+      { springMetric: Number.POSITIVE_INFINITY }, { robustSpringMetric: "1.2" },
+    ]) {
+      const invalid = structuredClone(snapshot);
+      Object.assign(invalid.teams[0]!.pendingSubmissions!["optical-flow"]![0]!, patch);
+      expect(reconstructPublicLeaderboardSnapshot(invalid)).toBeNull();
+    }
+    const missingMetric = structuredClone(snapshot) as unknown as Record<string, unknown>;
+    const missingTeam = (missingMetric.teams as Array<Record<string, unknown>>)[0]!;
+    const missingPending = missingTeam.pendingSubmissions as Record<string, Array<Record<string, unknown>>>;
+    delete missingPending["optical-flow"]![0]!.robustSpringMetric;
+    expect(reconstructPublicLeaderboardSnapshot(missingMetric)).toBeNull();
+
+    for (const pendingSubmissions of [
+      null,
+      { "cross-task": [pending] },
+      { exploration: [pending] },
+      { "optical-flow": [pending, pending] },
+      { "optical-flow": Array.from({ length: 11 }, (_value, index) => ({
+        ...pending, benchmarkUrl: `https://spring-benchmark.org/${600 + index}/`,
+      })) },
+    ]) {
+      const invalid = structuredClone(snapshot) as unknown as Record<string, unknown>;
+      (invalid.teams as Array<Record<string, unknown>>)[0]!.pendingSubmissions = pendingSubmissions;
+      expect(reconstructPublicLeaderboardSnapshot(invalid)).toBeNull();
+    }
+    const unregistered: PublicLeaderboardSnapshot = structuredClone(snapshot);
+    unregistered.teams[0]!.registeredTracks = ["stereo-matching"];
+    expect(reconstructPublicLeaderboardSnapshot(unregistered)).toBeNull();
   });
 
   it("reports healthy cache hits and stale fallback separately", async () => {

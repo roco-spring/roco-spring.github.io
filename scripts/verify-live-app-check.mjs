@@ -170,6 +170,31 @@ function verifyPublicLeaderboardResult(result, track) {
     }
 }
 
+function verifyPublicPendingSubmission(result) {
+    // Pending rows expose only their public identity and available metrics.
+    // In particular, a pending score or private registration field is invalid.
+    const keys = new Set([
+        "benchmarkMethod", "benchmarkUrl", "submittedAt", "matchBasis",
+        "springMetric", "robustSpringMetric"
+    ]);
+    if (!hasOnlyKeys(result, keys) || Object.keys(result).length !== keys.size
+        || typeof result.benchmarkMethod !== "string"
+        || result.benchmarkMethod.length === 0
+        || result.benchmarkMethod.length > 240
+        || /[\u0000-\u001f\u007f]/u.test(result.benchmarkMethod)
+        || typeof result.benchmarkUrl !== "string"
+        || !/^https:\/\/spring-benchmark\.org\/\d{1,9}\/$/u.test(result.benchmarkUrl)
+        || !validIsoTimestamp(result.submittedAt)
+        || !["team-id", "team-name"].includes(result.matchBasis)
+        || [result.springMetric, result.robustSpringMetric].some((value) => (
+            value !== null && (
+                typeof value !== "number" || !Number.isFinite(value) || value < 0 || value > 1e9
+            )
+        ))) {
+        throw new Error("The live leaderboard pending submission projection is invalid.");
+    }
+}
+
 function verifyLiveLeaderboardSnapshot(snapshot) {
     const topLevelKeys = new Set([
         "schemaVersion", "updatedAt", "sourceLabel", "scoringConvention",
@@ -191,14 +216,16 @@ function verifyLiveLeaderboardSnapshot(snapshot) {
         throw new Error("The live leaderboard snapshot schema is invalid.");
     }
 
-    const teamKeys = new Set([
+    const requiredTeamKeys = [
         "teamId", "teamName", "registeredTracks", "results", "submissionHistory"
-    ]);
+    ];
+    // Keep schema 2 compatible with snapshots published before pending rows.
+    const teamKeys = new Set([...requiredTeamKeys, "pendingSubmissions"]);
     const seenTeamIds = new Set();
     for (const team of snapshot.teams) {
         const idMatch = typeof team?.teamId === "string" ? /^RoCo-([1-9]\d*)$/u.exec(team.teamId) : null;
         if (!hasOnlyKeys(team, teamKeys)
-            || Object.keys(team).length !== teamKeys.size
+            || requiredTeamKeys.some((key) => !Object.hasOwn(team, key))
             || !idMatch
             || Number(idMatch[1]) < 8
             || seenTeamIds.has(team.teamId)
@@ -211,7 +238,9 @@ function verifyLiveLeaderboardSnapshot(snapshot) {
             || new Set(team.registeredTracks).size !== team.registeredTracks.length
             || team.registeredTracks.some((track) => !REGISTRATION_TRACKS.has(track))
             || !hasOnlyKeys(team.results, LEADERBOARD_TRACKS)
-            || !hasOnlyKeys(team.submissionHistory, QUANTITATIVE_TRACKS)) {
+            || !hasOnlyKeys(team.submissionHistory, QUANTITATIVE_TRACKS)
+            || (Object.hasOwn(team, "pendingSubmissions")
+                && !hasOnlyKeys(team.pendingSubmissions, QUANTITATIVE_TRACKS))) {
             throw new Error("The live leaderboard team projection is invalid.");
         }
         seenTeamIds.add(team.teamId);
@@ -234,6 +263,17 @@ function verifyLiveLeaderboardSnapshot(snapshot) {
                 throw new Error("The live leaderboard history track is invalid.");
             }
             history.forEach((result) => verifyPublicLeaderboardResult(result, track));
+        }
+        for (const [track, pending] of Object.entries(team.pendingSubmissions ?? {})) {
+            if (!team.registeredTracks.includes(track)
+                || !Array.isArray(pending)
+                || pending.length > 10) {
+                throw new Error("The live leaderboard pending submissions are invalid.");
+            }
+            pending.forEach(verifyPublicPendingSubmission);
+            if (new Set(pending.map((result) => result.benchmarkUrl)).size !== pending.length) {
+                throw new Error("The live leaderboard pending submissions contain duplicate results.");
+            }
         }
     }
     if ([...KNOWN_PUBLIC_TEAM_IDS].some((teamId) => !seenTeamIds.has(teamId))) {

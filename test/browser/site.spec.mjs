@@ -286,6 +286,203 @@ test("live leaderboard renders scored results and only forces explicit user refr
     .toEqual([false, true, true, true]);
 });
 
+test("canonical method labels retain distinct results across refresh, tracks, and homepage preview", async ({ page }) => {
+  const methods = ["CAR-WAFT", "WAFT+", "Method 1", "Method 2"];
+  const quantitativeTracks = ["optical-flow", "stereo-matching", "scene-flow"];
+  const results = methods.map((benchmarkMethod, index) => ({
+    rankChange: [0, 1, -1, 2][index],
+    score: (index + 1) / 10,
+    springMetric: index + 1,
+    robustSpringMetric: index + 2,
+    springTerm: (index + 1) / 10,
+    robustSpringTerm: (index + 1) / 10,
+    submittedAt: `2026-09-0${index + 1}T12:00:00.000Z`,
+    benchmarkMethod,
+    benchmarkUrl: `https://spring-benchmark.org/${471 + index}/`
+  }));
+  const snapshot = {
+    schemaVersion: 2,
+    updatedAt: "2026-09-07T12:00:00.000Z",
+    sourceLabel: "Canonical method label test",
+    baselines: LEADERBOARD_BASELINES,
+    teams: [{
+      teamId: "RoCo-14",
+      teamName: "Registered Racing",
+      registeredTracks: quantitativeTracks,
+      results: Object.fromEntries(quantitativeTracks.map((track) => [track, results[3]])),
+      // Deliberately scramble the history and duplicate the current result.
+      // Rank and identity must depend on scores and URLs, never display labels
+      // or the order in which benchmark entries were fetched.
+      submissionHistory: Object.fromEntries(quantitativeTracks.map((track) => [track, [
+        { ...results[3], rankChange: 0 }, results[1], results[2], results[0]
+      ]]))
+    }]
+  };
+  const installSnapshot = async () => {
+    await page.waitForFunction(() => Boolean(window.RoCoLeaderboardLive));
+    await page.evaluate(async (fixture) => {
+      await window.RoCoLeaderboardLive.installDataSource(async ({ force }) => {
+        if (force) {
+          for (const history of Object.values(fixture.teams[0].submissionHistory)) {
+            history.reverse();
+          }
+        }
+        return { snapshot: fixture, syncState: "synchronized" };
+      });
+    }, snapshot);
+  };
+
+  await page.goto("/evaluation.html");
+  await installSnapshot();
+  const panel = page.locator('[role="tabpanel"]:not([hidden])');
+  const rows = panel.locator("tbody tr:not(.leaderboard-row--baseline)");
+  const expectCanonicalRows = async () => {
+    await expect(rows).toHaveCount(4);
+    await expect(rows.locator(".leaderboard-team-name"))
+      .toHaveText(Array(4).fill("Registered Racing"));
+    await expect(rows.locator(".leaderboard-team-id")).toHaveText(Array(4).fill("RoCo-14"));
+    await expect(rows.locator(".leaderboard-method")).toHaveText(methods);
+    await expect(rows.locator(".leaderboard-rank")).toHaveText(["1", "2", "3", "4"]);
+    await expect(rows.locator(".rank-change")).toHaveText(["— 0", "▲ 1", "▼ 1", "▲ 2"]);
+    await expect(rows.locator(".leaderboard-score")).toHaveText(["0.1000", "0.2000", "0.3000", "0.4000"]);
+    for (let index = 0; index < results.length; index += 1) {
+      const method = rows.nth(index).locator(".leaderboard-method");
+      await expect(method).toHaveAttribute("href", results[index].benchmarkUrl);
+      await expect(method).toHaveAttribute("title", methods[index]);
+      await expect(method).toHaveAttribute("rel", "noopener noreferrer");
+      await expect(rows.nth(index).locator(".leaderboard-submitted"))
+        .toHaveAttribute("title", results[index].submittedAt);
+    }
+  };
+  for (const label of ["Optical Flow", "Stereo Matching", "Scene Flow"]) {
+    await page.getByRole("tab", { name: label, exact: true }).click();
+    await expectCanonicalRows();
+  }
+  await page.getByRole("button", { name: "Refresh standings" }).click();
+  await expect(page.locator("[data-leaderboard-refresh-status]")).toHaveText("Live standings refreshed.");
+  await expectCanonicalRows();
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  const tableWrap = panel.locator(".leaderboard-table-wrap");
+  const dimensions = await tableWrap.evaluate((wrapper) => ({
+    page: document.documentElement.clientWidth,
+    pageContent: document.documentElement.scrollWidth,
+    table: wrapper.clientWidth,
+    tableContent: wrapper.scrollWidth
+  }));
+  expect(dimensions.pageContent).toBeLessThanOrEqual(dimensions.page + 1);
+  expect(dimensions.tableContent).toBeGreaterThan(dimensions.table);
+
+  await page.goto("/index.html");
+  await installSnapshot();
+  for (const track of quantitativeTracks) {
+    const card = page.locator(`.leaderboard-preview-card[aria-labelledby="preview-${track}"]`);
+    await expect(card.locator(".leaderboard-preview-method")).toHaveText(methods.slice(0, 3));
+    await expect(card.locator(".leaderboard-preview-rank")).toHaveText(["1", "2", "3"]);
+    await expect(card.locator(".leaderboard-preview-team strong"))
+      .toHaveText(Array(3).fill("Registered Racing"));
+    await expect(card.getByRole("link", { name: "View full standings →" }))
+      .toHaveAttribute("href", "evaluation.html#leaderboards");
+  }
+  expect(await page.evaluate(() => document.documentElement.scrollWidth))
+    .toBeLessThanOrEqual(391);
+});
+
+test("incomplete public methods remain visible without a rank until complete metrics arrive", async ({ page }) => {
+  const method = (benchmarkMethod, resultId, springMetric, score = null) => ({
+    rankChange: 0,
+    score,
+    springMetric,
+    robustSpringMetric: score === null ? null : 2,
+    springTerm: score,
+    robustSpringTerm: score,
+    submittedAt: "2026-09-07T12:00:00.000Z",
+    benchmarkMethod,
+    benchmarkUrl: `https://spring-benchmark.org/${resultId}/`
+  });
+  const unnamed = method("Method 1", 474, 0.7, 0.2);
+  const snapshot = {
+    schemaVersion: 2,
+    updatedAt: "2026-09-07T12:05:00.000Z",
+    sourceLabel: "Incomplete public method test",
+    teams: [
+      {
+        teamId: "RoCo-14", teamName: "Road Racing", registeredTracks: ["optical-flow"],
+        results: { "optical-flow": method("CAR-WAFT v2", 499, 0.8, 0.3) },
+        pendingSubmissions: { "optical-flow": [method("CAR-WAFT", 471, 0.9)] }
+      },
+      {
+        teamId: "RoCo-19", teamName: "WAFT Team", registeredTracks: ["optical-flow", "stereo-matching"],
+        pendingSubmissions: {
+          "optical-flow": [method("WAFT+", 488, 1.1)],
+          "stereo-matching": [method("WAFT+", 488, 1.1), method("WAFT++", 489, 1.2)]
+        }
+      },
+      {
+        teamId: "RoCo-29", teamName: "VSAI", registeredTracks: ["optical-flow"],
+        results: { "optical-flow": unnamed },
+        // A pending copy must never hide the complete result at the same URL.
+        pendingSubmissions: { "optical-flow": [{ ...unnamed, score: null }] }
+      },
+      { teamId: "RoCo-30", teamName: "Alpha Pending", registeredTracks: ["optical-flow"] }
+    ]
+  };
+  const installSnapshot = async () => {
+    await page.waitForFunction(() => Boolean(window.RoCoLeaderboardLive));
+    await page.evaluate(async (fixture) => {
+      await window.RoCoLeaderboardLive.installDataSource(async ({ force }) => {
+        if (force) {
+          const pending = fixture.teams[0].pendingSubmissions["optical-flow"][0];
+          fixture.teams[0].submissionHistory = {
+            "optical-flow": [{ ...pending, score: 0.1, robustSpringMetric: 1.2 }]
+          };
+        }
+        return { snapshot: fixture, syncState: "synchronized" };
+      });
+    }, snapshot);
+  };
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/evaluation.html");
+  await installSnapshot();
+  const rows = page.locator('[role="tabpanel"]:not([hidden]) tbody tr');
+  await expect(rows).toHaveCount(5);
+  await expect(rows.locator(".leaderboard-team-name"))
+    .toHaveText(["VSAI", "Road Racing", "Alpha Pending", "Road Racing", "WAFT Team"]);
+  await expect(rows.locator(".leaderboard-rank")).toHaveText(["1", "2", "—", "—", "—"]);
+  await expect(rows.locator(".leaderboard-score")).toHaveText(["0.2000", "0.3000", "—", "—", "—"]);
+  await expect(rows.locator(".leaderboard-method-placeholder")).toHaveCount(1);
+  for (const [name, resultId, clean] of [["CAR-WAFT", 471, "0.900"], ["WAFT+", 488, "1.100"]]) {
+    const row = rows.filter({ has: page.getByRole("link", { name: `${name} benchmark result (opens in a new tab)`, exact: true }) });
+    await expect(row.locator(".leaderboard-pending-badge")).toHaveText("Awaiting benchmark results");
+    await expect(row.locator(".leaderboard-method"))
+      .toHaveAttribute("href", `https://spring-benchmark.org/${resultId}/`);
+    await expect(row.locator(".leaderboard-metric")).toHaveText([clean, "—"]);
+    await expect(row.locator(".leaderboard-submitted"))
+      .toHaveAttribute("title", "2026-09-07T12:00:00.000Z");
+  }
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(391);
+
+  await page.getByRole("button", { name: "Refresh standings" }).click();
+  await expect(page.locator("[data-leaderboard-refresh-status]")).toHaveText("Live standings refreshed.");
+  await expect(rows).toHaveCount(5);
+  await expect(rows.first().locator(".leaderboard-method")).toHaveText("CAR-WAFT");
+  await expect(rows.first().locator(".leaderboard-method"))
+    .toHaveAttribute("href", "https://spring-benchmark.org/471/");
+  await expect(rows.first().locator(".leaderboard-rank")).toHaveText("1");
+  await expect(rows.first().locator(".leaderboard-score")).toHaveText("0.1000");
+  await expect(rows.first().locator(".leaderboard-pending-badge")).toHaveCount(0);
+
+  await page.goto("/index.html");
+  await installSnapshot();
+  const preview = page.locator('.leaderboard-preview-card[aria-labelledby="preview-optical-flow"]');
+  await expect(preview.locator(".leaderboard-preview-method")).toHaveText(["Method 1", "CAR-WAFT v2"]);
+  await expect(preview.locator(".leaderboard-preview-rank")).toHaveText(["1", "2"]);
+  await expect(page.locator('.leaderboard-preview-card[aria-labelledby="preview-stereo-matching"] .leaderboard-preview-empty'))
+    .toHaveText("No complete benchmark results yet · 1 registered team");
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(391);
+});
+
 test("exact leaderboard ties use numeric team ID and then benchmark URL", async ({ page }) => {
   await page.goto("/evaluation.html");
   await page.waitForFunction(() => Boolean(window.RoCoLeaderboardLive));
@@ -346,7 +543,7 @@ test("homepage preview does not promote alphabetically sorted pending teams", as
   await expect(page.locator(".leaderboard-preview-list")).toHaveCount(0);
   await expect(page.locator(".leaderboard-preview-empty")).toHaveCount(4);
   for (const card of await cards.all()) {
-    await expect(card.locator(".leaderboard-preview-empty")).toContainText("No matched public results yet");
+    await expect(card.locator(".leaderboard-preview-empty")).toContainText("No complete benchmark results yet");
   }
 });
 

@@ -32,8 +32,8 @@
                     <div class="eyebrow">Current Standings</div>
                     <h2>RoCo-Spring Leaderboard</h2>
                     <p>
-                        Lower RbS-Scores rank higher. Registered teams without a matched public benchmark result
-                        appear after scored teams in alphabetical order.
+                        Lower RbS-Scores rank higher. Teams and methods awaiting complete benchmark results
+                        appear after scored methods in alphabetical order by team.
                     </p>
                 </div>
 
@@ -63,6 +63,10 @@
             <p class="leaderboard-integrity-note" role="note">
                 The organizer-approved matcher uses an exact RoCo team ID first, then a unique normalized team-name
                 substring. Private or unmatched benchmark entries remain pending instead of being assigned arbitrarily.
+                The Team column uses the registered team name; Method Name omits the team ID and repeated team name.
+                Entries without a method name receive a stable label such as Method 1 or Method 2 within their team.
+                Each method links to its original Spring result, and multiple methods from the same team remain separate.
+                Methods awaiting complete benchmark results show their available metrics but remain unranked.
                 Automatic matches are provisional: ranked and award-eligible entries must use the same method,
                 checkpoint, inference settings, and clean outputs in both uploads, subject to organizer verification.
                 The public benchmark cannot prove that cross-upload identity. “Spring Submission Time” is the original

@@ -1,9 +1,8 @@
 {
   "schemaVersion": 2,
-  "updatedAt": "2026-09-03T09:48:03.117Z",
-  "sourceLabel": "Fallback snapshot · roster verified 3 Sep 2026 · no complete public result matches at publication",
+  "updatedAt": "2026-09-07T09:33:15.578Z",
+  "sourceLabel": "Live Spring and RobustSpring public benchmark snapshot",
   "scoringConvention": "organizer-approved-additive-proxy",
-  "syncStatus": "static-fallback",
   "baselines": {
     "optical-flow": {
       "spring": 0.9925,
@@ -36,230 +35,485 @@
       }
     }
   },
+  "syncStatus": "static-fallback",
   "teams": [
-    {
-      "teamId": "RoCo-8",
-      "teamName": "JTS@UW",
-      "registeredTracks": ["optical-flow", "exploration"],
-      "results": {},
-      "submissionHistory": {}
-    },
-    {
-      "teamId": "RoCo-9",
-      "teamName": "Nitansh Jain",
-      "registeredTracks": ["optical-flow", "stereo-matching"],
-      "results": {},
-      "submissionHistory": {}
-    },
-    {
-      "teamId": "RoCo-10",
-      "teamName": "iktsuarpok",
-      "registeredTracks": ["optical-flow"],
-      "results": {},
-      "submissionHistory": {}
-    },
-    {
-      "teamId": "RoCo-11",
-      "teamName": "MLDA@EEE",
-      "registeredTracks": ["scene-flow"],
-      "results": {},
-      "submissionHistory": {}
-    },
-    {
-      "teamId": "RoCo-12",
-      "teamName": "aneev",
-      "registeredTracks": ["optical-flow", "stereo-matching", "scene-flow"],
-      "results": {},
-      "submissionHistory": {}
-    },
     {
       "teamId": "RoCo-13",
       "teamName": "Abdulrahman M.Saadeldin",
-      "registeredTracks": ["optical-flow", "stereo-matching", "scene-flow", "exploration"],
-      "results": {},
-      "submissionHistory": {}
-    },
-    {
-      "teamId": "RoCo-14",
-      "teamName": "ZXUv2.0",
-      "registeredTracks": ["optical-flow"],
-      "results": {},
-      "submissionHistory": {}
-    },
-    {
-      "teamId": "RoCo-15",
-      "teamName": "Drivers",
-      "registeredTracks": ["optical-flow", "stereo-matching"],
-      "results": {},
-      "submissionHistory": {}
-    },
-    {
-      "teamId": "RoCo-16",
-      "teamName": "Swarm",
-      "registeredTracks": ["optical-flow", "stereo-matching", "scene-flow", "exploration"],
-      "results": {},
-      "submissionHistory": {}
-    },
-    {
-      "teamId": "RoCo-17",
-      "teamName": "BuildDiff",
-      "registeredTracks": ["optical-flow", "stereo-matching", "scene-flow", "exploration"],
-      "results": {},
-      "submissionHistory": {}
-    },
-    {
-      "teamId": "RoCo-18",
-      "teamName": "KOGUMA Lab",
-      "registeredTracks": ["optical-flow", "stereo-matching", "scene-flow"],
-      "results": {},
-      "submissionHistory": {}
-    },
-    {
-      "teamId": "RoCo-19",
-      "teamName": "KoreaU_DLmath",
-      "registeredTracks": ["optical-flow", "stereo-matching", "scene-flow", "exploration"],
-      "results": {},
-      "submissionHistory": {}
-    },
-    {
-      "teamId": "RoCo-20",
-      "teamName": "DDEVS",
-      "registeredTracks": ["stereo-matching"],
-      "results": {},
-      "submissionHistory": {}
-    },
-    {
-      "teamId": "RoCo-21",
-      "teamName": "mau5",
-      "registeredTracks": ["optical-flow", "exploration"],
-      "results": {},
-      "submissionHistory": {}
-    },
-    {
-      "teamId": "RoCo-22",
-      "teamName": "cactus8603",
-      "registeredTracks": ["optical-flow", "stereo-matching", "scene-flow", "exploration"],
-      "results": {},
-      "submissionHistory": {}
-    },
-    {
-      "teamId": "RoCo-23",
-      "teamName": "PlayStation",
-      "registeredTracks": ["optical-flow"],
-      "results": {},
-      "submissionHistory": {}
-    },
-    {
-      "teamId": "RoCo-24",
-      "teamName": "E-lab",
-      "registeredTracks": ["optical-flow", "stereo-matching", "scene-flow", "exploration"],
-      "results": {},
-      "submissionHistory": {}
-    },
-    {
-      "teamId": "RoCo-25",
-      "teamName": "HexWarrior",
-      "registeredTracks": ["optical-flow", "stereo-matching", "scene-flow", "exploration"],
-      "results": {},
-      "submissionHistory": {}
-    },
-    {
-      "teamId": "RoCo-26",
-      "teamName": "Batman",
-      "registeredTracks": ["optical-flow", "stereo-matching", "scene-flow", "exploration"],
-      "results": {},
-      "submissionHistory": {}
-    },
-    {
-      "teamId": "RoCo-27",
-      "teamName": "Mysterious Power of the East",
-      "registeredTracks": ["optical-flow", "exploration"],
-      "results": {},
-      "submissionHistory": {}
-    },
-    {
-      "teamId": "RoCo-28",
-      "teamName": "Norisk",
-      "registeredTracks": ["scene-flow"],
-      "results": {},
-      "submissionHistory": {}
-    },
-    {
-      "teamId": "RoCo-29",
-      "teamName": "VSAI",
-      "registeredTracks": ["optical-flow"],
+      "registeredTracks": [
+        "optical-flow",
+        "stereo-matching",
+        "scene-flow",
+        "exploration"
+      ],
       "results": {},
       "submissionHistory": {}
     },
     {
       "teamId": "RoCo-30",
       "teamName": "acvlab",
-      "registeredTracks": ["optical-flow", "stereo-matching", "scene-flow", "exploration"],
+      "registeredTracks": [
+        "optical-flow",
+        "stereo-matching",
+        "scene-flow",
+        "exploration"
+      ],
       "results": {},
       "submissionHistory": {}
     },
     {
-      "teamId": "RoCo-31",
-      "teamName": "e-motion AI",
-      "registeredTracks": ["scene-flow", "exploration"],
+      "teamId": "RoCo-12",
+      "teamName": "aneev",
+      "registeredTracks": [
+        "optical-flow",
+        "stereo-matching",
+        "scene-flow"
+      ],
       "results": {},
       "submissionHistory": {}
     },
     {
-      "teamId": "RoCo-32",
-      "teamName": "XLR8",
-      "registeredTracks": ["optical-flow", "stereo-matching", "scene-flow", "exploration"],
+      "teamId": "RoCo-26",
+      "teamName": "Batman",
+      "registeredTracks": [
+        "optical-flow",
+        "stereo-matching",
+        "scene-flow",
+        "exploration"
+      ],
       "results": {},
       "submissionHistory": {}
     },
     {
-      "teamId": "RoCo-33",
-      "teamName": "Epoch Labs",
-      "registeredTracks": ["optical-flow", "stereo-matching", "scene-flow", "exploration"],
+      "teamId": "RoCo-41",
+      "teamName": "batman",
+      "registeredTracks": [
+        "optical-flow",
+        "exploration"
+      ],
       "results": {},
       "submissionHistory": {}
     },
     {
-      "teamId": "RoCo-34",
-      "teamName": "Pamboo",
-      "registeredTracks": ["optical-flow", "stereo-matching", "scene-flow", "exploration"],
-      "results": {},
-      "submissionHistory": {}
-    },
-    {
-      "teamId": "RoCo-35",
-      "teamName": "Team'5",
-      "registeredTracks": ["optical-flow", "stereo-matching", "scene-flow", "exploration"],
+      "teamId": "RoCo-17",
+      "teamName": "BuildDiff",
+      "registeredTracks": [
+        "optical-flow",
+        "stereo-matching",
+        "scene-flow",
+        "exploration"
+      ],
       "results": {},
       "submissionHistory": {}
     },
     {
       "teamId": "RoCo-36",
       "teamName": "c-mike",
-      "registeredTracks": ["optical-flow", "stereo-matching", "scene-flow", "exploration"],
+      "registeredTracks": [
+        "optical-flow",
+        "stereo-matching",
+        "scene-flow",
+        "exploration"
+      ],
       "results": {},
       "submissionHistory": {}
     },
     {
-      "teamId": "RoCo-37",
-      "teamName": "Innovators",
-      "registeredTracks": ["optical-flow", "stereo-matching", "scene-flow", "exploration"],
+      "teamId": "RoCo-22",
+      "teamName": "cactus8603",
+      "registeredTracks": [
+        "optical-flow",
+        "stereo-matching",
+        "scene-flow",
+        "exploration"
+      ],
+      "results": {},
+      "submissionHistory": {}
+    },
+    {
+      "teamId": "RoCo-20",
+      "teamName": "DDEVS",
+      "registeredTracks": [
+        "stereo-matching"
+      ],
+      "results": {},
+      "submissionHistory": {}
+    },
+    {
+      "teamId": "RoCo-15",
+      "teamName": "Drivers",
+      "registeredTracks": [
+        "optical-flow",
+        "stereo-matching"
+      ],
+      "results": {},
+      "submissionHistory": {}
+    },
+    {
+      "teamId": "RoCo-24",
+      "teamName": "E-lab",
+      "registeredTracks": [
+        "optical-flow",
+        "stereo-matching",
+        "scene-flow",
+        "exploration"
+      ],
+      "results": {},
+      "submissionHistory": {}
+    },
+    {
+      "teamId": "RoCo-31",
+      "teamName": "e-motion AI",
+      "registeredTracks": [
+        "scene-flow",
+        "exploration"
+      ],
+      "results": {},
+      "submissionHistory": {}
+    },
+    {
+      "teamId": "RoCo-33",
+      "teamName": "Epoch Labs",
+      "registeredTracks": [
+        "optical-flow",
+        "stereo-matching",
+        "scene-flow",
+        "exploration"
+      ],
       "results": {},
       "submissionHistory": {}
     },
     {
       "teamId": "RoCo-38",
       "teamName": "Four And Furios",
-      "registeredTracks": ["optical-flow", "stereo-matching", "scene-flow", "exploration"],
+      "registeredTracks": [
+        "optical-flow",
+        "stereo-matching",
+        "scene-flow",
+        "exploration"
+      ],
+      "results": {},
+      "submissionHistory": {}
+    },
+    {
+      "teamId": "RoCo-42",
+      "teamName": "Geodesic Physical Intelligence",
+      "registeredTracks": [
+        "optical-flow",
+        "stereo-matching",
+        "scene-flow",
+        "exploration"
+      ],
+      "results": {},
+      "submissionHistory": {}
+    },
+    {
+      "teamId": "RoCo-43",
+      "teamName": "gun-py",
+      "registeredTracks": [
+        "optical-flow",
+        "stereo-matching",
+        "scene-flow",
+        "exploration"
+      ],
+      "results": {},
+      "submissionHistory": {}
+    },
+    {
+      "teamId": "RoCo-25",
+      "teamName": "HexWarrior",
+      "registeredTracks": [
+        "optical-flow",
+        "stereo-matching",
+        "scene-flow",
+        "exploration"
+      ],
+      "results": {},
+      "submissionHistory": {}
+    },
+    {
+      "teamId": "RoCo-10",
+      "teamName": "iktsuarpok",
+      "registeredTracks": [
+        "optical-flow"
+      ],
+      "results": {},
+      "submissionHistory": {}
+    },
+    {
+      "teamId": "RoCo-37",
+      "teamName": "Innovators",
+      "registeredTracks": [
+        "optical-flow",
+        "stereo-matching",
+        "scene-flow",
+        "exploration"
+      ],
+      "results": {},
+      "submissionHistory": {}
+    },
+    {
+      "teamId": "RoCo-8",
+      "teamName": "JTS@UW",
+      "registeredTracks": [
+        "optical-flow",
+        "exploration"
+      ],
+      "results": {},
+      "submissionHistory": {}
+    },
+    {
+      "teamId": "RoCo-18",
+      "teamName": "KOGUMA Lab",
+      "registeredTracks": [
+        "optical-flow",
+        "stereo-matching",
+        "scene-flow"
+      ],
+      "results": {},
+      "submissionHistory": {}
+    },
+    {
+      "teamId": "RoCo-19",
+      "teamName": "KoreaU_DLmath",
+      "registeredTracks": [
+        "optical-flow",
+        "stereo-matching",
+        "scene-flow",
+        "exploration"
+      ],
+      "results": {},
+      "submissionHistory": {},
+      "pendingSubmissions": {
+        "optical-flow": [
+          {
+            "benchmarkMethod": "SEARAFT-Finetune",
+            "benchmarkUrl": "https://spring-benchmark.org/475/",
+            "submittedAt": "2026-09-04T10:49:00.000Z",
+            "matchBasis": "team-id",
+            "springMetric": 2.651,
+            "robustSpringMetric": null
+          },
+          {
+            "benchmarkMethod": "WAFT",
+            "benchmarkUrl": "https://spring-benchmark.org/484/",
+            "submittedAt": "2026-09-07T03:15:00.000Z",
+            "matchBasis": "team-id",
+            "springMetric": 0.384,
+            "robustSpringMetric": null
+          },
+          {
+            "benchmarkMethod": "WAFT+",
+            "benchmarkUrl": "https://spring-benchmark.org/488/",
+            "submittedAt": "2026-09-07T06:10:00.000Z",
+            "matchBasis": "team-id",
+            "springMetric": 0.364,
+            "robustSpringMetric": null
+          }
+        ],
+        "stereo-matching": [
+          {
+            "benchmarkMethod": "RAFTStereo_Scale040_new",
+            "benchmarkUrl": "https://spring-benchmark.org/482/",
+            "submittedAt": "2026-09-06T06:15:00.000Z",
+            "matchBasis": "team-id",
+            "springMetric": 1.077,
+            "robustSpringMetric": null
+          }
+        ],
+        "scene-flow": [
+          {
+            "benchmarkMethod": "DEFOM2K-DPFlow",
+            "benchmarkUrl": "https://spring-benchmark.org/473/",
+            "submittedAt": "2026-09-03T04:01:00.000Z",
+            "matchBasis": "team-id",
+            "springMetric": 0.154587,
+            "robustSpringMetric": null
+          }
+        ]
+      }
+    },
+    {
+      "teamId": "RoCo-21",
+      "teamName": "mau5",
+      "registeredTracks": [
+        "optical-flow",
+        "exploration"
+      ],
+      "results": {},
+      "submissionHistory": {}
+    },
+    {
+      "teamId": "RoCo-11",
+      "teamName": "MLDA@EEE",
+      "registeredTracks": [
+        "scene-flow"
+      ],
+      "results": {},
+      "submissionHistory": {}
+    },
+    {
+      "teamId": "RoCo-27",
+      "teamName": "Mysterious Power of the East",
+      "registeredTracks": [
+        "optical-flow",
+        "exploration"
+      ],
+      "results": {},
+      "submissionHistory": {}
+    },
+    {
+      "teamId": "RoCo-9",
+      "teamName": "Nitansh Jain",
+      "registeredTracks": [
+        "optical-flow",
+        "stereo-matching"
+      ],
+      "results": {},
+      "submissionHistory": {}
+    },
+    {
+      "teamId": "RoCo-28",
+      "teamName": "Norisk",
+      "registeredTracks": [
+        "scene-flow"
+      ],
+      "results": {},
+      "submissionHistory": {}
+    },
+    {
+      "teamId": "RoCo-34",
+      "teamName": "Pamboo",
+      "registeredTracks": [
+        "optical-flow",
+        "stereo-matching",
+        "scene-flow",
+        "exploration"
+      ],
+      "results": {},
+      "submissionHistory": {}
+    },
+    {
+      "teamId": "RoCo-23",
+      "teamName": "PlayStation",
+      "registeredTracks": [
+        "optical-flow"
+      ],
       "results": {},
       "submissionHistory": {}
     },
     {
       "teamId": "RoCo-39",
       "teamName": "PocketChange",
-      "registeredTracks": ["exploration"],
+      "registeredTracks": [
+        "exploration"
+      ],
       "results": {},
       "submissionHistory": {}
+    },
+    {
+      "teamId": "RoCo-40",
+      "teamName": "shashank test",
+      "registeredTracks": [
+        "optical-flow",
+        "exploration"
+      ],
+      "results": {},
+      "submissionHistory": {}
+    },
+    {
+      "teamId": "RoCo-16",
+      "teamName": "Swarm",
+      "registeredTracks": [
+        "optical-flow",
+        "stereo-matching",
+        "scene-flow",
+        "exploration"
+      ],
+      "results": {},
+      "submissionHistory": {}
+    },
+    {
+      "teamId": "RoCo-35",
+      "teamName": "Team'5",
+      "registeredTracks": [
+        "optical-flow",
+        "stereo-matching",
+        "scene-flow",
+        "exploration"
+      ],
+      "results": {},
+      "submissionHistory": {}
+    },
+    {
+      "teamId": "RoCo-29",
+      "teamName": "VSAI",
+      "registeredTracks": [
+        "optical-flow"
+      ],
+      "results": {
+        "optical-flow": {
+          "rankChange": 0,
+          "score": 1.103783,
+          "springMetric": 1.411,
+          "robustSpringMetric": 4.739,
+          "springTerm": 1.421662,
+          "robustSpringTerm": 0.785904,
+          "submittedAt": "2026-09-03T16:56:00.000Z",
+          "benchmarkMethod": "Method 1",
+          "benchmarkUrl": "https://spring-benchmark.org/474/",
+          "matchBasis": "team-id"
+        }
+      },
+      "submissionHistory": {
+        "optical-flow": [
+          {
+            "rankChange": 0,
+            "score": 1.103783,
+            "springMetric": 1.411,
+            "robustSpringMetric": 4.739,
+            "springTerm": 1.421662,
+            "robustSpringTerm": 0.785904,
+            "submittedAt": "2026-09-03T16:56:00.000Z",
+            "benchmarkMethod": "Method 1",
+            "benchmarkUrl": "https://spring-benchmark.org/474/",
+            "matchBasis": "team-id"
+          }
+        ]
+      }
+    },
+    {
+      "teamId": "RoCo-32",
+      "teamName": "XLR8",
+      "registeredTracks": [
+        "optical-flow",
+        "stereo-matching",
+        "scene-flow",
+        "exploration"
+      ],
+      "results": {},
+      "submissionHistory": {}
+    },
+    {
+      "teamId": "RoCo-14",
+      "teamName": "ZXUv2.0",
+      "registeredTracks": [
+        "optical-flow"
+      ],
+      "results": {},
+      "submissionHistory": {},
+      "pendingSubmissions": {
+        "optical-flow": [
+          {
+            "benchmarkMethod": "CAR-WAFT",
+            "benchmarkUrl": "https://spring-benchmark.org/471/",
+            "submittedAt": "2026-08-27T22:35:00.000Z",
+            "matchBasis": "team-id",
+            "springMetric": 0.298,
+            "robustSpringMetric": null
+          }
+        ]
+      }
     }
   ]
 }

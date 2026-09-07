@@ -135,7 +135,17 @@
         const history = Array.isArray(team.submissionHistory?.[trackKey])
             ? team.submissionHistory[trackKey]
             : [];
-        const candidates = [...history];
+        const pending = Array.isArray(team.pendingSubmissions?.[trackKey])
+            ? team.pendingSubmissions[trackKey]
+            : [];
+        // Show public methods that still await complete benchmark metrics.
+        // They cannot receive a score; a complete history/current result at
+        // the same immutable URL replaces the pending copy below.
+        const candidates = [
+            ...pending.filter((result) => result && typeof result === "object")
+                .map((result) => ({ ...result, score: null, rankChange: 0 })),
+            ...history
+        ];
         if (current && typeof current === "object") candidates.push(current);
 
         // The backend history is already unique by immutable benchmark URL.
@@ -185,7 +195,12 @@
             const leftScored = isFiniteNumber(left.score);
             const rightScored = isFiniteNumber(right.score);
             if (leftScored !== rightScored) return leftScored ? -1 : 1;
-            if (!leftScored) return compareTeamIdentity(left, right);
+            if (!leftScored) {
+                // Keep team order alphabetical, then use immutable result
+                // URLs to order multiple pending methods from the same team.
+                return compareTeamIdentity(left, right) || String(left.benchmarkUrl ?? "")
+                    .localeCompare(String(right.benchmarkUrl ?? ""), undefined, { numeric: true });
+            }
             return compareScoredRows(left, right);
         });
 
@@ -467,15 +482,21 @@
                 teamMeta.append(element("span", "leaderboard-team-id", row.teamId));
             }
             if (isPending && !isBaseline) {
-                teamMeta.append(element("span", "leaderboard-pending-badge", "Awaiting result"));
+                teamMeta.append(element(
+                    "span",
+                    "leaderboard-pending-badge",
+                    row.benchmarkMethod ? "Awaiting benchmark results" : "Awaiting result"
+                ));
             }
             teamCell.append(teamMeta);
 
             const methodCell = element("td", "leaderboard-method-cell");
             if (row.benchmarkMethod) {
+                // The backend supplies the canonical method label, including
+                // stable labels for unnamed entries; never reparse it here.
                 const resultUrl = safeBenchmarkUrl(row.benchmarkUrl);
                 const method = element(resultUrl ? "a" : "span", "leaderboard-method", row.benchmarkMethod);
-                // Long official names stay compact in the table but remain
+                // Long method names stay compact in the table but remain
                 // available in full to pointer users and assistive technology.
                 method.title = row.benchmarkMethod;
                 if (resultUrl) {
@@ -582,7 +603,7 @@
                 "leaderboard-panel-note",
                 track.key === "cross-task"
                     ? "Cross-Task standings include teams registered for all three quantitative tracks."
-                    : "Participant methods are ranked by RbS-Score; teams awaiting a matched public result follow alphabetically. Rows labeled Baseline are score-sorted, unranked Spring-Team references with complete Spring and RobustSpring metrics; they do not affect participant standings."
+                    : "Participant methods are ranked by RbS-Score; teams and methods awaiting complete benchmark results follow alphabetically by team. Rows labeled Baseline are score-sorted, unranked Spring-Team references with complete Spring and RobustSpring metrics; they do not affect participant standings."
             );
             note.id = `${panelId}-note`;
             const scrollHint = element(
@@ -645,11 +666,13 @@
             if (rows.length) {
                 card.append(list);
             } else {
-                const noun = allRows.length === 1 ? "team" : "teams";
+                // Several pending methods still belong to one registered team.
+                const teamCount = snapshot.teams.filter((team) => isRegisteredForTrack(team, track.key)).length;
+                const noun = teamCount === 1 ? "team" : "teams";
                 card.append(element(
                     "p",
                     "leaderboard-preview-empty",
-                    `No matched public results yet · ${allRows.length} registered ${noun}`
+                    `No complete benchmark results yet · ${teamCount} registered ${noun}`
                 ));
             }
             card.append(link);
