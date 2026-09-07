@@ -61,7 +61,7 @@ for (const path of SITE_PAGES) {
   });
 }
 
-test("Leaderboard tabs render the complete pending roster and expose live refresh", async ({ page }) => {
+test("Leaderboard tabs render the published scored and pending methods with the complete roster", async ({ page }) => {
   await page.goto("/evaluation.html");
 
   const tabs = page.getByRole("tab");
@@ -77,12 +77,40 @@ test("Leaderboard tabs render the complete pending roster and expose live refres
   const baselineRows = visiblePanel.locator("tbody tr.leaderboard-row--baseline");
   await expect(visiblePanel.locator("thead th")).toHaveCount(8);
   await expect(visiblePanel.getByRole("columnheader", { name: "Method Name" })).toBeVisible();
-  await expect(participantRows).toHaveCount(27);
-  await expect(participantRows.locator(".leaderboard-pending-badge")).toHaveCount(27);
-  await expect(participantRows.first().locator(".leaderboard-rank")).toHaveText("—");
+  // 31 Optical Flow teams produce 33 rows: KoreaU_DLmath has three methods.
+  await expect(participantRows).toHaveCount(33);
+  await expect(participantRows.locator(".leaderboard-pending-badge")).toHaveCount(32);
+  await expect(participantRows.locator(".leaderboard-method-placeholder")).toHaveCount(28);
+  await expect(participantRows.first().locator(".leaderboard-team-name")).toHaveText("VSAI");
+  await expect(participantRows.first().locator(".leaderboard-team-id")).toHaveText("RoCo-29");
+  await expect(participantRows.first().locator(".leaderboard-rank")).toHaveText("1");
   await expect(participantRows.first().locator(".rank-change")).toHaveText("— 0");
-  await expect(participantRows.first().locator(".leaderboard-score")).toHaveText("—");
-  await expect(participantRows.first().locator(".leaderboard-method-placeholder")).toHaveText("—");
+  await expect(participantRows.first().locator(".leaderboard-score")).toHaveText("1.1038");
+  await expect(participantRows.first().locator(".leaderboard-metric")).toHaveText(["1.411", "4.739"]);
+  await expect(participantRows.first().locator(".leaderboard-method")).toHaveText("Method 1");
+  await expect(participantRows.first().locator(".leaderboard-method"))
+    .toHaveAttribute("href", "https://spring-benchmark.org/474/");
+  await expect(participantRows.first().locator(".leaderboard-submitted"))
+    .toHaveAttribute("title", "2026-09-03T16:56:00.000Z");
+  const pendingRows = visiblePanel.locator("tbody tr.leaderboard-row--pending");
+  await expect(pendingRows.locator(".leaderboard-rank")).toHaveText(Array(32).fill("—"));
+  await expect(pendingRows.locator(".leaderboard-score")).toHaveText(Array(32).fill("—"));
+  for (const [teamId, teamName, names, links, clean] of [
+    ["RoCo-19", "KoreaU_DLmath", ["SEARAFT-Finetune", "WAFT", "WAFT+"], [475, 484, 488], ["2.651", "0.384", "0.364"]],
+    ["RoCo-14", "ZXUv2.0", ["CAR-WAFT"], [471], ["0.298"]]
+  ]) {
+    const teamRows = participantRows.filter({ has: page.locator(".leaderboard-team-id", { hasText: teamId }) });
+    await expect(teamRows.locator(".leaderboard-team-name")).toHaveText(Array(names.length).fill(teamName));
+    await expect(teamRows.locator(".leaderboard-method")).toHaveText(names);
+    await expect(teamRows.locator(".leaderboard-pending-badge"))
+      .toHaveText(Array(names.length).fill("Awaiting benchmark results"));
+    for (let index = 0; index < names.length; index += 1) {
+      await expect(teamRows.nth(index).locator(".leaderboard-method"))
+        .toHaveAttribute("href", `https://spring-benchmark.org/${links[index]}/`);
+      await expect(teamRows.nth(index).locator(".leaderboard-metric")).toHaveText([clean[index], "—"]);
+    }
+  }
+  await expect(participantRows.locator('a[href="https://spring-benchmark.org/483/"]')).toHaveCount(0);
   await expect(baselineRows).toHaveCount(12);
   await expect(baselineRows.locator(".leaderboard-baseline-badge")).toHaveCount(12);
   await expect(baselineRows.locator(".leaderboard-team-name"))
@@ -115,14 +143,32 @@ test("Leaderboard tabs render the complete pending roster and expose live refres
     .toHaveAttribute("title", "(Baseline) RoCo-Spring Team Baselines-Optical Flow");
 
   await tabs.nth(1).click();
-  await expect(participantRows).toHaveCount(21);
+  await expect(participantRows).toHaveCount(23);
+  await expect(participantRows.locator(".leaderboard-method-placeholder")).toHaveCount(22);
+  await expect(participantRows.locator(".leaderboard-rank")).toHaveText(Array(23).fill("—"));
+  await expect(participantRows.locator(".leaderboard-score")).toHaveText(Array(23).fill("—"));
+  const stereoPending = participantRows.filter({ has: page.locator(".leaderboard-method") });
+  await expect(stereoPending.locator(".leaderboard-team-name")).toHaveText("KoreaU_DLmath");
+  await expect(stereoPending.locator(".leaderboard-method")).toHaveText("RAFTStereo_Scale040_new");
+  await expect(stereoPending.locator(".leaderboard-method"))
+    .toHaveAttribute("href", "https://spring-benchmark.org/482/");
+  await expect(stereoPending.locator(".leaderboard-metric")).toHaveText(["1.077", "—"]);
   await expect(baselineRows).toHaveCount(7);
   await expect(baselineRows.locator(".leaderboard-score"))
     .toHaveText(["0.6884", "0.9689", "1.0830", "1.1176", "1.1783", "1.2609", "1.2792"]);
   await tabs.nth(1).press("ArrowRight");
   await expect(tabs.nth(2)).toHaveAttribute("aria-selected", "true");
   await expect(tabs.nth(2)).toBeFocused();
-  await expect(participantRows).toHaveCount(21);
+  await expect(participantRows).toHaveCount(23);
+  await expect(participantRows.locator(".leaderboard-method-placeholder")).toHaveCount(22);
+  await expect(participantRows.locator(".leaderboard-rank")).toHaveText(Array(23).fill("—"));
+  await expect(participantRows.locator(".leaderboard-score")).toHaveText(Array(23).fill("—"));
+  const scenePending = participantRows.filter({ has: page.locator(".leaderboard-method") });
+  await expect(scenePending.locator(".leaderboard-team-name")).toHaveText("KoreaU_DLmath");
+  await expect(scenePending.locator(".leaderboard-method")).toHaveText("DEFOM2K-DPFlow");
+  await expect(scenePending.locator(".leaderboard-method"))
+    .toHaveAttribute("href", "https://spring-benchmark.org/473/");
+  await expect(scenePending.locator(".leaderboard-metric")).toHaveText(["0.155", "—"]);
   await expect(baselineRows).toHaveCount(3);
   await expect(baselineRows.locator(".leaderboard-score")).toHaveText(["0.9522", "1.0478", "1.0850"]);
   await expect(baselineRows.first().locator(".leaderboard-submitted"))
@@ -133,7 +179,10 @@ test("Leaderboard tabs render the complete pending roster and expose live refres
     .toHaveAttribute("title", /RobustSpring proxy components: d1/u);
 
   await tabs.nth(3).click();
-  await expect(participantRows).toHaveCount(18);
+  await expect(participantRows).toHaveCount(20);
+  await expect(participantRows.locator(".leaderboard-method-placeholder")).toHaveCount(20);
+  await expect(participantRows.locator(".leaderboard-rank")).toHaveText(Array(20).fill("—"));
+  await expect(participantRows.locator(".leaderboard-score")).toHaveText(Array(20).fill("—"));
   await expect(baselineRows).toHaveCount(0);
   await expect(page.locator("[data-leaderboard-updated]")).not.toHaveText("Loading…");
   await expect(page.locator("#leaderboard-refresh-note")).toContainText("public Spring/RobustSpring results");
@@ -540,10 +589,18 @@ test("homepage preview does not promote alphabetically sorted pending teams", as
 
   const cards = page.locator(".leaderboard-preview-card");
   await expect(cards).toHaveCount(4);
-  await expect(page.locator(".leaderboard-preview-list")).toHaveCount(0);
-  await expect(page.locator(".leaderboard-preview-empty")).toHaveCount(4);
-  for (const card of await cards.all()) {
-    await expect(card.locator(".leaderboard-preview-empty")).toContainText("No complete benchmark results yet");
+  await expect(page.locator(".leaderboard-preview-list")).toHaveCount(1);
+  await expect(page.locator(".leaderboard-preview-empty")).toHaveCount(3);
+  const optical = page.locator('.leaderboard-preview-card[aria-labelledby="preview-optical-flow"]');
+  await expect(optical.locator(".leaderboard-preview-list li")).toHaveCount(1);
+  await expect(optical.locator(".leaderboard-preview-rank")).toHaveText("1");
+  await expect(optical.locator(".leaderboard-preview-team strong")).toHaveText("VSAI");
+  await expect(optical.locator(".leaderboard-preview-method")).toHaveText("Method 1");
+  await expect(optical.locator(".leaderboard-preview-score")).toHaveText("1.1038");
+  for (const [track, count] of [["stereo-matching", 23], ["scene-flow", 23], ["cross-task", 20]]) {
+    const card = page.locator(`.leaderboard-preview-card[aria-labelledby="preview-${track}"]`);
+    await expect(card.locator(".leaderboard-preview-empty"))
+      .toHaveText(`No complete benchmark results yet · ${count} registered teams`);
   }
 });
 
