@@ -16,12 +16,9 @@ if (timelineTable) {
         row.classList.add("timeline-row--next");
 
         const dateCell = row.querySelector("td:first-child");
-        const dateText = dateCell.textContent.trim();
-        dateCell.textContent = "";
-
         const dateLabel = document.createElement("span");
         dateLabel.className = "timeline-date-label";
-        dateLabel.textContent = dateText;
+        dateLabel.append(...dateCell.childNodes);
 
         const badge = document.createElement("span");
         badge.className = "timeline-next-badge";

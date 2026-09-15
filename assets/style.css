@@ -274,6 +274,35 @@ main,
     z-index: 1;
 }
 
+.workshop-details {
+    margin-bottom: 28px;
+    padding: 18px 22px;
+    border: 1px solid rgba(93, 124, 255, 0.35);
+    border-radius: 18px;
+    background: rgba(93, 124, 255, 0.1);
+}
+
+.workshop-details-title {
+    display: block;
+    margin-bottom: 6px;
+    color: #3047e8;
+    font-size: 0.85rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+
+.workshop-details-items {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 24px;
+    font-weight: 750;
+}
+
+.workshop-details-items small {
+    font-size: 0.85em;
+    font-weight: 500;
+}
+
 .eyebrow {
     margin-bottom: 14px;
     color: var(--accent);
@@ -1268,6 +1297,40 @@ table.schedule-table {
     letter-spacing: 0.07em;
     text-transform: uppercase;
     white-space: nowrap;
+}
+
+.paper-submission-date {
+    white-space: nowrap;
+}
+
+.new-deadline-badge {
+    display: inline-block;
+    margin-left: 10px;
+    padding: 3px 9px;
+    border: 1px solid #9ed9bc;
+    border-radius: 999px;
+    background: #d9f8e8;
+    color: #14613d;
+    font-size: 0.72rem;
+    font-weight: 850;
+    letter-spacing: 0.07em;
+    white-space: nowrap;
+    animation: new-deadline-pulse 1.8s ease-in-out infinite;
+}
+
+@keyframes new-deadline-pulse {
+    0%, 100% {
+        transform: scale(0.94);
+    }
+    50% {
+        transform: scale(1.06);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .new-deadline-badge {
+        animation: none;
+    }
 }
 
 th,
