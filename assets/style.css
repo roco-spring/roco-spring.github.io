@@ -274,33 +274,194 @@ main,
     z-index: 1;
 }
 
+.hero-card>h1 {
+    font-size: clamp(2rem, 6vw, 4.5rem);
+    text-wrap: balance;
+}
+
 .workshop-details {
-    margin-bottom: 28px;
-    padding: 18px 22px;
-    border: 1px solid rgba(93, 124, 255, 0.35);
-    border-radius: 18px;
-    background: rgba(93, 124, 255, 0.1);
+    isolation: isolate;
+    overflow: hidden;
+    margin: 30px 0;
+    padding: 22px 28px 26px;
+    border: 1px solid transparent;
+    border-radius: 22px;
+    color: #f5f8ff;
+    background:
+        linear-gradient(115deg, #0b1730, #14234b 65%, #13394a) padding-box,
+        linear-gradient(110deg, #7b90ff, #62e7ff 55%, #a6b4ff) border-box;
+    box-shadow: 0 12px 30px rgba(12, 28, 64, 0.2), 0 0 24px rgba(93, 124, 255, 0.12);
+}
+
+.workshop-details::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    background: radial-gradient(circle, rgba(144, 203, 255, 0.18) 1px, transparent 1.5px) 12px 12px / 22px 22px;
+    pointer-events: none;
+}
+
+.workshop-details-heading {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 18px;
+}
+
+.workshop-correspondence {
+    flex: 0 0 52px;
+    width: 52px;
+    height: 28px;
+    overflow: visible;
+    pointer-events: none;
+}
+
+.workshop-correspondence path {
+    fill: none;
+    stroke: #92b5f9;
+    stroke-width: 1.2;
+    stroke-dasharray: 4 5;
+    animation: workshop-correspondence-flow 4s linear infinite;
+}
+
+.workshop-correspondence-source {
+    fill: #8b9fff;
+    stroke: rgba(139, 159, 255, 0.2);
+    stroke-width: 7px;
+}
+
+.workshop-correspondence-target {
+    fill: #65e5f5;
+    stroke: rgba(101, 229, 245, 0.2);
+    stroke-width: 7px;
 }
 
 .workshop-details-title {
-    display: block;
-    margin-bottom: 6px;
-    color: #3047e8;
     font-size: 0.85rem;
-    letter-spacing: 0.06em;
+    font-weight: 850;
+    letter-spacing: 0.1em;
     text-transform: uppercase;
 }
 
 .workshop-details-items {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px 24px;
-    font-weight: 750;
+    display: grid;
+    grid-template-columns: 1.2fr 0.85fr 1fr;
+    gap: 24px;
+    margin: 0;
 }
 
-.workshop-details-items small {
-    font-size: 0.85em;
+.workshop-details-item {
+    --workshop-point: #8b9fff;
+    position: relative;
+    min-width: 0;
+    padding-top: 13px;
+    border-top: 1px solid rgba(160, 197, 255, 0.25);
+}
+
+.workshop-details-item:nth-child(2) {
+    --workshop-point: #b8a4ff;
+}
+
+.workshop-details-item:nth-child(3) {
+    --workshop-point: #65e5f5;
+}
+
+.workshop-details-item::before {
+    content: "";
+    position: absolute;
+    top: -4px;
+    left: 0;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--workshop-point);
+    box-shadow: 0 0 0 4px rgba(157, 189, 255, 0.1), 0 0 12px var(--workshop-point);
+}
+
+.workshop-details-item dt {
+    margin-bottom: 5px;
+    color: #b8c8e8;
+    font-size: 0.7rem;
+    font-weight: 750;
+    letter-spacing: 0.13em;
+    text-transform: uppercase;
+}
+
+.workshop-details-item dd {
+    margin: 0;
+    font-size: clamp(1.1rem, 1.8vw, 1.4rem);
+    font-weight: 800;
+    line-height: 1.25;
+    letter-spacing: -0.025em;
+}
+
+.workshop-details-item small {
+    display: block;
+    margin-top: 6px;
+    color: #b8c8e8;
+    font-size: 0.76rem;
     font-weight: 500;
+    letter-spacing: 0;
+}
+
+@keyframes workshop-correspondence-flow {
+    to {
+        stroke-dashoffset: -36;
+    }
+}
+
+@media (max-width: 900px) {
+    .workshop-details {
+        padding: 20px;
+    }
+
+    .workshop-details-items {
+        grid-template-columns: 1fr;
+        gap: 18px;
+    }
+
+    .workshop-details-item {
+        display: grid;
+        grid-template-columns: 76px minmax(0, 1fr);
+        align-items: baseline;
+        gap: 12px;
+    }
+}
+
+@media (max-width: 380px) {
+    .hero-card>h1 {
+        font-size: 1.7rem;
+    }
+
+    .workshop-details {
+        margin: 22px 0;
+        padding: 16px;
+    }
+
+    .workshop-details-heading {
+        gap: 10px;
+    }
+
+    .workshop-correspondence {
+        flex-basis: 36px;
+        width: 36px;
+    }
+
+    .workshop-details-item {
+        grid-template-columns: 1fr;
+        gap: 0;
+    }
+
+    .workshop-details-items {
+        gap: 14px;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .workshop-correspondence path {
+        animation: none;
+    }
 }
 
 .eyebrow {
