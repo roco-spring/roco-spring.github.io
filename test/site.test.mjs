@@ -73,112 +73,105 @@ test("Leaderboard is the consistent public page name", async () => {
     assert.doesNotMatch(index, /href="evaluation\.html">Evaluation<\/a>/u);
 });
 
-test("published leaderboard snapshot contains the exact public team roster", async () => {
+test("published leaderboard snapshot contains the frozen final roster", async () => {
     const snapshot = JSON.parse(await source("assets/leaderboard-data.json"));
     const expectedTeams = new Map([
-        ["RoCo-8", ["JTS@UW", ["optical-flow", "exploration"]]],
-        ["RoCo-9", ["Nitansh Jain", ["optical-flow", "stereo-matching"]]],
-        ["RoCo-10", ["iktsuarpok", ["optical-flow"]]],
-        ["RoCo-11", ["MLDA@EEE", ["scene-flow"]]],
-        ["RoCo-12", ["aneev", ["optical-flow", "stereo-matching", "scene-flow"]]],
-        ["RoCo-13", ["Abdulrahman M.Saadeldin", ["optical-flow", "stereo-matching", "scene-flow", "exploration"]]],
         ["RoCo-14", ["ZXUv2.0", ["optical-flow"]]],
-        ["RoCo-15", ["Drivers", ["optical-flow", "stereo-matching"]]],
-        ["RoCo-16", ["Swarm", ["optical-flow", "stereo-matching", "scene-flow", "exploration"]]],
-        ["RoCo-17", ["BuildDiff", ["optical-flow", "stereo-matching", "scene-flow", "exploration"]]],
-        ["RoCo-18", ["KOGUMA Lab", ["optical-flow", "stereo-matching", "scene-flow"]]],
         ["RoCo-19", ["KoreaU_DLmath", ["optical-flow", "stereo-matching", "scene-flow", "exploration"]]],
-        ["RoCo-20", ["DDEVS", ["stereo-matching"]]],
-        ["RoCo-21", ["mau5", ["optical-flow", "exploration"]]],
-        ["RoCo-22", ["cactus8603", ["optical-flow", "stereo-matching", "scene-flow", "exploration"]]],
+        ["RoCo-22", ["cactus8603", ["optical-flow", "stereo-matching", "exploration"]]],
         ["RoCo-23", ["PlayStation", ["optical-flow"]]],
-        ["RoCo-24", ["E-lab", ["optical-flow", "stereo-matching", "scene-flow", "exploration"]]],
-        ["RoCo-25", ["HexWarrior", ["optical-flow", "stereo-matching", "scene-flow", "exploration"]]],
-        ["RoCo-26", ["Batman", ["optical-flow", "stereo-matching", "scene-flow", "exploration"]]],
-        ["RoCo-27", ["Mysterious Power of the East", ["optical-flow", "exploration"]]],
-        ["RoCo-28", ["Norisk", ["scene-flow"]]],
         ["RoCo-29", ["VSAI", ["optical-flow"]]],
-        ["RoCo-30", ["acvlab", ["optical-flow", "stereo-matching", "scene-flow", "exploration"]]],
-        ["RoCo-31", ["e-motion AI", ["scene-flow", "exploration"]]],
-        ["RoCo-32", ["XLR8", ["optical-flow", "stereo-matching", "scene-flow", "exploration"]]],
-        ["RoCo-33", ["Epoch Labs", ["optical-flow", "stereo-matching", "scene-flow", "exploration"]]],
-        ["RoCo-34", ["Pamboo", ["optical-flow", "stereo-matching", "scene-flow", "exploration"]]],
-        ["RoCo-35", ["Team'5", ["optical-flow", "stereo-matching", "scene-flow", "exploration"]]],
-        ["RoCo-36", ["c-mike", ["optical-flow", "stereo-matching", "scene-flow", "exploration"]]],
-        ["RoCo-37", ["Innovators", ["optical-flow", "stereo-matching", "scene-flow", "exploration"]]],
-        ["RoCo-38", ["Four And Furios", ["optical-flow", "stereo-matching", "scene-flow", "exploration"]]],
-        ["RoCo-39", ["PocketChange", ["exploration"]]],
-        ["RoCo-40", ["shashank test", ["optical-flow", "exploration"]]],
-        ["RoCo-41", ["batman", ["optical-flow", "exploration"]]],
-        ["RoCo-42", ["Geodesic Physical Intelligence", ["optical-flow", "stereo-matching", "scene-flow", "exploration"]]],
-        ["RoCo-43", ["gun-py", ["optical-flow", "stereo-matching", "scene-flow", "exploration"]]]
+        ["RoCo-67", ["Anonymous", ["stereo-matching", "exploration"]]]
     ]);
-    const scoredResult = {
-        rankChange: 0,
-        score: 1.103783,
-        springMetric: 1.411,
-        robustSpringMetric: 4.739,
-        springTerm: 1.421662,
-        robustSpringTerm: 0.785904,
-        submittedAt: "2026-09-03T16:56:00.000Z",
-        benchmarkMethod: "Method 1",
-        benchmarkUrl: "https://spring-benchmark.org/474/",
-        matchBasis: "team-id"
+    const result = (fields) => ({ rankChange: 0, matchBasis: "team-id", ...fields });
+    const opticalFlow = {
+        "RoCo-14": {
+            current: result({
+                score: 0.307844, springMetric: 0.299, robustSpringMetric: 1.896,
+                springTerm: 0.301259, robustSpringTerm: 0.314428,
+                submittedAt: "2026-09-08T00:19:00.000Z", benchmarkMethod: "Test",
+                benchmarkUrl: "https://spring-benchmark.org/489/"
+            }),
+            history: [result({
+                score: 0.306345, springMetric: 0.298, robustSpringMetric: 1.884,
+                springTerm: 0.300252, robustSpringTerm: 0.312438,
+                submittedAt: "2026-08-27T22:35:00.000Z", benchmarkMethod: "CAR-WAFT",
+                benchmarkUrl: "https://spring-benchmark.org/471/"
+            })]
+        },
+        "RoCo-19": {
+            current: result({
+                score: 0.429395, springMetric: 0.364, robustSpringMetric: 2.967,
+                springTerm: 0.366751, robustSpringTerm: 0.49204,
+                submittedAt: "2026-09-07T06:10:00.000Z", benchmarkMethod: "WAFT+",
+                benchmarkUrl: "https://spring-benchmark.org/488/"
+            })
+        },
+        "RoCo-22": {
+            current: result({
+                score: 0.363957, springMetric: 0.388, robustSpringMetric: 2.032,
+                springTerm: 0.390932, robustSpringTerm: 0.336982,
+                submittedAt: "2026-09-09T21:47:00.000Z", benchmarkMethod: "PairBridge",
+                benchmarkUrl: "https://spring-benchmark.org/492/"
+            })
+        },
+        "RoCo-23": {
+            current: result({
+                score: 0.211795, springMetric: 0.268, robustSpringMetric: 0.926,
+                springTerm: 0.270025, robustSpringTerm: 0.153566,
+                submittedAt: "2026-09-14T08:39:00.000Z", benchmarkMethod: "SPEAR-L-K1",
+                benchmarkUrl: "https://spring-benchmark.org/517/"
+            })
+        },
+        "RoCo-29": {
+            current: result({
+                score: 1.103783, springMetric: 1.411, robustSpringMetric: 4.739,
+                springTerm: 1.421662, robustSpringTerm: 0.785904,
+                submittedAt: "2026-09-03T16:56:00.000Z", benchmarkMethod: "Method 1",
+                benchmarkUrl: "https://spring-benchmark.org/474/"
+            })
+        }
     };
-    // These source rows have clean metrics but no RobustSpring result yet.
-    // Exact objects guard both attribution and the public-only data boundary.
-    const expectedPending = new Map([
-        ["RoCo-14", {
-            "optical-flow": [{
-                benchmarkMethod: "CAR-WAFT",
-                benchmarkUrl: "https://spring-benchmark.org/471/",
-                submittedAt: "2026-08-27T22:35:00.000Z",
-                matchBasis: "team-id",
-                springMetric: 0.298,
-                robustSpringMetric: null
-            }]
-        }],
-        ["RoCo-19", {
-            "optical-flow": [{
-                benchmarkMethod: "SEARAFT-Finetune",
-                benchmarkUrl: "https://spring-benchmark.org/475/",
-                submittedAt: "2026-09-04T10:49:00.000Z",
-                matchBasis: "team-id",
-                springMetric: 2.651,
-                robustSpringMetric: null
-            }, {
-                benchmarkMethod: "WAFT",
-                benchmarkUrl: "https://spring-benchmark.org/484/",
-                submittedAt: "2026-09-07T03:15:00.000Z",
-                matchBasis: "team-id",
-                springMetric: 0.384,
-                robustSpringMetric: null
-            }, {
-                benchmarkMethod: "WAFT+",
-                benchmarkUrl: "https://spring-benchmark.org/488/",
-                submittedAt: "2026-09-07T06:10:00.000Z",
-                matchBasis: "team-id",
-                springMetric: 0.364,
-                robustSpringMetric: null
-            }],
-            "stereo-matching": [{
-                benchmarkMethod: "RAFTStereo_Scale040_new",
-                benchmarkUrl: "https://spring-benchmark.org/482/",
-                submittedAt: "2026-09-06T06:15:00.000Z",
-                matchBasis: "team-id",
-                springMetric: 1.077,
-                robustSpringMetric: null
-            }],
-            "scene-flow": [{
-                benchmarkMethod: "DEFOM2K-DPFlow",
-                benchmarkUrl: "https://spring-benchmark.org/473/",
-                submittedAt: "2026-09-03T04:01:00.000Z",
-                matchBasis: "team-id",
-                springMetric: 0.154587,
-                robustSpringMetric: null
-            }]
-        }]
-    ]);
+    opticalFlow["RoCo-14"].history.push(opticalFlow["RoCo-14"].current);
+    for (const teamId of ["RoCo-19", "RoCo-22", "RoCo-23", "RoCo-29"]) {
+        opticalFlow[teamId].history = [opticalFlow[teamId].current];
+    }
+    const stereo = {
+        "RoCo-19": result({
+            score: 0.117581, springMetric: 0.457, robustSpringMetric: 1.898,
+            springTerm: 0.132291, robustSpringTerm: 0.10287,
+            submittedAt: "2026-09-20T02:12:00.000Z", benchmarkMethod: "CorrDrop-Stereo",
+            benchmarkUrl: "https://spring-benchmark.org/522/"
+        }),
+        "RoCo-22": result({
+            score: 0.145595, springMetric: 0.471, robustSpringMetric: 2.857,
+            springTerm: 0.136344, robustSpringTerm: 0.154847,
+            submittedAt: "2026-09-08T07:13:00.000Z", benchmarkMethod: "StableBridge",
+            benchmarkUrl: "https://spring-benchmark.org/490/"
+        }),
+        "RoCo-67": {
+            current: result({
+                score: 0.136734, springMetric: 0.474, robustSpringMetric: 2.514,
+                springTerm: 0.137212, robustSpringTerm: 0.136256,
+                submittedAt: "2026-10-01T07:02:00.000Z", benchmarkMethod: "M03",
+                benchmarkUrl: "https://spring-benchmark.org/531/"
+            }),
+            earlier: result({
+                score: 0.14695, springMetric: 0.471, robustSpringMetric: 2.907,
+                springTerm: 0.136344, robustSpringTerm: 0.157557,
+                submittedAt: "2026-10-01T06:01:00.000Z", benchmarkMethod: "M02",
+                benchmarkUrl: "https://spring-benchmark.org/530/"
+            })
+        }
+    };
+    const sceneFlow = result({
+        score: 0.241302, springMetric: 0.105324, robustSpringMetric: 0.377281,
+        springTerm: 0.105324, robustSpringTerm: 0.377281,
+        submittedAt: "2026-09-14T10:44:00.000Z", benchmarkMethod: "Q4-Independent",
+        benchmarkUrl: "https://spring-benchmark.org/518/",
+        springComponents: { d1: 0.568, d2: 0.836, flow: 0.328 },
+        robustSpringComponents: { d1: 4.408, d2: 4.761, flow: 2.304 }
+    });
 
     assert.deepEqual(Object.keys(snapshot).sort(), [
         "baselines", "schemaVersion", "scoringConvention", "sourceLabel",
@@ -186,8 +179,12 @@ test("published leaderboard snapshot contains the exact public team roster", asy
     ]);
     assert.equal(snapshot.schemaVersion, 2);
     assert.equal(snapshot.scoringConvention, "organizer-approved-additive-proxy");
-    assert.equal(snapshot.syncStatus, "static-fallback");
-    assert.equal(snapshot.sourceLabel, "Live Spring and RobustSpring public benchmark snapshot");
+    assert.equal(snapshot.syncStatus, "final");
+    assert.equal(
+        snapshot.sourceLabel,
+        "Final leaderboard frozen at October 1, 2026, 23:59 Anywhere on Earth"
+    );
+    assert.equal(snapshot.updatedAt, "2026-10-02T11:59:00.000Z");
     assert.equal(new Date(snapshot.updatedAt).toISOString(), snapshot.updatedAt);
     assert.deepEqual(snapshot.baselines, {
         "optical-flow": {
@@ -211,31 +208,74 @@ test("published leaderboard snapshot contains the exact public team roster", asy
     });
     assert.equal(snapshot.teams.length, expectedTeams.size);
     assert.equal(new Set(snapshot.teams.map((team) => team.teamId)).size, expectedTeams.size);
+    const cutoff = Date.parse("2026-10-02T12:00:00.000Z");
+    const serialized = JSON.stringify(snapshot);
+    for (const excluded of ["SPEAR-L-K3", "/521/", "/536/", "/539/"]) {
+        assert.equal(serialized.includes(excluded), false, excluded);
+    }
     for (const team of snapshot.teams) {
         const expected = expectedTeams.get(team.teamId);
         assert.ok(expected, team.teamId);
         assert.equal(team.teamName, expected[0], team.teamId);
         assert.deepEqual(team.registeredTracks, expected[1], team.teamId);
-        const expectedResults = team.teamId === "RoCo-29" ? { "optical-flow": scoredResult } : {};
-        const expectedHistory = team.teamId === "RoCo-29" ? { "optical-flow": [scoredResult] } : {};
-        assert.deepEqual(team.results, expectedResults, team.teamId);
-        assert.deepEqual(team.submissionHistory, expectedHistory, team.teamId);
-        assert.deepEqual(team.pendingSubmissions, expectedPending.get(team.teamId), team.teamId);
+        assert.equal(team.pendingSubmissions, undefined, team.teamId);
         assert.deepEqual(Object.keys(team).sort(), [
-            ...(expectedPending.has(team.teamId) ? ["pendingSubmissions"] : []),
-            "registeredTracks",
-            "results",
-            "submissionHistory",
-            "teamId",
-            "teamName"
+            "registeredTracks", "results", "submissionHistory", "teamId", "teamName"
         ]);
+        const entries = [
+            ...Object.values(team.results),
+            ...Object.values(team.submissionHistory).flat()
+        ];
+        assert.ok(entries.length > 0, team.teamId);
+        for (const entry of entries) {
+            assert.ok(Date.parse(entry.submittedAt) < cutoff, entry.benchmarkUrl);
+            assert.equal(Number.isFinite(entry.score), true, entry.benchmarkUrl);
+        }
     }
+    assert.deepEqual(snapshot.teams.map((team) => team.teamId), [
+        "RoCo-67", "RoCo-22", "RoCo-19", "RoCo-23", "RoCo-29", "RoCo-14"
+    ]);
+    const byId = new Map(snapshot.teams.map((team) => [team.teamId, team]));
+    assert.deepEqual(byId.get("RoCo-14").results["optical-flow"], opticalFlow["RoCo-14"].current);
+    assert.deepEqual(byId.get("RoCo-14").submissionHistory["optical-flow"], opticalFlow["RoCo-14"].history);
+    for (const teamId of ["RoCo-19", "RoCo-22", "RoCo-23", "RoCo-29"]) {
+        assert.deepEqual(byId.get(teamId).results["optical-flow"], opticalFlow[teamId].current, teamId);
+        assert.deepEqual(
+            byId.get(teamId).submissionHistory["optical-flow"],
+            opticalFlow[teamId].history,
+            teamId
+        );
+    }
+    assert.deepEqual(byId.get("RoCo-19").results["stereo-matching"], stereo["RoCo-19"]);
+    assert.deepEqual(byId.get("RoCo-19").submissionHistory["stereo-matching"], [stereo["RoCo-19"]]);
+    assert.deepEqual(byId.get("RoCo-22").results["stereo-matching"], stereo["RoCo-22"]);
+    assert.deepEqual(byId.get("RoCo-22").submissionHistory["stereo-matching"], [stereo["RoCo-22"]]);
+    assert.deepEqual(byId.get("RoCo-67").results["stereo-matching"], stereo["RoCo-67"].current);
+    assert.deepEqual(byId.get("RoCo-67").submissionHistory["stereo-matching"], [
+        stereo["RoCo-67"].earlier,
+        stereo["RoCo-67"].current
+    ]);
+    assert.deepEqual(byId.get("RoCo-19").results["scene-flow"], sceneFlow);
+    assert.deepEqual(byId.get("RoCo-19").submissionHistory["scene-flow"], [sceneFlow]);
+    assert.deepEqual(byId.get("RoCo-19").results["cross-task"], {
+        rankChange: 0,
+        score: 0.262759,
+        springMetric: 0.201455,
+        robustSpringMetric: 0.324064,
+        springTerm: 0.201455,
+        robustSpringTerm: 0.324064,
+        submittedAt: "2026-09-20T02:12:00.000Z",
+        benchmarkMethod: "Combined quantitative tracks",
+        benchmarkUrl: "https://spring-benchmark.org/",
+        matchBasis: "cross-task"
+    });
 
     const crossTaskTeams = snapshot.teams.filter((team) =>
         ["optical-flow", "stereo-matching", "scene-flow"]
             .every((track) => team.registeredTracks.includes(track))
     );
-    assert.equal(crossTaskTeams.length, 20);
+    assert.equal(crossTaskTeams.length, 1);
+    assert.equal(crossTaskTeams[0].teamId, "RoCo-19");
 });
 
 test("leaderboard baselines are per-method additive-proxy medians", async () => {
@@ -295,24 +335,23 @@ test("leaderboard UI is data-driven, documents the additive proxy, and is wired 
 
     assert.ok(evaluation.indexOf('id="leaderboards"') < evaluation.indexOf('<div class="eyebrow">Metric</div>'));
     assert.match(evaluation, /data-leaderboard-root data-mode="full"/u);
-    assert.match(evaluation, /data-leaderboard-refresh/u);
-    assert.match(evaluation, /class="leaderboard-refresh-status" role="status"/u);
-    assert.doesNotMatch(evaluation, /class="visually-hidden"[^>]*data-leaderboard-refresh-status/u);
-    assert.match(evaluation, /Last updated:/u);
-    assert.match(evaluation, /latest registered-team roster and public Spring\/RobustSpring results/u);
+    assert.doesNotMatch(evaluation, /data-leaderboard-refresh/u);
+    assert.doesNotMatch(evaluation, /leaderboard-live\.js/u);
+    assert.doesNotMatch(index, /leaderboard-live\.js/u);
+    assert.match(evaluation, /Freeze instant:/u);
+    assert.match(evaluation, /October 1, 2026, 23:59 Anywhere on Earth/u);
+    assert.match(evaluation, /SPEAR-L-K3/u);
     assert.match(evaluation, /exact RoCo team ID first[\s\S]{0,220}unique normalized team-name\s+substring/u);
     assert.match(evaluation, /E<sub>R,proxy<\/sub> = E<sub>S<\/sub> \+ &Delta;/u);
     assert.match(evaluation, /not presented as an exact corrupted-input[\s\S]{0,30}ground-truth measurement/u);
+    assert.match(index, /<h2 id="winners-heading">Final Challenge Winners<\/h2>/u);
+    assert.match(index, /RbS-Score 0\.211795/u);
     assert.match(index, /<h2 id="leaderboard-preview-heading">Top Three by Track<\/h2>/u);
     assert.match(index, /data-leaderboard-root data-mode="preview"/u);
     assert.match(index, /Open full leaderboard/u);
     assert.match(index, /assets\/leaderboard\.js/u);
     assert.match(evaluation, /assets\/leaderboard\.js/u);
-    assert.match(index, /assets\/leaderboard-live\.js/u);
-    assert.match(evaluation, /assets\/leaderboard-live\.js/u);
-    assert.match(liveAdapter, /https:\/\/www\.recaptcha\.net\/recaptcha\/enterprise\.js\?render=explicit/u);
-    assert.match(liveAdapter, /loadGlobalRecaptcha\(\)\s*\.then\(\(\) => Promise\.all/u);
-    assert.doesNotMatch(liveAdapter, /www\.google\.com\/recaptcha\/enterprise\.js/u);
+    assert.match(script, /The final published standings are visible\./u);
 
     for (const label of ["Optical Flow", "Stereo Matching", "Scene Flow", "Cross-Task"]) {
         assert.ok(script.includes(`label: "${label}"`), label);
@@ -393,8 +432,6 @@ test("leaderboard UI is data-driven, documents the additive proxy, and is wired 
     assert.match(evaluation, /most recently submitted complete method/u);
     assert.match(evaluation, /Lower organizer-issued numeric team ID/u);
     assert.match(evaluation, /Lower immutable numeric Spring result ID/u);
-    assert.match(evaluation, /Automatic matches are provisional/u);
-    assert.match(evaluation, /same method,[\s\S]{0,100}checkpoint,[\s\S]{0,100}clean outputs/u);
     assert.match(evaluation, /separate RobustSpring upload time is not exposed publicly/u);
 });
 
@@ -423,8 +460,8 @@ test("site headings and named resources use consistent capitalization", async ()
 test("homepage and Participate registration placeholders link to the live page", async () => {
     const index = await source("index.html");
     const participate = await source("participate.html");
-    assert.match(index, /href="team-registration\.html"[\s\S]{0,180}Register or manage your team/u);
-    assert.match(participate, /href="team-registration\.html"[\s\S]{0,120}Register/u);
+    assert.match(index, /href="team-registration\.html"[\s\S]{0,180}Existing teams can review their registration/u);
+    assert.match(participate, /href="team-registration\.html"[\s\S]{0,160}Review an existing/u);
 });
 
 test("the devkit is the published GitHub resource and support destinations are active", async () => {
@@ -630,7 +667,8 @@ test("participation calls to action have a rainbow invitation ring and navigatio
     const chrome = await source("assets/site-chrome.html");
     const style = await source("assets/style.css");
 
-    assert.match(index, /class="button primary participate-cta" href="participate\.html"/u);
+    assert.match(index, /class="button primary" href="evaluation\.html#winners">Final results<\/a>/u);
+    assert.match(index, /class="button secondary participate-cta" href="participate\.html"/u);
     assert.match(participate, /class="button primary compact participate-cta"/u);
     assert.match(registration, /class="button primary form-submit participate-cta"/u);
     assert.match(chrome, /<nav id="site-nav" class="nav"/u);
@@ -668,7 +706,7 @@ test("OpenReview submission calls to action are branded, safe, and present at al
         assert.match(html, /target="_blank" rel="noopener noreferrer"/u, location);
         assert.match(
             html,
-            /<span class="openreview-wordmark">OpenReview<\/span>\s*<span>Submission<\/span>/u,
+            /<span class="openreview-wordmark">OpenReview<\/span>\s*<span>Archive<\/span>/u,
             location
         );
     }
@@ -684,7 +722,7 @@ test("OpenReview submission calls to action are branded, safe, and present at al
 
 test("registration page includes the exact introduction and required controls", async () => {
     const html = (await source("team-registration.html")).replace(/\s+/gu, " ");
-    assert.ok(html.includes("Register a team for the RoCo-Spring challenge. The person completing this registration must be one of the team members listed below. At least one competition track and one team member are required."));
+    assert.ok(html.includes("The RoCo-Spring challenge has concluded. Existing teams can sign in to review their registration. The form below remains the historical registration record: the person completing a registration must be one of the team members listed below, and at least one competition track and one team member are required."));
     assert.match(html, /Register a new team/u);
     assert.match(html, /Sign in to an existing team/u);
     assert.match(html, /id="add-registration-member"/u);

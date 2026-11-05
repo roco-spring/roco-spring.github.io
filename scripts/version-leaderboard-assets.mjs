@@ -10,7 +10,6 @@ const ROOT = path.resolve(import.meta.dirname, "..");
 export const LEADERBOARD_PAGES = Object.freeze(["index.html", "evaluation.html"]);
 export const LEADERBOARD_ASSETS = Object.freeze([
     "assets/leaderboard.js",
-    "assets/leaderboard-live.js",
     "assets/style.css"
 ]);
 
@@ -20,8 +19,8 @@ export function fingerprintAsset(bytes) {
 
 export function versionLeaderboardHtml(html, versions) {
     const found = new Set();
-    // Only these three src/href values change. Registration, other resources,
-    // page content, and existing HTML formatting retain their exact bytes.
+    // Only published leaderboard src/href values change. Registration, other
+    // resources, page content, and existing HTML formatting retain their exact bytes.
     const versioned = html.replace(
         /(\b(?:href|src)\s*=\s*)(["'])(assets\/(?:leaderboard(?:-live)?\.js|style\.css))(?:\?[^"'#]*)?(#[^"']*)?\2/gu,
         (_match, attribute, quote, asset, fragment = "") => {

@@ -6,8 +6,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>RoCo-Spring: The Robust Correspondence Challenge</title>
     <meta name="description"
-        content="RoCo-Spring is a NeurIPS 2026 challenge on robust dense correspondence under realistic distribution shifts.">
-    <link rel="stylesheet" href="assets/style.css?v=27fb6ae34894">
+        content="Final results for RoCo-Spring, the concluded NeurIPS 2026 challenge on robust dense correspondence.">
+    <link rel="stylesheet" href="assets/style.css?v=be7d22599424">
     <script src="assets/site-layout.js" defer></script>
 </head>
 
@@ -53,8 +53,8 @@
                 </aside>
 
                 <p class="hero-subtitle">
-                    A NeurIPS 2026 challenge on robust dense correspondence under realistic distribution shifts,
-                    covering Optical Flow, Stereo Matching, and Scene Flow.
+                    The NeurIPS 2026 challenge on robust dense correspondence has concluded.
+                    Final Optical Flow, Stereo Matching, and Scene Flow standings are frozen.
                 </p>
 
                 <div class="hero-body">
@@ -73,12 +73,13 @@
                 </div>
 
                 <div class="hero-actions">
-                    <a class="button primary participate-cta" href="participate.html">Participate</a>
+                    <a class="button primary" href="evaluation.html#winners">Final results</a>
+                    <a class="button secondary participate-cta" href="participate.html">Challenge archive</a>
                     <a class="button openreview"
                         href="https://openreview.net/group?id=NeurIPS.cc/2026/Workshop/RoCo-Spring"
                         target="_blank" rel="noopener noreferrer">
                         <span class="openreview-wordmark">OpenReview</span>
-                        <span>Submission</span>
+                        <span>Archive</span>
                     </a>
                     <a class="button secondary" href="evaluation.html">Leaderboard</a>
                     <a class="button starter-kit" href="https://github.com/hmorimitsu/roco-spring-devkit"
@@ -97,14 +98,56 @@
                         <span>Optical Flow · Stereo Matching · Scene Flow · Exploration Track</span>
                     </a>
                     <a class="status-card" href="team-registration.html">
-                        <strong>Registration</strong>
-                        <span>Register or manage your team</span>
+                        <strong>Teams</strong>
+                        <span>Existing teams can review their registration</span>
                     </a>
                     <a class="status-card" href="evaluation.html#leaderboards">
                         <strong>Leaderboard</strong>
-                        <span>View current standings</span>
+                        <span>View final standings</span>
                     </a>
                 </div>
+            </div>
+        </section>
+
+        <section class="section" id="winners" aria-labelledby="winners-heading">
+            <div class="section-heading">
+                <div class="eyebrow">Winners</div>
+                <h2 id="winners-heading">Final Challenge Winners</h2>
+                <p>
+                    Each winner is the complete scored method with the lowest RbS-Score.
+                    Standings were frozen at October 1, 2026, 23:59 Anywhere on Earth.
+                </p>
+            </div>
+
+            <div class="card-grid four">
+                <article class="track-card winner-card">
+                    <span class="track-card-badge">Optical Flow</span>
+                    <h3>PlayStation</h3>
+                    <p>RoCo-23 · <a href="https://spring-benchmark.org/517/" target="_blank"
+                            rel="noopener noreferrer">SPEAR-L-K1</a></p>
+                    <p class="winner-score">RbS-Score 0.211795</p>
+                </article>
+                <article class="track-card winner-card">
+                    <span class="track-card-badge">Stereo Matching</span>
+                    <h3>KoreaU_DLmath</h3>
+                    <p>RoCo-19 · <a href="https://spring-benchmark.org/522/" target="_blank"
+                            rel="noopener noreferrer">CorrDrop-Stereo</a></p>
+                    <p class="winner-score">RbS-Score 0.117581</p>
+                </article>
+                <article class="track-card winner-card">
+                    <span class="track-card-badge">Scene Flow</span>
+                    <h3>KoreaU_DLmath</h3>
+                    <p>RoCo-19 · <a href="https://spring-benchmark.org/518/" target="_blank"
+                            rel="noopener noreferrer">Q4-Independent</a></p>
+                    <p class="winner-score">RbS-Score 0.241302</p>
+                </article>
+                <article class="track-card winner-card">
+                    <span class="track-card-badge">Cross-Task</span>
+                    <h3>KoreaU_DLmath</h3>
+                    <p>RoCo-19 · <a href="evaluation.html?track=cross-task#leaderboards">Combined quantitative
+                            tracks</a></p>
+                    <p class="winner-score">RbS-Score 0.262759</p>
+                </article>
             </div>
         </section>
 
@@ -114,15 +157,15 @@
                     <div class="eyebrow">Leaderboard Preview</div>
                     <h2 id="leaderboard-preview-heading">Top Three by Track</h2>
                     <p>
-                        A quick view of the latest registered teams and live public benchmark scores.
-                        Registered teams without scores remain visible on the full leaderboard.
+                        The best complete methods in the frozen final leaderboard.
+                        Teams without a complete score are not included.
                     </p>
                 </div>
                 <a class="button secondary" href="evaluation.html#leaderboards">Open full leaderboard</a>
             </div>
 
             <p class="leaderboard-preview-updated">
-                Snapshot updated <time data-leaderboard-updated>Loading…</time>
+                Frozen at <time data-leaderboard-updated>Loading…</time>
             </p>
             <div class="leaderboard-loading" data-leaderboard-root data-mode="preview" aria-live="polite">
                 Loading published standings…
@@ -285,7 +328,7 @@
                 </table>
             </div>
 
-            <p class="tentative-note">All dates are tentative and subject to change.</p>
+            <p class="tentative-note">The quantitative challenge has concluded and its leaderboard is frozen. The workshop is on December 12, 2026.</p>
         </section>
 
         <section class="section">
@@ -587,8 +630,7 @@
     <script src="assets/flow.js"></script>
     <script src="assets/lightbox.js"></script>
     <script src="assets/timeline.js?v=f7339b1bec9f"></script>
-    <script src="assets/leaderboard.js?v=ff4fd615ead5"></script>
-    <script type="module" src="assets/leaderboard-live.js?v=e15c6c970e7f"></script>
+    <script src="assets/leaderboard.js?v=41e98ae2f307"></script>
 </body>
 
 </html>

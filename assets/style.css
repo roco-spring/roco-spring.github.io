@@ -4023,10 +4023,17 @@ details p {
     color: rgba(255, 255, 255, 0.52);
 }
 
-.leaderboard-refresh-note {
+.leaderboard-refresh-note,
+.leaderboard-freeze-note {
     margin: -10px 0 16px;
     color: rgba(255, 255, 255, 0.6);
     font-size: 0.82rem;
+}
+
+.winner-card .winner-score {
+    margin-top: 12px;
+    color: inherit;
+    font-weight: 760;
 }
 
 .leaderboard-refresh-status {

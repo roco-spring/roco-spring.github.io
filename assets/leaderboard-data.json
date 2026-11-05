@@ -1,7 +1,7 @@
 {
   "schemaVersion": 2,
-  "updatedAt": "2026-09-07T09:33:15.578Z",
-  "sourceLabel": "Live Spring and RobustSpring public benchmark snapshot",
+  "updatedAt": "2026-10-02T11:59:00.000Z",
+  "sourceLabel": "Final leaderboard frozen at October 1, 2026, 23:59 Anywhere on Earth",
   "scoringConvention": "organizer-approved-additive-proxy",
   "baselines": {
     "optical-flow": {
@@ -35,88 +35,57 @@
       }
     }
   },
-  "syncStatus": "static-fallback",
+  "syncStatus": "final",
   "teams": [
     {
-      "teamId": "RoCo-13",
-      "teamName": "Abdulrahman M.Saadeldin",
+      "teamId": "RoCo-67",
+      "teamName": "Anonymous",
       "registeredTracks": [
-        "optical-flow",
         "stereo-matching",
-        "scene-flow",
         "exploration"
       ],
-      "results": {},
-      "submissionHistory": {}
-    },
-    {
-      "teamId": "RoCo-30",
-      "teamName": "acvlab",
-      "registeredTracks": [
-        "optical-flow",
-        "stereo-matching",
-        "scene-flow",
-        "exploration"
-      ],
-      "results": {},
-      "submissionHistory": {}
-    },
-    {
-      "teamId": "RoCo-12",
-      "teamName": "aneev",
-      "registeredTracks": [
-        "optical-flow",
-        "stereo-matching",
-        "scene-flow"
-      ],
-      "results": {},
-      "submissionHistory": {}
-    },
-    {
-      "teamId": "RoCo-26",
-      "teamName": "Batman",
-      "registeredTracks": [
-        "optical-flow",
-        "stereo-matching",
-        "scene-flow",
-        "exploration"
-      ],
-      "results": {},
-      "submissionHistory": {}
-    },
-    {
-      "teamId": "RoCo-41",
-      "teamName": "batman",
-      "registeredTracks": [
-        "optical-flow",
-        "exploration"
-      ],
-      "results": {},
-      "submissionHistory": {}
-    },
-    {
-      "teamId": "RoCo-17",
-      "teamName": "BuildDiff",
-      "registeredTracks": [
-        "optical-flow",
-        "stereo-matching",
-        "scene-flow",
-        "exploration"
-      ],
-      "results": {},
-      "submissionHistory": {}
-    },
-    {
-      "teamId": "RoCo-36",
-      "teamName": "c-mike",
-      "registeredTracks": [
-        "optical-flow",
-        "stereo-matching",
-        "scene-flow",
-        "exploration"
-      ],
-      "results": {},
-      "submissionHistory": {}
+      "results": {
+        "stereo-matching": {
+          "rankChange": 0,
+          "score": 0.136734,
+          "springMetric": 0.474,
+          "robustSpringMetric": 2.514,
+          "springTerm": 0.137212,
+          "robustSpringTerm": 0.136256,
+          "submittedAt": "2026-10-01T07:02:00.000Z",
+          "benchmarkMethod": "M03",
+          "benchmarkUrl": "https://spring-benchmark.org/531/",
+          "matchBasis": "team-id"
+        }
+      },
+      "submissionHistory": {
+        "stereo-matching": [
+          {
+            "rankChange": 0,
+            "score": 0.14695,
+            "springMetric": 0.471,
+            "robustSpringMetric": 2.907,
+            "springTerm": 0.136344,
+            "robustSpringTerm": 0.157557,
+            "submittedAt": "2026-10-01T06:01:00.000Z",
+            "benchmarkMethod": "M02",
+            "benchmarkUrl": "https://spring-benchmark.org/530/",
+            "matchBasis": "team-id"
+          },
+          {
+            "rankChange": 0,
+            "score": 0.136734,
+            "springMetric": 0.474,
+            "robustSpringMetric": 2.514,
+            "springTerm": 0.137212,
+            "robustSpringTerm": 0.136256,
+            "submittedAt": "2026-10-01T07:02:00.000Z",
+            "benchmarkMethod": "M03",
+            "benchmarkUrl": "https://spring-benchmark.org/531/",
+            "matchBasis": "team-id"
+          }
+        ]
+      }
     },
     {
       "teamId": "RoCo-22",
@@ -124,154 +93,64 @@
       "registeredTracks": [
         "optical-flow",
         "stereo-matching",
-        "scene-flow",
         "exploration"
       ],
-      "results": {},
-      "submissionHistory": {}
-    },
-    {
-      "teamId": "RoCo-20",
-      "teamName": "DDEVS",
-      "registeredTracks": [
-        "stereo-matching"
-      ],
-      "results": {},
-      "submissionHistory": {}
-    },
-    {
-      "teamId": "RoCo-15",
-      "teamName": "Drivers",
-      "registeredTracks": [
-        "optical-flow",
-        "stereo-matching"
-      ],
-      "results": {},
-      "submissionHistory": {}
-    },
-    {
-      "teamId": "RoCo-24",
-      "teamName": "E-lab",
-      "registeredTracks": [
-        "optical-flow",
-        "stereo-matching",
-        "scene-flow",
-        "exploration"
-      ],
-      "results": {},
-      "submissionHistory": {}
-    },
-    {
-      "teamId": "RoCo-31",
-      "teamName": "e-motion AI",
-      "registeredTracks": [
-        "scene-flow",
-        "exploration"
-      ],
-      "results": {},
-      "submissionHistory": {}
-    },
-    {
-      "teamId": "RoCo-33",
-      "teamName": "Epoch Labs",
-      "registeredTracks": [
-        "optical-flow",
-        "stereo-matching",
-        "scene-flow",
-        "exploration"
-      ],
-      "results": {},
-      "submissionHistory": {}
-    },
-    {
-      "teamId": "RoCo-38",
-      "teamName": "Four And Furios",
-      "registeredTracks": [
-        "optical-flow",
-        "stereo-matching",
-        "scene-flow",
-        "exploration"
-      ],
-      "results": {},
-      "submissionHistory": {}
-    },
-    {
-      "teamId": "RoCo-42",
-      "teamName": "Geodesic Physical Intelligence",
-      "registeredTracks": [
-        "optical-flow",
-        "stereo-matching",
-        "scene-flow",
-        "exploration"
-      ],
-      "results": {},
-      "submissionHistory": {}
-    },
-    {
-      "teamId": "RoCo-43",
-      "teamName": "gun-py",
-      "registeredTracks": [
-        "optical-flow",
-        "stereo-matching",
-        "scene-flow",
-        "exploration"
-      ],
-      "results": {},
-      "submissionHistory": {}
-    },
-    {
-      "teamId": "RoCo-25",
-      "teamName": "HexWarrior",
-      "registeredTracks": [
-        "optical-flow",
-        "stereo-matching",
-        "scene-flow",
-        "exploration"
-      ],
-      "results": {},
-      "submissionHistory": {}
-    },
-    {
-      "teamId": "RoCo-10",
-      "teamName": "iktsuarpok",
-      "registeredTracks": [
-        "optical-flow"
-      ],
-      "results": {},
-      "submissionHistory": {}
-    },
-    {
-      "teamId": "RoCo-37",
-      "teamName": "Innovators",
-      "registeredTracks": [
-        "optical-flow",
-        "stereo-matching",
-        "scene-flow",
-        "exploration"
-      ],
-      "results": {},
-      "submissionHistory": {}
-    },
-    {
-      "teamId": "RoCo-8",
-      "teamName": "JTS@UW",
-      "registeredTracks": [
-        "optical-flow",
-        "exploration"
-      ],
-      "results": {},
-      "submissionHistory": {}
-    },
-    {
-      "teamId": "RoCo-18",
-      "teamName": "KOGUMA Lab",
-      "registeredTracks": [
-        "optical-flow",
-        "stereo-matching",
-        "scene-flow"
-      ],
-      "results": {},
-      "submissionHistory": {}
+      "results": {
+        "optical-flow": {
+          "rankChange": 0,
+          "score": 0.363957,
+          "springMetric": 0.388,
+          "robustSpringMetric": 2.032,
+          "springTerm": 0.390932,
+          "robustSpringTerm": 0.336982,
+          "submittedAt": "2026-09-09T21:47:00.000Z",
+          "benchmarkMethod": "PairBridge",
+          "benchmarkUrl": "https://spring-benchmark.org/492/",
+          "matchBasis": "team-id"
+        },
+        "stereo-matching": {
+          "rankChange": 0,
+          "score": 0.145595,
+          "springMetric": 0.471,
+          "robustSpringMetric": 2.857,
+          "springTerm": 0.136344,
+          "robustSpringTerm": 0.154847,
+          "submittedAt": "2026-09-08T07:13:00.000Z",
+          "benchmarkMethod": "StableBridge",
+          "benchmarkUrl": "https://spring-benchmark.org/490/",
+          "matchBasis": "team-id"
+        }
+      },
+      "submissionHistory": {
+        "optical-flow": [
+          {
+            "rankChange": 0,
+            "score": 0.363957,
+            "springMetric": 0.388,
+            "robustSpringMetric": 2.032,
+            "springTerm": 0.390932,
+            "robustSpringTerm": 0.336982,
+            "submittedAt": "2026-09-09T21:47:00.000Z",
+            "benchmarkMethod": "PairBridge",
+            "benchmarkUrl": "https://spring-benchmark.org/492/",
+            "matchBasis": "team-id"
+          }
+        ],
+        "stereo-matching": [
+          {
+            "rankChange": 0,
+            "score": 0.145595,
+            "springMetric": 0.471,
+            "robustSpringMetric": 2.857,
+            "springTerm": 0.136344,
+            "robustSpringTerm": 0.154847,
+            "submittedAt": "2026-09-08T07:13:00.000Z",
+            "benchmarkMethod": "StableBridge",
+            "benchmarkUrl": "https://spring-benchmark.org/490/",
+            "matchBasis": "team-id"
+          }
+        ]
+      }
     },
     {
       "teamId": "RoCo-19",
@@ -282,116 +161,120 @@
         "scene-flow",
         "exploration"
       ],
-      "results": {},
-      "submissionHistory": {},
-      "pendingSubmissions": {
+      "results": {
+        "optical-flow": {
+          "rankChange": 0,
+          "score": 0.429395,
+          "springMetric": 0.364,
+          "robustSpringMetric": 2.967,
+          "springTerm": 0.366751,
+          "robustSpringTerm": 0.49204,
+          "submittedAt": "2026-09-07T06:10:00.000Z",
+          "benchmarkMethod": "WAFT+",
+          "benchmarkUrl": "https://spring-benchmark.org/488/",
+          "matchBasis": "team-id"
+        },
+        "stereo-matching": {
+          "rankChange": 0,
+          "score": 0.117581,
+          "springMetric": 0.457,
+          "robustSpringMetric": 1.898,
+          "springTerm": 0.132291,
+          "robustSpringTerm": 0.10287,
+          "submittedAt": "2026-09-20T02:12:00.000Z",
+          "benchmarkMethod": "CorrDrop-Stereo",
+          "benchmarkUrl": "https://spring-benchmark.org/522/",
+          "matchBasis": "team-id"
+        },
+        "scene-flow": {
+          "rankChange": 0,
+          "score": 0.241302,
+          "springMetric": 0.105324,
+          "robustSpringMetric": 0.377281,
+          "springTerm": 0.105324,
+          "robustSpringTerm": 0.377281,
+          "submittedAt": "2026-09-14T10:44:00.000Z",
+          "benchmarkMethod": "Q4-Independent",
+          "benchmarkUrl": "https://spring-benchmark.org/518/",
+          "matchBasis": "team-id",
+          "springComponents": {
+            "d1": 0.568,
+            "d2": 0.836,
+            "flow": 0.328
+          },
+          "robustSpringComponents": {
+            "d1": 4.408,
+            "d2": 4.761,
+            "flow": 2.304
+          }
+        },
+        "cross-task": {
+          "rankChange": 0,
+          "score": 0.262759,
+          "springMetric": 0.201455,
+          "robustSpringMetric": 0.324064,
+          "springTerm": 0.201455,
+          "robustSpringTerm": 0.324064,
+          "submittedAt": "2026-09-20T02:12:00.000Z",
+          "benchmarkMethod": "Combined quantitative tracks",
+          "benchmarkUrl": "https://spring-benchmark.org/",
+          "matchBasis": "cross-task"
+        }
+      },
+      "submissionHistory": {
         "optical-flow": [
           {
-            "benchmarkMethod": "SEARAFT-Finetune",
-            "benchmarkUrl": "https://spring-benchmark.org/475/",
-            "submittedAt": "2026-09-04T10:49:00.000Z",
-            "matchBasis": "team-id",
-            "springMetric": 2.651,
-            "robustSpringMetric": null
-          },
-          {
-            "benchmarkMethod": "WAFT",
-            "benchmarkUrl": "https://spring-benchmark.org/484/",
-            "submittedAt": "2026-09-07T03:15:00.000Z",
-            "matchBasis": "team-id",
-            "springMetric": 0.384,
-            "robustSpringMetric": null
-          },
-          {
+            "rankChange": 0,
+            "score": 0.429395,
+            "springMetric": 0.364,
+            "robustSpringMetric": 2.967,
+            "springTerm": 0.366751,
+            "robustSpringTerm": 0.49204,
+            "submittedAt": "2026-09-07T06:10:00.000Z",
             "benchmarkMethod": "WAFT+",
             "benchmarkUrl": "https://spring-benchmark.org/488/",
-            "submittedAt": "2026-09-07T06:10:00.000Z",
-            "matchBasis": "team-id",
-            "springMetric": 0.364,
-            "robustSpringMetric": null
+            "matchBasis": "team-id"
           }
         ],
         "stereo-matching": [
           {
-            "benchmarkMethod": "RAFTStereo_Scale040_new",
-            "benchmarkUrl": "https://spring-benchmark.org/482/",
-            "submittedAt": "2026-09-06T06:15:00.000Z",
-            "matchBasis": "team-id",
-            "springMetric": 1.077,
-            "robustSpringMetric": null
+            "rankChange": 0,
+            "score": 0.117581,
+            "springMetric": 0.457,
+            "robustSpringMetric": 1.898,
+            "springTerm": 0.132291,
+            "robustSpringTerm": 0.10287,
+            "submittedAt": "2026-09-20T02:12:00.000Z",
+            "benchmarkMethod": "CorrDrop-Stereo",
+            "benchmarkUrl": "https://spring-benchmark.org/522/",
+            "matchBasis": "team-id"
           }
         ],
         "scene-flow": [
           {
-            "benchmarkMethod": "DEFOM2K-DPFlow",
-            "benchmarkUrl": "https://spring-benchmark.org/473/",
-            "submittedAt": "2026-09-03T04:01:00.000Z",
+            "rankChange": 0,
+            "score": 0.241302,
+            "springMetric": 0.105324,
+            "robustSpringMetric": 0.377281,
+            "springTerm": 0.105324,
+            "robustSpringTerm": 0.377281,
+            "submittedAt": "2026-09-14T10:44:00.000Z",
+            "benchmarkMethod": "Q4-Independent",
+            "benchmarkUrl": "https://spring-benchmark.org/518/",
             "matchBasis": "team-id",
-            "springMetric": 0.154587,
-            "robustSpringMetric": null
+            "springComponents": {
+              "d1": 0.568,
+              "d2": 0.836,
+              "flow": 0.328
+            },
+            "robustSpringComponents": {
+              "d1": 4.408,
+              "d2": 4.761,
+              "flow": 2.304
+            }
           }
         ]
       }
-    },
-    {
-      "teamId": "RoCo-21",
-      "teamName": "mau5",
-      "registeredTracks": [
-        "optical-flow",
-        "exploration"
-      ],
-      "results": {},
-      "submissionHistory": {}
-    },
-    {
-      "teamId": "RoCo-11",
-      "teamName": "MLDA@EEE",
-      "registeredTracks": [
-        "scene-flow"
-      ],
-      "results": {},
-      "submissionHistory": {}
-    },
-    {
-      "teamId": "RoCo-27",
-      "teamName": "Mysterious Power of the East",
-      "registeredTracks": [
-        "optical-flow",
-        "exploration"
-      ],
-      "results": {},
-      "submissionHistory": {}
-    },
-    {
-      "teamId": "RoCo-9",
-      "teamName": "Nitansh Jain",
-      "registeredTracks": [
-        "optical-flow",
-        "stereo-matching"
-      ],
-      "results": {},
-      "submissionHistory": {}
-    },
-    {
-      "teamId": "RoCo-28",
-      "teamName": "Norisk",
-      "registeredTracks": [
-        "scene-flow"
-      ],
-      "results": {},
-      "submissionHistory": {}
-    },
-    {
-      "teamId": "RoCo-34",
-      "teamName": "Pamboo",
-      "registeredTracks": [
-        "optical-flow",
-        "stereo-matching",
-        "scene-flow",
-        "exploration"
-      ],
-      "results": {},
-      "submissionHistory": {}
     },
     {
       "teamId": "RoCo-23",
@@ -399,51 +282,36 @@
       "registeredTracks": [
         "optical-flow"
       ],
-      "results": {},
-      "submissionHistory": {}
-    },
-    {
-      "teamId": "RoCo-39",
-      "teamName": "PocketChange",
-      "registeredTracks": [
-        "exploration"
-      ],
-      "results": {},
-      "submissionHistory": {}
-    },
-    {
-      "teamId": "RoCo-40",
-      "teamName": "shashank test",
-      "registeredTracks": [
-        "optical-flow",
-        "exploration"
-      ],
-      "results": {},
-      "submissionHistory": {}
-    },
-    {
-      "teamId": "RoCo-16",
-      "teamName": "Swarm",
-      "registeredTracks": [
-        "optical-flow",
-        "stereo-matching",
-        "scene-flow",
-        "exploration"
-      ],
-      "results": {},
-      "submissionHistory": {}
-    },
-    {
-      "teamId": "RoCo-35",
-      "teamName": "Team'5",
-      "registeredTracks": [
-        "optical-flow",
-        "stereo-matching",
-        "scene-flow",
-        "exploration"
-      ],
-      "results": {},
-      "submissionHistory": {}
+      "results": {
+        "optical-flow": {
+          "rankChange": 0,
+          "score": 0.211795,
+          "springMetric": 0.268,
+          "robustSpringMetric": 0.926,
+          "springTerm": 0.270025,
+          "robustSpringTerm": 0.153566,
+          "submittedAt": "2026-09-14T08:39:00.000Z",
+          "benchmarkMethod": "SPEAR-L-K1",
+          "benchmarkUrl": "https://spring-benchmark.org/517/",
+          "matchBasis": "team-id"
+        }
+      },
+      "submissionHistory": {
+        "optical-flow": [
+          {
+            "rankChange": 0,
+            "score": 0.211795,
+            "springMetric": 0.268,
+            "robustSpringMetric": 0.926,
+            "springTerm": 0.270025,
+            "robustSpringTerm": 0.153566,
+            "submittedAt": "2026-09-14T08:39:00.000Z",
+            "benchmarkMethod": "SPEAR-L-K1",
+            "benchmarkUrl": "https://spring-benchmark.org/517/",
+            "matchBasis": "team-id"
+          }
+        ]
+      }
     },
     {
       "teamId": "RoCo-29",
@@ -483,34 +351,50 @@
       }
     },
     {
-      "teamId": "RoCo-32",
-      "teamName": "XLR8",
-      "registeredTracks": [
-        "optical-flow",
-        "stereo-matching",
-        "scene-flow",
-        "exploration"
-      ],
-      "results": {},
-      "submissionHistory": {}
-    },
-    {
       "teamId": "RoCo-14",
       "teamName": "ZXUv2.0",
       "registeredTracks": [
         "optical-flow"
       ],
-      "results": {},
-      "submissionHistory": {},
-      "pendingSubmissions": {
+      "results": {
+        "optical-flow": {
+          "rankChange": 0,
+          "score": 0.307844,
+          "springMetric": 0.299,
+          "robustSpringMetric": 1.896,
+          "springTerm": 0.301259,
+          "robustSpringTerm": 0.314428,
+          "submittedAt": "2026-09-08T00:19:00.000Z",
+          "benchmarkMethod": "Test",
+          "benchmarkUrl": "https://spring-benchmark.org/489/",
+          "matchBasis": "team-id"
+        }
+      },
+      "submissionHistory": {
         "optical-flow": [
           {
+            "rankChange": 0,
+            "score": 0.306345,
+            "springMetric": 0.298,
+            "robustSpringMetric": 1.884,
+            "springTerm": 0.300252,
+            "robustSpringTerm": 0.312438,
+            "submittedAt": "2026-08-27T22:35:00.000Z",
             "benchmarkMethod": "CAR-WAFT",
             "benchmarkUrl": "https://spring-benchmark.org/471/",
-            "submittedAt": "2026-08-27T22:35:00.000Z",
-            "matchBasis": "team-id",
-            "springMetric": 0.298,
-            "robustSpringMetric": null
+            "matchBasis": "team-id"
+          },
+          {
+            "rankChange": 0,
+            "score": 0.307844,
+            "springMetric": 0.299,
+            "robustSpringMetric": 1.896,
+            "springTerm": 0.301259,
+            "robustSpringTerm": 0.314428,
+            "submittedAt": "2026-09-08T00:19:00.000Z",
+            "benchmarkMethod": "Test",
+            "benchmarkUrl": "https://spring-benchmark.org/489/",
+            "matchBasis": "team-id"
           }
         ]
       }

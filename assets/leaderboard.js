@@ -879,7 +879,7 @@
             return "Live refresh did not complete; stale cached standings remain visible.";
         }
         if (syncState === "fallback") {
-            return "Live sync is unavailable; the published fallback standings remain visible.";
+            return "The final published standings are visible.";
         }
         return "Standings loaded, but a completed live sync could not be confirmed.";
     }

@@ -61,7 +61,7 @@ for (const path of SITE_PAGES) {
   });
 }
 
-test("Leaderboard tabs render the published scored and pending methods with the complete roster", async ({ page }) => {
+test("Leaderboard tabs render the frozen final standings", async ({ page }) => {
   await page.goto("/evaluation.html");
 
   const tabs = page.getByRole("tab");
@@ -77,40 +77,29 @@ test("Leaderboard tabs render the published scored and pending methods with the 
   const baselineRows = visiblePanel.locator("tbody tr.leaderboard-row--baseline");
   await expect(visiblePanel.locator("thead th")).toHaveCount(8);
   await expect(visiblePanel.getByRole("columnheader", { name: "Method Name" })).toBeVisible();
-  // 31 Optical Flow teams produce 33 rows: KoreaU_DLmath has three methods.
-  await expect(participantRows).toHaveCount(33);
-  await expect(participantRows.locator(".leaderboard-pending-badge")).toHaveCount(32);
-  await expect(participantRows.locator(".leaderboard-method-placeholder")).toHaveCount(28);
-  await expect(participantRows.first().locator(".leaderboard-team-name")).toHaveText("VSAI");
-  await expect(participantRows.first().locator(".leaderboard-team-id")).toHaveText("RoCo-29");
+  await expect(page.locator("#winners")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Refresh standings" })).toHaveCount(0);
+  await expect(page.locator('a[href*="/521/"], a[href*="/536/"], a[href*="/539/"]')).toHaveCount(0);
+  await expect(page.getByText("SPEAR-L-K3")).toHaveCount(1);
+  await expect(participantRows).toHaveCount(6);
+  await expect(participantRows.locator(".leaderboard-pending-badge")).toHaveCount(0);
+  await expect(participantRows.locator(".leaderboard-method-placeholder")).toHaveCount(0);
+  await expect(participantRows.first().locator(".leaderboard-team-name")).toHaveText("PlayStation");
+  await expect(participantRows.first().locator(".leaderboard-team-id")).toHaveText("RoCo-23");
   await expect(participantRows.first().locator(".leaderboard-rank")).toHaveText("1");
   await expect(participantRows.first().locator(".rank-change")).toHaveText("— 0");
-  await expect(participantRows.first().locator(".leaderboard-score")).toHaveText("1.1038");
-  await expect(participantRows.first().locator(".leaderboard-metric")).toHaveText(["1.411", "4.739"]);
-  await expect(participantRows.first().locator(".leaderboard-method")).toHaveText("Method 1");
+  await expect(participantRows.first().locator(".leaderboard-score")).toHaveText("0.2118");
+  await expect(participantRows.first().locator(".leaderboard-metric")).toHaveText(["0.268", "0.926"]);
+  await expect(participantRows.first().locator(".leaderboard-method")).toHaveText("SPEAR-L-K1");
   await expect(participantRows.first().locator(".leaderboard-method"))
-    .toHaveAttribute("href", "https://spring-benchmark.org/474/");
+    .toHaveAttribute("href", "https://spring-benchmark.org/517/");
   await expect(participantRows.first().locator(".leaderboard-submitted"))
-    .toHaveAttribute("title", "2026-09-03T16:56:00.000Z");
-  const pendingRows = visiblePanel.locator("tbody tr.leaderboard-row--pending");
-  await expect(pendingRows.locator(".leaderboard-rank")).toHaveText(Array(32).fill("—"));
-  await expect(pendingRows.locator(".leaderboard-score")).toHaveText(Array(32).fill("—"));
-  for (const [teamId, teamName, names, links, clean] of [
-    ["RoCo-19", "KoreaU_DLmath", ["SEARAFT-Finetune", "WAFT", "WAFT+"], [475, 484, 488], ["2.651", "0.384", "0.364"]],
-    ["RoCo-14", "ZXUv2.0", ["CAR-WAFT"], [471], ["0.298"]]
-  ]) {
-    const teamRows = participantRows.filter({ has: page.locator(".leaderboard-team-id", { hasText: teamId }) });
-    await expect(teamRows.locator(".leaderboard-team-name")).toHaveText(Array(names.length).fill(teamName));
-    await expect(teamRows.locator(".leaderboard-method")).toHaveText(names);
-    await expect(teamRows.locator(".leaderboard-pending-badge"))
-      .toHaveText(Array(names.length).fill("Awaiting robustness results"));
-    for (let index = 0; index < names.length; index += 1) {
-      await expect(teamRows.nth(index).locator(".leaderboard-method"))
-        .toHaveAttribute("href", `https://spring-benchmark.org/${links[index]}/`);
-      await expect(teamRows.nth(index).locator(".leaderboard-metric")).toHaveText([clean[index], "—"]);
-    }
-  }
-  await expect(participantRows.locator('a[href="https://spring-benchmark.org/483/"]')).toHaveCount(0);
+    .toHaveAttribute("title", "2026-09-14T08:39:00.000Z");
+  const roco14 = participantRows.filter({ has: page.locator(".leaderboard-team-id", { hasText: "RoCo-14" }) });
+  await expect(roco14).toHaveCount(2);
+  await expect(roco14.locator(".leaderboard-rank")).toHaveText(["2", "3"]);
+  await expect(roco14.locator(".leaderboard-method")).toHaveText(["CAR-WAFT", "Test"]);
+  await expect(roco14.locator(".leaderboard-score")).toHaveText(["0.3063", "0.3078"]);
   await expect(baselineRows).toHaveCount(12);
   await expect(baselineRows.locator(".leaderboard-baseline-badge")).toHaveCount(12);
   await expect(baselineRows.locator(".leaderboard-team-name"))
@@ -143,32 +132,24 @@ test("Leaderboard tabs render the published scored and pending methods with the 
     .toHaveAttribute("title", "(Baseline) RoCo-Spring Team Baselines-Optical Flow");
 
   await tabs.nth(1).click();
-  await expect(participantRows).toHaveCount(23);
-  await expect(participantRows.locator(".leaderboard-method-placeholder")).toHaveCount(22);
-  await expect(participantRows.locator(".leaderboard-rank")).toHaveText(Array(23).fill("—"));
-  await expect(participantRows.locator(".leaderboard-score")).toHaveText(Array(23).fill("—"));
-  const stereoPending = participantRows.filter({ has: page.locator(".leaderboard-method") });
-  await expect(stereoPending.locator(".leaderboard-team-name")).toHaveText("KoreaU_DLmath");
-  await expect(stereoPending.locator(".leaderboard-method")).toHaveText("RAFTStereo_Scale040_new");
-  await expect(stereoPending.locator(".leaderboard-method"))
-    .toHaveAttribute("href", "https://spring-benchmark.org/482/");
-  await expect(stereoPending.locator(".leaderboard-metric")).toHaveText(["1.077", "—"]);
+  await expect(participantRows).toHaveCount(4);
+  await expect(participantRows.locator(".leaderboard-method-placeholder")).toHaveCount(0);
+  await expect(participantRows.first().locator(".leaderboard-team-name")).toHaveText("KoreaU_DLmath");
+  await expect(participantRows.first().locator(".leaderboard-method")).toHaveText("CorrDrop-Stereo");
+  await expect(participantRows.first().locator(".leaderboard-score")).toHaveText("0.1176");
+  await expect(participantRows.first().locator(".leaderboard-method"))
+    .toHaveAttribute("href", "https://spring-benchmark.org/522/");
   await expect(baselineRows).toHaveCount(7);
   await expect(baselineRows.locator(".leaderboard-score"))
     .toHaveText(["0.6884", "0.9689", "1.0830", "1.1176", "1.1783", "1.2609", "1.2792"]);
   await tabs.nth(1).press("ArrowRight");
   await expect(tabs.nth(2)).toHaveAttribute("aria-selected", "true");
   await expect(tabs.nth(2)).toBeFocused();
-  await expect(participantRows).toHaveCount(23);
-  await expect(participantRows.locator(".leaderboard-method-placeholder")).toHaveCount(22);
-  await expect(participantRows.locator(".leaderboard-rank")).toHaveText(Array(23).fill("—"));
-  await expect(participantRows.locator(".leaderboard-score")).toHaveText(Array(23).fill("—"));
-  const scenePending = participantRows.filter({ has: page.locator(".leaderboard-method") });
-  await expect(scenePending.locator(".leaderboard-team-name")).toHaveText("KoreaU_DLmath");
-  await expect(scenePending.locator(".leaderboard-method")).toHaveText("DEFOM2K-DPFlow");
-  await expect(scenePending.locator(".leaderboard-method"))
-    .toHaveAttribute("href", "https://spring-benchmark.org/473/");
-  await expect(scenePending.locator(".leaderboard-metric")).toHaveText(["0.155", "—"]);
+  await expect(participantRows).toHaveCount(1);
+  await expect(participantRows.locator(".leaderboard-method")).toHaveText("Q4-Independent");
+  await expect(participantRows.locator(".leaderboard-score")).toHaveText("0.2413");
+  await expect(participantRows.locator(".leaderboard-method"))
+    .toHaveAttribute("href", "https://spring-benchmark.org/518/");
   await expect(baselineRows).toHaveCount(3);
   await expect(baselineRows.locator(".leaderboard-score")).toHaveText(["0.9522", "1.0478", "1.0850"]);
   await expect(baselineRows.first().locator(".leaderboard-submitted"))
@@ -179,18 +160,14 @@ test("Leaderboard tabs render the published scored and pending methods with the 
     .toHaveAttribute("title", /RobustSpring proxy components: d1/u);
 
   await tabs.nth(3).click();
-  await expect(participantRows).toHaveCount(20);
-  await expect(participantRows.locator(".leaderboard-method-placeholder")).toHaveCount(20);
-  await expect(participantRows.locator(".leaderboard-rank")).toHaveText(Array(20).fill("—"));
-  await expect(participantRows.locator(".leaderboard-score")).toHaveText(Array(20).fill("—"));
+  await expect(participantRows).toHaveCount(1);
+  await expect(participantRows.locator(".leaderboard-method-placeholder")).toHaveCount(0);
+  await expect(participantRows.locator(".leaderboard-team-id")).toHaveText("RoCo-19");
+  await expect(participantRows.locator(".leaderboard-score")).toHaveText("0.2628");
   await expect(baselineRows).toHaveCount(0);
   await expect(page.locator("[data-leaderboard-updated]")).not.toHaveText("Loading…");
-  await expect(page.locator("#leaderboard-refresh-note")).toContainText("public Spring/RobustSpring results");
-
-  await page.getByRole("button", { name: "Refresh standings" }).click();
-  await expect(page.locator("[data-leaderboard-refresh-status]"))
-    .toHaveText("Live sync is unavailable; the published fallback standings remain visible.");
-  await expect(page.locator("[data-leaderboard-refresh-status]")).toBeVisible();
+  await expect(page.locator("#leaderboard-freeze-note")).toContainText("23:59 Anywhere on Earth");
+  expect(await page.evaluate(() => window.RoCoLeaderboardLive)).toBeUndefined();
 });
 
 test("leaderboard method and baseline columns stay contained on mobile", async ({ page }) => {
@@ -212,12 +189,12 @@ test("leaderboard method and baseline columns stay contained on mobile", async (
 
 test("live leaderboard renders scored results and only forces explicit user refreshes", async ({ page }) => {
   await page.goto("/evaluation.html");
-  await page.waitForFunction(() => Boolean(window.RoCoLeaderboardLive));
+  await page.waitForFunction(() => Boolean(window.RoCoLeaderboard));
 
   await page.evaluate(async (baselines) => {
     window.__leaderboardTestForces = [];
     window.__leaderboardTestForcedCalls = 0;
-    await window.RoCoLeaderboardLive.installDataSource(async ({ force }) => {
+    await window.RoCoLeaderboard.setDataSource(async ({ force }) => {
       window.__leaderboardTestForces.push(force);
       if (force) window.__leaderboardTestForcedCalls += 1;
       const stale = window.__leaderboardTestForcedCalls === 2;
@@ -312,25 +289,25 @@ test("live leaderboard renders scored results and only forces explicit user refr
   await expect(page.locator("[data-leaderboard-source]"))
     .toHaveText("Browser-tested live snapshot · live cache");
 
-  await page.getByRole("button", { name: "Refresh standings" }).click();
-  await expect(page.locator("[data-leaderboard-refresh-status]"))
-    .toHaveText("Live standings refreshed.");
+  const refreshStandings = () => page.evaluate(() => window.RoCoLeaderboard.refresh({
+    force: true,
+    announce: true
+  }));
+  await refreshStandings();
   await expect(page.locator("[data-leaderboard-source]"))
     .toHaveText("Browser-tested live snapshot · synchronized");
   await expect.poll(() => page.evaluate(() => window.__leaderboardTestForces))
     .toEqual([false, true]);
 
-  await page.getByRole("button", { name: "Refresh standings" }).click();
-  await expect(page.locator("[data-leaderboard-refresh-status]"))
-    .toHaveText("Live refresh did not complete; stale cached standings remain visible.");
+  await refreshStandings();
   await expect(page.locator("[data-leaderboard-source]"))
     .toHaveText("Browser-tested live snapshot · stale cache");
   await expect.poll(() => page.evaluate(() => window.__leaderboardTestForces))
     .toEqual([false, true, true]);
 
-  await page.getByRole("button", { name: "Refresh standings" }).click();
-  await expect(page.locator("[data-leaderboard-refresh-status]"))
-    .toHaveText("Cached live standings loaded; no newer sync was needed.");
+  await refreshStandings();
+  await expect(page.locator("[data-leaderboard-source]"))
+    .toHaveText("Browser-tested live snapshot · live cache");
   await expect.poll(() => page.evaluate(() => window.__leaderboardTestForces))
     .toEqual([false, true, true, true]);
 });
@@ -368,9 +345,9 @@ test("canonical method labels retain distinct results across refresh, tracks, an
     }]
   };
   const installSnapshot = async () => {
-    await page.waitForFunction(() => Boolean(window.RoCoLeaderboardLive));
+    await page.waitForFunction(() => Boolean(window.RoCoLeaderboard));
     await page.evaluate(async (fixture) => {
-      await window.RoCoLeaderboardLive.installDataSource(async ({ force }) => {
+      await window.RoCoLeaderboard.setDataSource(async ({ force }) => {
         if (force) {
           for (const history of Object.values(fixture.teams[0].submissionHistory)) {
             history.reverse();
@@ -407,8 +384,7 @@ test("canonical method labels retain distinct results across refresh, tracks, an
     await page.getByRole("tab", { name: label, exact: true }).click();
     await expectCanonicalRows();
   }
-  await page.getByRole("button", { name: "Refresh standings" }).click();
-  await expect(page.locator("[data-leaderboard-refresh-status]")).toHaveText("Live standings refreshed.");
+  await page.evaluate(() => window.RoCoLeaderboard.refresh({ force: true, announce: true }));
   await expectCanonicalRows();
 
   await page.setViewportSize({ width: 390, height: 844 });
@@ -477,9 +453,9 @@ test("incomplete public methods remain visible without a rank until complete met
     ]
   };
   const installSnapshot = async () => {
-    await page.waitForFunction(() => Boolean(window.RoCoLeaderboardLive));
+    await page.waitForFunction(() => Boolean(window.RoCoLeaderboard));
     await page.evaluate(async (fixture) => {
-      await window.RoCoLeaderboardLive.installDataSource(async ({ force }) => {
+      await window.RoCoLeaderboard.setDataSource(async ({ force }) => {
         if (force) {
           const pending = fixture.teams[0].pendingSubmissions["optical-flow"][0];
           fixture.teams[0].submissionHistory = {
@@ -513,8 +489,7 @@ test("incomplete public methods remain visible without a rank until complete met
   await expect(rows.last().locator(".leaderboard-pending-badge")).toHaveText("No submission yet");
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(391);
 
-  await page.getByRole("button", { name: "Refresh standings" }).click();
-  await expect(page.locator("[data-leaderboard-refresh-status]")).toHaveText("Live standings refreshed.");
+  await page.evaluate(() => window.RoCoLeaderboard.refresh({ force: true, announce: true }));
   await expect(rows).toHaveCount(5);
   await expect(rows.first().locator(".leaderboard-method")).toHaveText("CAR-WAFT");
   await expect(rows.first().locator(".leaderboard-method"))
@@ -548,17 +523,20 @@ for (const width of [390, 1440]) {
     await expect(page.getByRole("tab", { name: "Optical Flow", exact: true }))
       .toHaveAttribute("aria-selected", "true");
     await expect(search).toHaveValue("RoCo-14");
-    await expect(participantRows).toHaveCount(1);
-    await expect(participantRows).toHaveAttribute("data-team-id", "RoCo-14");
-    await expect(participantRows.locator(".leaderboard-team-name")).toHaveText("ZXUv2.0");
-    await expect(participantRows.locator(".leaderboard-method")).toHaveText("CAR-WAFT");
-    await expect(participantRows.locator(".leaderboard-method"))
+    await expect(participantRows).toHaveCount(2);
+    await expect(participantRows.locator(".leaderboard-team-id")).toHaveText(["RoCo-14", "RoCo-14"]);
+    await expect(participantRows.locator(".leaderboard-team-name")).toHaveText(["ZXUv2.0", "ZXUv2.0"]);
+    await expect(participantRows.locator(".leaderboard-rank")).toHaveText(["2", "3"]);
+    await expect(participantRows.locator(".leaderboard-method")).toHaveText(["CAR-WAFT", "Test"]);
+    await expect(participantRows.nth(0).locator(".leaderboard-method"))
       .toHaveAttribute("href", "https://spring-benchmark.org/471/");
-    await expect(participantRows.locator(".leaderboard-metric")).toHaveText(["0.298", "—"]);
-    await expect(participantRows.locator(".leaderboard-score")).toHaveText("—");
-    await expect(participantRows.locator(".leaderboard-pending-badge"))
-      .toHaveText("Awaiting robustness results");
-    await expect(status).toHaveText("Showing 1 of 45 entries in Optical Flow.");
+    await expect(participantRows.nth(1).locator(".leaderboard-method"))
+      .toHaveAttribute("href", "https://spring-benchmark.org/489/");
+    await expect(participantRows.nth(0).locator(".leaderboard-metric")).toHaveText(["0.298", "1.884"]);
+    await expect(participantRows.nth(1).locator(".leaderboard-metric")).toHaveText(["0.299", "1.896"]);
+    await expect(participantRows.locator(".leaderboard-score")).toHaveText(["0.3063", "0.3078"]);
+    await expect(participantRows.locator(".leaderboard-pending-badge")).toHaveCount(0);
+    await expect(status).toHaveText("Showing 2 of 18 entries in Optical Flow.");
 
     await page.goto("/evaluation.html?track=optical-flow&team=RoCo-29#leaderboards");
     await expect(search).toHaveValue("RoCo-29");
@@ -568,29 +546,26 @@ for (const width of [390, 1440]) {
     await expect(participantRows.locator(".leaderboard-method")).toHaveText("Method 1");
     await expect(participantRows.locator(".leaderboard-method"))
       .toHaveAttribute("href", "https://spring-benchmark.org/474/");
-    await expect(participantRows.locator(".leaderboard-rank")).toHaveText("1");
+    await expect(participantRows.locator(".leaderboard-rank")).toHaveText("6");
     await expect(participantRows.locator(".leaderboard-score")).toHaveText("1.1038");
 
     await page.getByRole("button", { name: "Clear filters", exact: true }).click();
     await expect(search).toHaveValue("");
     await expect(view).toHaveValue("all");
-    await expect(participantRows).toHaveCount(33);
-    // Evaluated methods awaiting robustness are visible before empty teams.
-    await expect(participantRows.locator(".leaderboard-team-id").first()).toHaveText("RoCo-29");
-    await expect(participantRows.nth(4).locator(".leaderboard-team-id")).toHaveText("RoCo-14");
-    await expect(participantRows.nth(5).locator(".leaderboard-pending-badge")).toHaveText("No submission yet");
+    await expect(participantRows).toHaveCount(6);
+    await expect(participantRows.locator(".leaderboard-team-id").first()).toHaveText("RoCo-23");
     await view.selectOption({ label: "Submitted methods" });
-    await expect(participantRows).toHaveCount(5);
-    await expect(participantRows.locator(".leaderboard-method")).toHaveCount(5);
+    await expect(participantRows).toHaveCount(6);
+    await expect(participantRows.locator(".leaderboard-method")).toHaveCount(6);
     await expect(panel.locator("tbody tr.leaderboard-row--baseline")).toHaveCount(0);
-    await expect(status).toHaveText("Showing 5 of 45 entries in Optical Flow.");
+    await expect(status).toHaveText("Showing 6 of 18 entries in Optical Flow.");
     await expect(participantRows.locator('a[href="https://spring-benchmark.org/471/"]')).toHaveCount(1);
     await expect(participantRows.locator('a[href="https://spring-benchmark.org/474/"]')).toHaveCount(1);
 
     await view.selectOption({ label: "Baselines" });
     await expect(panel.locator("tbody tr.leaderboard-row--baseline")).toHaveCount(12);
     await expect(participantRows).toHaveCount(0);
-    await expect(status).toHaveText("Showing 12 of 45 entries in Optical Flow.");
+    await expect(status).toHaveText("Showing 12 of 18 entries in Optical Flow.");
 
     const dimensions = await search.evaluate((input) => ({
       page: document.documentElement.clientWidth,
@@ -607,7 +582,7 @@ for (const width of [390, 1440]) {
 
 test("leaderboard filters preserve exact team identities, global ranks, track state, and the search caret", async ({ page }) => {
   await page.goto("/evaluation.html");
-  await page.waitForFunction(() => Boolean(window.RoCoLeaderboardLive));
+  await page.waitForFunction(() => Boolean(window.RoCoLeaderboard));
   await page.evaluate(async () => {
     const result = (benchmarkMethod, id, score) => ({
       rankChange: 0, score, springMetric: score, robustSpringMetric: score,
@@ -629,7 +604,7 @@ test("leaderboard filters preserve exact team identities, global ranks, track st
     }));
     teams.push({ teamId: "RoCo-30", teamName: "Empty Team", registeredTracks: ["optical-flow"], results: {} });
     window.__filterRefreshes = 0;
-    await window.RoCoLeaderboardLive.installDataSource(async ({ force }) => {
+    await window.RoCoLeaderboard.setDataSource(async ({ force }) => {
       if (force) window.__filterRefreshes += 1;
       return { syncState: "synchronized", snapshot: {
         schemaVersion: 2, updatedAt: "2026-09-07T12:05:00.000Z",
@@ -694,7 +669,7 @@ test("leaderboard filters preserve exact team identities, global ranks, track st
 
 test("exact leaderboard ties use numeric team ID and then benchmark URL", async ({ page }) => {
   await page.goto("/evaluation.html");
-  await page.waitForFunction(() => Boolean(window.RoCoLeaderboardLive));
+  await page.waitForFunction(() => Boolean(window.RoCoLeaderboard));
 
   await page.evaluate(async () => {
     const result = (teamId, resultId) => ({
@@ -708,7 +683,7 @@ test("exact leaderboard ties use numeric team ID and then benchmark URL", async 
       benchmarkMethod: `${teamId} method ${resultId}`,
       benchmarkUrl: `https://spring-benchmark.org/${resultId}/`
     });
-    await window.RoCoLeaderboardLive.installDataSource(async () => ({
+    await window.RoCoLeaderboard.setDataSource(async () => ({
       syncState: "cached",
       snapshot: {
         schemaVersion: 2,
@@ -744,46 +719,39 @@ test("exact leaderboard ties use numeric team ID and then benchmark URL", async 
     .toHaveText(["1", "2", "3"]);
 });
 
-test("homepage preview does not promote alphabetically sorted pending teams", async ({ page }) => {
+test("homepage preview shows the frozen top results for every track", async ({ page }) => {
   await page.goto("/index.html");
 
   const cards = page.locator(".leaderboard-preview-card");
   await expect(cards).toHaveCount(4);
-  await expect(page.locator(".leaderboard-preview-list")).toHaveCount(1);
-  await expect(page.locator(".leaderboard-preview-empty")).toHaveCount(3);
+  await expect(page.locator(".leaderboard-preview-list")).toHaveCount(4);
+  await expect(page.locator(".leaderboard-preview-empty")).toHaveCount(0);
+  await expect(page.locator(".leaderboard-preview-pending-link")).toHaveCount(0);
   const optical = page.locator('.leaderboard-preview-card[aria-labelledby="preview-optical-flow"]');
-  await expect(optical.locator(".leaderboard-preview-list li")).toHaveCount(1);
-  await expect(optical.locator(".leaderboard-preview-rank")).toHaveText("1");
-  await expect(optical.locator(".leaderboard-preview-team strong")).toHaveText("VSAI");
-  await expect(optical.locator(".leaderboard-preview-method")).toHaveText("Method 1");
-  await expect(optical.locator(".leaderboard-preview-score")).toHaveText("1.1038");
-  await expect(optical.locator(".leaderboard-preview-pending-link"))
-    .toHaveText("4 methods awaiting results");
-  await expect(optical.locator(".leaderboard-preview-pending-link"))
-    .toHaveAttribute("href", "evaluation.html?track=optical-flow&view=submissions#leaderboards");
-  for (const [track, count] of [["stereo-matching", 23], ["scene-flow", 23], ["cross-task", 20]]) {
-    const card = page.locator(`.leaderboard-preview-card[aria-labelledby="preview-${track}"]`);
-    await expect(card.locator(".leaderboard-preview-empty"))
-      .toHaveText(`No complete benchmark results yet · ${count} registered teams`);
-    if (track === "cross-task") {
-      await expect(card.locator(".leaderboard-preview-pending-link")).toHaveCount(0);
-    } else {
-      await expect(card.locator(".leaderboard-preview-pending-link"))
-        .toHaveText("1 method awaiting results");
-      await expect(card.locator(".leaderboard-preview-pending-link"))
-        .toHaveAttribute("href", `evaluation.html?track=${track}&view=submissions#leaderboards`);
-    }
-  }
-  await optical.locator(".leaderboard-preview-pending-link").click();
+  await expect(optical.locator(".leaderboard-preview-list li")).toHaveCount(3);
+  await expect(optical.locator(".leaderboard-preview-rank")).toHaveText(["1", "2", "3"]);
+  await expect(optical.locator(".leaderboard-preview-team strong"))
+    .toHaveText(["PlayStation", "ZXUv2.0", "ZXUv2.0"]);
+  await expect(optical.locator(".leaderboard-preview-method"))
+    .toHaveText(["SPEAR-L-K1", "CAR-WAFT", "Test"]);
+  await expect(optical.locator(".leaderboard-preview-score"))
+    .toHaveText(["0.2118", "0.3063", "0.3078"]);
+  const stereo = page.locator('.leaderboard-preview-card[aria-labelledby="preview-stereo-matching"]');
+  await expect(stereo.locator(".leaderboard-preview-team strong"))
+    .toHaveText(["KoreaU_DLmath", "Anonymous", "cactus8603"]);
+  const scene = page.locator('.leaderboard-preview-card[aria-labelledby="preview-scene-flow"]');
+  await expect(scene.locator(".leaderboard-preview-method")).toHaveText("Q4-Independent");
+  await expect(scene.locator(".leaderboard-preview-score")).toHaveText("0.2413");
+  const crossTask = page.locator('.leaderboard-preview-card[aria-labelledby="preview-cross-task"]');
+  await expect(crossTask.locator(".leaderboard-preview-team strong")).toHaveText("KoreaU_DLmath");
+  await expect(crossTask.locator(".leaderboard-preview-score")).toHaveText("0.2628");
+
+  await optical.getByRole("link", { name: "View full standings" }).click();
   await expect(page.getByRole("tab", { name: "Optical Flow", exact: true }))
     .toHaveAttribute("aria-selected", "true");
-  await expect(page.getByRole("combobox", { name: "Show", exact: true })).toHaveValue("submissions");
-  const submittedRows = page.locator('[role="tabpanel"]:not([hidden]) tbody tr[data-team-id]');
-  await expect(submittedRows).toHaveCount(5);
-  await expect(submittedRows.filter({ has: page.locator('a[href="https://spring-benchmark.org/471/"]') }))
-    .toHaveAttribute("data-team-id", "RoCo-14");
-  await expect(submittedRows.filter({ has: page.locator('a[href="https://spring-benchmark.org/474/"]') }))
-    .toHaveAttribute("data-team-id", "RoCo-29");
+  const winner = page.locator('[role="tabpanel"]:not([hidden]) tbody tr[data-team-id]').first();
+  await expect(winner).toHaveAttribute("data-team-id", "RoCo-23");
+  await expect(winner.locator(".leaderboard-method")).toHaveText("SPEAR-L-K1");
 });
 
 test("registration portal starts with three slots, validates partial members, and switches tabs", async ({ page }) => {
@@ -860,7 +828,7 @@ test("OpenReview submission buttons are consistent, accessible, and officially b
   for (const placement of placements) {
     await page.goto(placement.path);
     const button = page.locator(placement.scope)
-      .getByRole("link", { name: "OpenReview Submission", exact: true });
+      .getByRole("link", { name: "OpenReview Archive", exact: true });
     await expect(button).toHaveCount(1);
     await expect(button).toBeVisible();
     await expect(button).toHaveAttribute("href", expectedUrl);
@@ -897,7 +865,7 @@ test("OpenReview submission buttons wrap without mobile overflow", async ({ page
     "/call-for-papers.html"
   ]) {
     await page.goto(path);
-    await expect(page.getByRole("link", { name: "OpenReview Submission", exact: true })).toBeVisible();
+    await expect(page.getByRole("link", { name: "OpenReview Archive", exact: true })).toBeVisible();
     const widths = await page.evaluate(() => ({
       client: document.documentElement.clientWidth,
       scroll: document.documentElement.scrollWidth
