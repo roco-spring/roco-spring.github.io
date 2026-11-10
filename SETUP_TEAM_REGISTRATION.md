@@ -174,6 +174,111 @@ Do not rotate secrets, delete Auth users, or clear Firestore broadly before coll
 7. Requeue only affected pending/failed Sheet or email records after dependency health passes. Reset rate-limit documents only for requests demonstrably consumed by the incident.
 8. Run a controlled E2E test and monitor logs through at least two reconciler intervals.
 
+### 2026-09-16 dependency-health incident
+
+Read-only investigation at 15:04 UTC found one `google_transient` dependency
+failure at 14:31:05 UTC on `reconcileregistrations-00007-gih`, followed by six
+healthy scheduled passes from 14:36 through 15:01 UTC. The preceding 24-hour
+window contained 289 health checks: 288 healthy and that single failure. The
+runtime logs do not retain the failing Google endpoint or HTTP status, so the
+exact upstream cause is unknown. Recovery occurred automatically on the next
+scheduled pass; no deployment, credential rotation, or registration mutation
+was needed.
+
+The billing, bound Google integration health, function secret binding, remote
+monitoring/runtime, and five callable endpoint gates all passed. The first
+monitoring read encountered HTTP 503 at `run_service_iam`; one subsequent
+read-only attempt passed without configuration changes. The enabled dependency
+alert retains its configured 1,800-second auto-close period; this investigation
+verified application recovery, not the incident's closed state in the console.
+
+Firestore contained 55 active teams with matching committed registration
+requests, all 55 registration emails recorded as sent, no pending side effects,
+and no unsettled registration requests. The other 15 request records were failed
+attempts with cleanup complete. This is stored-state evidence, not a new inbox
+delivery test.
+
+Six pre-existing Sheet failures are separate from this incident. The exact
+stored Sheets for RoCo-1, RoCo-5, RoCo-6, RoCo-7, RoCo-40, and RoCo-41 are in
+Drive Trash. Their last failed attempts range from August 17 to September 5.
+All six still match their request markers and configured parent, have private
+permissions and organizer edit capability, and retain the expected tabs. The
+other 49 teams report synchronized Sheets. Stored revisions match for all 55,
+but this audit did not compare participant cell contents. Restoration was left
+pending clarification of whether the earlier removals were intentional; no
+Sheet was restored and no failure state was reset. Do not use the August 31
+requeue command for these files.
+
+Sanitized local evidence and read-only audit scripts are in the ignored
+`debugging/registration-incident-2026-09-16.{mjs,json}` and
+`debugging/registration-failed-sheets-2026-09-16.{mjs,json}`. They contain no
+credentials or participant payloads. To repeat the incident audit from this
+trusted operator checkout, run
+`node debugging/registration-incident-2026-09-16.mjs`; use
+`npm run google:health:bound` and `npm run production:runtime:verify` for the
+standard live gates. Production continues under the existing remote Scheduler
+and Cloud Monitoring, with no local supervisor required.
+
+### 2026-09-17 authorized test-account cleanup
+
+The organizer authorized deletion of the previously flagged registrations when
+their names matched Shashank, Katrin, or Henrique. RoCo-1 and RoCo-5 matched
+Shashank, RoCo-6 matched Henrique, RoCo-7 matched Katrin, and RoCo-40 matched a
+Shashank test label. Each was checked against its exact Auth user, registration
+request, owner/email mappings, and private marked Sheet already in Drive Trash.
+
+Cleanup completed at 11:00:14 UTC. It removed those five Auth users, five Sheets,
+20 Firestore documents (team, owner, email ownership, and registration request
+per team), and RoCo-40's cached leaderboard entry. The other four were already
+absent from that cache. No method-name documents existed for these targets.
+The guarded atomic Firestore write preserved the other cache entries and fenced
+expired refresh ownership; no active refresh or resource lease was interrupted.
+Auth absence was verified by both UID and email, Sheet absence by exact ID and
+request marker, and Firestore absence by exact path. All other 50 team bindings
+and the monotonic team counter were preserved. Shared rate-limit records were
+not changed.
+
+The live audit from September 16 at 15:05 UTC through September 17 at 10:57 UTC
+found 239 healthy dependency checks and 239 successful Scheduler completions,
+with no Cloud Run errors or Scheduler failures. Billing, bound Google health,
+remote runtime/monitoring, and all five callable endpoint gates passed. After
+cleanup, bound Google health passed again and the 11:01 UTC scheduled pass
+completed with healthy dependencies, a successful Sheet synchronization, HTTP
+200, and no errors.
+
+At 11:01:25 UTC, 50 active teams remained: 49 Sheets synchronized, all 50 emails
+recorded sent, and no pending registration or cleanup work. The one remaining
+failed Sheet belongs to RoCo-41. Its team/member names are `batman` / `itachi`,
+and its contact address does not match the supplied organizer names. It was
+initially preserved pending organizer identification.
+
+The organizer subsequently confirmed that RoCo-41 (`batman` / `itachi`) was
+also their test registration and explicitly authorized its deletion. Its cleanup
+completed at 11:25:06 UTC using the same guards with a separate, exact RoCo-41
+target and state file. The Auth user, four linked Firestore documents, trashed
+Sheet, and cached leaderboard entry were removed and verified absent. The other
+49 registrations and monotonic team counter were preserved.
+
+At 11:25:52 UTC, all 49 remaining teams were active, all 49 Sheets reported
+`synced` with matching stored revisions, and all 49 registration emails were
+recorded sent. There were no pending or failed Sheet/email jobs and no pending
+registration cleanup. The 15 historical failed request records still had
+cleanup complete. All six confirmed test registrations were absent. The
+RoCo-41 script and private state are
+`debugging/cleanup-roco-41-2026-09-17.{mjs,private.json}`; sanitized final counts
+are in `debugging/roco-41-cleanup-result-2026-09-17.json`.
+The bound Google health gate passed after deletion, and the 11:26 UTC scheduled
+pass was healthy, returned HTTP 200, and reported an empty queue with no errors.
+
+The cleanup script is
+`debugging/cleanup-test-registrations-2026-09-17.mjs`. Its ignored, mode-0600
+`.private.json` state contains the exact test resource identities needed for
+verification and recovery; do not publish it. The completed cleanup is verified
+with the same script's `--verify` option, and `--apply` resumes its saved state
+without broadening the target list. Sanitized evidence is in
+`debugging/registration-health-2026-09-17.json` and
+`debugging/registration-final-check-2026-09-17.json`.
+
 ### Exact 2026-08-31 Sheet-timeout recovery
 
 The operator command below is deliberately incident-specific. It accepts only RoCo-10, RoCo-14, RoCo-20, or RoCo-28 and requires the exact audited document update time, last-attempt time, retry count, active/sent/failed state, matching authoritative and synchronized revisions, existing Sheet/request bindings, `external_permanent` category, and exactly null lease fields. Any later edit or different failure makes the command ineligible. It preserves the original retry count and attempt timestamp, and changes only the misclassified status/category.
