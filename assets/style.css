@@ -1320,6 +1320,22 @@ p {
     margin-bottom: 0;
 }
 
+.competition-closed {
+    margin: -8px 0 22px;
+    padding: 20px 26px;
+    border: 1px solid rgba(193, 18, 31, 0.42);
+    border-radius: 18px;
+    background:
+        radial-gradient(circle at 0 0, rgba(255, 140, 140, 0.42), transparent 48%),
+        linear-gradient(135deg, #fff6f6, #ffd4d4);
+    box-shadow: 0 16px 40px rgba(160, 24, 32, 0.18), inset 0 0 0 1px rgba(255, 255, 255, 0.7);
+    color: #c1121f;
+    font-size: clamp(1.35rem, 2.6vw, 1.85rem);
+    font-weight: 800;
+    letter-spacing: -0.025em;
+    line-height: 1.35;
+}
+
 .tentative-note {
     margin-top: 14px;
     color: rgba(255, 255, 255, 0.58);

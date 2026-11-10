@@ -654,6 +654,8 @@ test("the homepage schedule is linked from the Schedule tab", async () => {
     const scheduleAt = index.indexOf('id="schedule"');
     const datasetsAt = index.indexOf("Spring and RobustSpring");
     assert.ok(previewAt < speakerAt && speakerAt < scheduleAt && scheduleAt < datasetsAt);
+    assert.match(index, /<h2>Competition Schedule<\/h2>\s*<\/div>\s*<p class="competition-closed">The competition has now concluded, and submissions are now closed\. See you at the workshop :\)<\/p>/u);
+    assert.doesNotMatch(index, /September 25, 2026 <span class="new-deadline-badge">NEW<\/span>/u);
     for (const item of [
         "15:30–15:45",
         "Opening Remarks",
