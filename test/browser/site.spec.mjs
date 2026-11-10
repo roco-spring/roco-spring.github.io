@@ -1032,12 +1032,20 @@ test("homepage portraits and funding logos stay compact at desktop and mobile si
     await page.goto("/index.html");
 
     const portraits = page.locator(".keynote-photo");
-    await expect(portraits).toHaveCount(2);
+    await expect(portraits).toHaveCount(1);
+    await expect(page.getByRole("link", { name: "Matteo Poggi", exact: true })).toHaveAttribute(
+      "href",
+      "https://scholar.google.com/citations?user=bve0VwgAAAAJ&hl=en"
+    );
     for (const portrait of await portraits.all()) {
       const box = await portrait.boundingBox();
       expect(box).not.toBeNull();
-      expect(box.width).toBeLessThanOrEqual(72);
-      expect(box.height).toBeLessThanOrEqual(72);
+      const maxSide = viewport.width > 680 ? 320 : 220;
+      const minSide = viewport.width > 680 ? 240 : 160;
+      expect(box.width).toBeGreaterThanOrEqual(minSide);
+      expect(box.width).toBeLessThanOrEqual(maxSide);
+      expect(box.height).toBeGreaterThanOrEqual(minSide);
+      expect(box.height).toBeLessThanOrEqual(maxSide);
       expect(Math.abs(box.width - box.height)).toBeLessThanOrEqual(1);
     }
 

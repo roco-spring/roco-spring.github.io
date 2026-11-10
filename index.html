@@ -7,7 +7,7 @@
     <title>RoCo-Spring: The Robust Correspondence Challenge</title>
     <meta name="description"
         content="Final results for RoCo-Spring, the concluded NeurIPS 2026 challenge on robust dense correspondence.">
-    <link rel="stylesheet" href="assets/style.css?v=be7d22599424">
+    <link rel="stylesheet" href="assets/style.css?v=fc900de56255">
     <script src="assets/site-layout.js" defer></script>
 </head>
 
@@ -119,33 +119,59 @@
                 </p>
             </div>
 
-            <div class="card-grid four">
+            <div class="winner-grid">
                 <article class="track-card winner-card">
                     <span class="track-card-badge">Optical Flow</span>
                     <h3>PlayStation</h3>
-                    <p>RoCo-23 · <a href="https://spring-benchmark.org/517/" target="_blank"
+                    <p class="winner-method">RoCo-23 · <a href="https://spring-benchmark.org/517/" target="_blank"
                             rel="noopener noreferrer">SPEAR-L-K1</a></p>
+                    <p class="winner-paper">
+                        <a href="https://openreview.net/forum?id=FMtSmCxOFk" target="_blank"
+                            rel="noopener noreferrer">SPEAR: Staged Pre-training and Expert Adapter Routing for Generalizable Optical Flow Learning</a>
+                    </p>
+                    <p class="winner-authors">Takahiro Shindo, Taiju Watanabe</p>
                     <p class="winner-score">RbS-Score 0.211795</p>
                 </article>
                 <article class="track-card winner-card">
                     <span class="track-card-badge">Stereo Matching</span>
                     <h3>KoreaU_DLmath</h3>
-                    <p>RoCo-19 · <a href="https://spring-benchmark.org/522/" target="_blank"
+                    <p class="winner-method">RoCo-19 · <a href="https://spring-benchmark.org/522/" target="_blank"
                             rel="noopener noreferrer">CorrDrop-Stereo</a></p>
+                    <p class="winner-paper">
+                        <a href="https://openreview.net/forum?id=YG4vxor9aA" target="_blank"
+                            rel="noopener noreferrer">Robust Stereo Matching under Missing Correspondence Evidence</a>
+                    </p>
+                    <p class="winner-authors">Minji Jeon, Donggun Kim, Jeongbin You, Seungsang Oh</p>
                     <p class="winner-score">RbS-Score 0.117581</p>
                 </article>
                 <article class="track-card winner-card">
                     <span class="track-card-badge">Scene Flow</span>
                     <h3>KoreaU_DLmath</h3>
-                    <p>RoCo-19 · <a href="https://spring-benchmark.org/518/" target="_blank"
+                    <p class="winner-method">RoCo-19 · <a href="https://spring-benchmark.org/518/" target="_blank"
                             rel="noopener noreferrer">Q4-Independent</a></p>
+                    <p class="winner-paper">
+                        <a href="https://openreview.net/forum?id=2hM9uf3sw6" target="_blank"
+                            rel="noopener noreferrer">Robust Scene Flow via Task-Wise Adaptation of Pretrained Stereo and Optical Flow</a>
+                    </p>
+                    <p class="winner-authors">Donggun Kim, Minji Jeon, Jeongbin You, Seungsang Oh</p>
                     <p class="winner-score">RbS-Score 0.241302</p>
                 </article>
                 <article class="track-card winner-card">
                     <span class="track-card-badge">Cross-Task</span>
                     <h3>KoreaU_DLmath</h3>
-                    <p>RoCo-19 · <a href="evaluation.html?track=cross-task#leaderboards">Combined quantitative
+                    <p class="winner-method">RoCo-19 · <a href="evaluation.html?track=cross-task#leaderboards">Combined quantitative
                             tracks</a></p>
+                    <p class="winner-papers-label">Workshop papers</p>
+                    <p class="winner-paper">
+                        <a href="https://openreview.net/forum?id=YG4vxor9aA" target="_blank"
+                            rel="noopener noreferrer">Robust Stereo Matching under Missing Correspondence Evidence</a>
+                    </p>
+                    <p class="winner-authors">Minji Jeon, Donggun Kim, Jeongbin You, Seungsang Oh</p>
+                    <p class="winner-paper">
+                        <a href="https://openreview.net/forum?id=2hM9uf3sw6" target="_blank"
+                            rel="noopener noreferrer">Robust Scene Flow via Task-Wise Adaptation of Pretrained Stereo and Optical Flow</a>
+                    </p>
+                    <p class="winner-authors">Donggun Kim, Minji Jeon, Jeongbin You, Seungsang Oh</p>
                     <p class="winner-score">RbS-Score 0.262759</p>
                 </article>
             </div>
@@ -331,155 +357,136 @@
             <p class="tentative-note">The quantitative challenge has concluded and its leaderboard is frozen. The workshop is on December 12, 2026.</p>
         </section>
 
-        <section class="section">
+        <section class="section" id="speaker" aria-labelledby="speaker-heading">
             <div class="section-heading">
                 <div class="eyebrow">Workshop</div>
-                <h2>Confirmed Keynote Speakers</h2>
+                <h2 id="speaker-heading">Invited Speaker</h2>
             </div>
 
-            <div class="card-grid two">
-                <article class="info-card keynote-card">
-                    <div class="keynote-profile">
-                        <a class="keynote-photo-link" href="https://www.cs.princeton.edu/~jiadeng/" target="_blank"
-                            rel="noopener noreferrer" aria-label="Visit Jia Deng's homepage">
-                            <img class="keynote-photo keynote-photo--jia" src="img/speakers/jia-deng.webp"
-                                alt="Jia Deng" loading="lazy">
-                        </a>
-                        <div class="keynote-identity">
-                            <h3>
-                                <a href="https://www.cs.princeton.edu/~jiadeng/" target="_blank"
-                                    rel="noopener noreferrer">Jia Deng</a>
-                            </h3>
-                            <p class="keynote-affiliation">
-                                Princeton University · Princeton Vision &amp; Learning Lab
-                            </p>
-                        </div>
-                    </div>
-                    <div class="keynote-content">
-                        <p>
-                            Jia Deng is Professor of Computer Science at Princeton University and
-                            Director of the Princeton Vision &amp; Learning Lab. He brings a uniquely
-                            relevant perspective to RoCo-Spring: his work spans benchmark-driven computer
-                            vision, large-scale datasets such as ImageNet<a class="citation-ref"
-                                href="#ref-deng2009imagenet" aria-label="Reference 1">[1]</a>, and
-                            influential dense correspondence architectures across multiple tasks,
-                            including RAFT for Optical Flow<a class="citation-ref" href="#ref-teed2020raft"
-                                aria-label="Reference 2">[2]</a>, RAFT-Stereo for Stereo Matching<a
-                                class="citation-ref" href="#ref-lipson2021raft-stereo"
-                                aria-label="Reference 3">[3]</a>, and SEA-RAFT for efficient and accurate
-                            Optical Flow<a class="citation-ref" href="#ref-wang2024searaft"
-                                aria-label="Reference 4">[4]</a>. His keynote will connect the evolution
-                            of correspondence methods and benchmark design with the central question of
-                            the challenge: how to turn clean benchmark progress into robust Optical Flow,
-                            Stereo Matching, and Scene Flow methods that remain reliable under realistic visual
-                            shifts.
+            <article class="info-card keynote-card keynote-card--featured">
+                <div class="keynote-profile">
+                    <a class="keynote-photo-link" href="https://scholar.google.com/citations?user=bve0VwgAAAAJ&amp;hl=en"
+                        target="_blank" rel="noopener noreferrer" aria-label="Visit Matteo Poggi's Google Scholar profile">
+                        <img class="keynote-photo keynote-photo--matteo" src="img/speakers/matteo-poggi.webp"
+                            alt="Matteo Poggi" loading="lazy">
+                    </a>
+                    <div class="keynote-identity">
+                        <h3>
+                            <a href="https://scholar.google.com/citations?user=bve0VwgAAAAJ&amp;hl=en" target="_blank"
+                                rel="noopener noreferrer">Matteo Poggi</a>
+                        </h3>
+                        <p class="keynote-affiliation">
+                            Associate Professor · University of Bologna · CVLab
                         </p>
                     </div>
-                </article>
-
-                <article class="info-card keynote-card">
-                    <div class="keynote-profile">
-                        <a class="keynote-photo-link" href="https://www.porikli.com/" target="_blank"
-                            rel="noopener noreferrer" aria-label="Visit Fatih Porikli's homepage">
-                            <img class="keynote-photo keynote-photo--fatih" src="img/speakers/fatih-porikli.webp"
-                                alt="Fatih Porikli" loading="lazy">
-                        </a>
-                        <div class="keynote-identity">
-                            <h3>
-                                <a href="https://www.porikli.com/" target="_blank"
-                                    rel="noopener noreferrer">Fatih Porikli</a>
-                            </h3>
-                            <p class="keynote-affiliation">Qualcomm AI Research</p>
-                        </div>
-                    </div>
-                    <div class="keynote-content">
-                        <p>
-                            Fatih Porikli is an IEEE Fellow and Vice President of Technology at Qualcomm
-                            AI Research. His expertise connects robust visual perception, video
-                            understanding, low-level vision, and real-world deployment. His prior work
-                            includes scene-flow estimation under degraded video conditions, including
-                            simultaneous stereo video deblurring and Scene Flow estimation<a class="citation-ref"
-                                href="#ref-pan2017stereodeblur" aria-label="Reference 5">[5]</a>, joint stereo video
-                            deblurring, scene
-                            flow estimation, and moving-object segmentation<a class="citation-ref"
-                                href="#ref-pan2020jointstereo" aria-label="Reference 6">[6]</a>, and
-                            adversarial robustness for vision systems<a class="citation-ref"
-                                href="#ref-naseer2020selfsupervised" aria-label="Reference 7">[7]</a>.
-                            His talk will provide an industry-facing and deployment-oriented perspective
-                            on robust dense correspondence.
-                        </p>
-                    </div>
-                </article>
-            </div>
+                </div>
+                <div class="keynote-content">
+                    <p>
+                        Matteo Poggi is Associate Professor at the University of Bologna, where he
+                        conducts research on dense correspondence at CVLab. His work sits at the center
+                        of RoCo-Spring: stereo matching, optical flow, and depth estimation that remain
+                        reliable when the visual domain shifts. He introduced continual adaptation for
+                        deep stereo with MADNet, a modular network that adapts online from the images
+                        observed at deployment, without requiring new ground truth<a class="citation-ref"
+                            href="#ref-poggi2021continual" aria-label="Reference 1">[1]</a>, and he has
+                        surveyed both the relationship between learning and binocular stereo<a class="citation-ref"
+                            href="#ref-poggi2021synergies" aria-label="Reference 2">[2]</a> and deep stereo
+                        matching in the 2020s<a class="citation-ref" href="#ref-tosi2025survey"
+                            aria-label="Reference 3">[3]</a>. Recent work includes FlowIt, a global-matching
+                        optical flow architecture evaluated on Spring as well as Sintel and KITTI, which
+                        recovers motion together with explicit confidence and occlusion cues<a class="citation-ref"
+                            href="#ref-safadoust2026flowit" aria-label="Reference 4">[4]</a>. His invited
+                        talk will connect this line of correspondence research with the question at the
+                        center of the workshop: how Optical Flow, Stereo Matching, and Scene Flow stay
+                        accurate under realistic corruptions such as noise, weather, blur, compression,
+                        and changes in illumination.
+                    </p>
+                </div>
+            </article>
 
             <div class="keynote-references content-card">
                 <h3>References</h3>
                 <ol>
-                    <li id="ref-deng2009imagenet">
-                        Deng, J., Dong, W., Socher, R., Li, L.-J., Li, K., &amp; Fei-Fei, L. (2009).
-                        ImageNet: A Large-Scale Hierarchical Image Database. <em>Proc. IEEE Conference
-                            on Computer Vision and Pattern Recognition (CVPR)</em>, 248–255.
+                    <li id="ref-poggi2021continual">
+                        Poggi, M., Tonioni, A., Tosi, F., Mattoccia, S., &amp; Di Stefano, L. (2021).
+                        Continual Adaptation for Deep Stereo. <em>IEEE Transactions on Pattern Analysis
+                            and Machine Intelligence (TPAMI)</em>.
                     </li>
-                    <li id="ref-teed2020raft">
-                        Teed, Z., &amp; Deng, J. (2020). RAFT: Recurrent All-Pairs Field Transforms
-                        for Optical Flow. <em>Proc. European Conference on Computer Vision (ECCV)</em>,
-                        402–419.
+                    <li id="ref-poggi2021synergies">
+                        Poggi, M., Tosi, F., Batsos, K., Mordohai, P., &amp; Mattoccia, S. (2021).
+                        On the Synergies between Machine Learning and Binocular Stereo for Depth
+                        Estimation from Images: A Survey. <em>IEEE Transactions on Pattern Analysis
+                            and Machine Intelligence (TPAMI)</em>.
                     </li>
-                    <li id="ref-lipson2021raft-stereo">
-                        Lipson, L., Teed, Z., &amp; Deng, J. (2021). RAFT-Stereo: Multilevel Recurrent
-                        Field Transforms for Stereo Matching. <em>Proc. International Conference on 3D
-                            Vision (3DV)</em>, 218–227.
+                    <li id="ref-tosi2025survey">
+                        Tosi, F., Bartolomei, L., &amp; Poggi, M. (2025). A Survey on Deep Stereo
+                        Matching in the Twenties. <em>International Journal of Computer Vision
+                            (IJCV)</em>, 133, 4245–4276.
                     </li>
-                    <li id="ref-wang2024searaft">
-                        Wang, Y., Lipson, L., &amp; Deng, J. (2024). SEA-RAFT: Simple, Efficient,
-                        Accurate RAFT for Optical Flow. <em>Proc. European Conference on Computer Vision
-                            (ECCV)</em>, 36–54.
-                    </li>
-                    <li id="ref-pan2017stereodeblur">
-                        Pan, L., Dai, Y., Liu, M., &amp; Porikli, F. (2017). Simultaneous Stereo Video
-                        Deblurring and Scene Flow Estimation. <em>Proc. IEEE Conference on Computer
-                            Vision and Pattern Recognition (CVPR)</em>, 6987–6996.
-                    </li>
-                    <li id="ref-pan2020jointstereo">
-                        Pan, L., Dai, Y., Liu, M., Porikli, F., &amp; Pan, Q. (2020). Joint Stereo Video
-                        Deblurring, Scene Flow Estimation and Moving Object Segmentation.
-                        <em>IEEE Transactions on Image Processing (TIP)</em>, 29, 1748–1761.
-                    </li>
-                    <li id="ref-naseer2020selfsupervised">
-                        Naseer, M., Khan, S., Hayat, M., Khan, F. S., &amp; Porikli, F. (2020). A
-                        Self-Supervised Approach for Adversarial Robustness. <em>Proc. IEEE/CVF
-                            Conference on Computer Vision and Pattern Recognition (CVPR)</em>, 262–271.
+                    <li id="ref-safadoust2026flowit">
+                        Safadoust, S., Tosi, F., Poggi, M., &amp; Güney, F. (2026). FlowIt: Global
+                        Matching via Hierarchical Transformers and Optimal Transport for Optical Flow.
+                        <em>Proc. British Machine Vision Conference (BMVC)</em>.
                     </li>
                 </ol>
             </div>
         </section>
 
-        <section class="section">
+        <section class="section" id="schedule" aria-labelledby="schedule-heading">
             <div class="section-heading">
                 <div class="eyebrow">Schedule</div>
-                <h2>Workshop Schedule</h2>
+                <h2 id="schedule-heading">Workshop Schedule</h2>
+                <p>December 12, 2026 · Room MR C4.3 · Sydney local time</p>
             </div>
 
             <div class="table-wrapper content-card">
                 <table class="schedule-table">
                     <thead>
                         <tr>
-                            <th>Date</th>
-                            <th>Time (Sydney local)</th>
-                            <th>Location</th>
+                            <th>Time</th>
+                            <th>Duration</th>
+                            <th>Activity</th>
                         </tr>
                     </thead>
                     <tbody>
                         <tr>
-                            <td>December 12, 2026</td>
-                            <td>15:30–17:45</td>
-                            <td>Room MR C4.3</td>
+                            <td>15:30–15:45</td>
+                            <td>15 mins</td>
+                            <td>Opening Remarks</td>
+                        </tr>
+                        <tr class="schedule-row--oral">
+                            <td>15:45–16:05</td>
+                            <td>20 mins (15 mins talk + 5 mins discussion)</td>
+                            <td>Oral Presentation: Team RoCo-19</td>
+                        </tr>
+                        <tr class="schedule-row--break">
+                            <td>16:05–16:15</td>
+                            <td>10 mins</td>
+                            <td>Coffee Break</td>
+                        </tr>
+                        <tr class="schedule-row--oral">
+                            <td>16:15–16:30</td>
+                            <td>15 mins (10 mins talk + 5 mins discussion)</td>
+                            <td>Oral Presentation: Team RoCo-23</td>
+                        </tr>
+                        <tr class="schedule-row--invited">
+                            <td>16:30–17:00</td>
+                            <td>30 mins</td>
+                            <td>Invited Talk: <a href="#speaker">Matteo Poggi</a></td>
+                        </tr>
+                        <tr>
+                            <td>17:00–17:15</td>
+                            <td>15 mins</td>
+                            <td>Open Discussion: Town Hall + Closing Remarks</td>
+                        </tr>
+                        <tr class="schedule-row--poster">
+                            <td>17:15–17:45</td>
+                            <td>30 mins</td>
+                            <td>Poster Session</td>
                         </tr>
                     </tbody>
                 </table>
             </div>
-
-            <p class="tentative-note">Detailed program to be announced.</p>
         </section>
 
         <section class="section">
@@ -630,7 +637,7 @@
     <script src="assets/flow.js"></script>
     <script src="assets/lightbox.js"></script>
     <script src="assets/timeline.js?v=f7339b1bec9f"></script>
-    <script src="assets/leaderboard.js?v=41e98ae2f307"></script>
+    <script src="assets/leaderboard.js?v=eaae2e69eb92"></script>
 </body>
 
 </html>

@@ -1128,13 +1128,52 @@ p {
     transition: transform 0.28s ease, filter 0.28s ease;
 }
 
-.keynote-photo--jia {
-    object-position: 50% 20%;
+.keynote-photo--matteo {
+    object-position: 50% 42%;
 }
 
-.keynote-photo--fatih {
-    object-position: 50% 38%;
-    background: linear-gradient(#ffffff 0%, #f8f8f8 48%, #b9b9b9 100%);
+.keynote-card--featured {
+    display: grid;
+    grid-template-columns: minmax(240px, 340px) minmax(0, 1fr);
+    gap: 42px;
+    align-items: center;
+    padding: 42px 48px;
+    background:
+        radial-gradient(circle at 0% 0%, rgba(93, 124, 255, 0.16), transparent 38%),
+        radial-gradient(circle at 100% 100%, rgba(0, 212, 255, 0.14), transparent 34%),
+        linear-gradient(165deg, #ffffff 0%, #f4f8ff 100%);
+    box-shadow: 0 22px 54px rgba(21, 34, 76, 0.16);
+}
+
+.keynote-card--featured .keynote-profile {
+    flex-direction: column;
+    align-items: center;
+    gap: 18px;
+    text-align: center;
+}
+
+.keynote-card--featured .keynote-photo-link {
+    width: 272px;
+    height: 272px;
+    flex-basis: 272px;
+    border: 4px solid transparent;
+    background:
+        linear-gradient(#ffffff, #ffffff) padding-box,
+        linear-gradient(140deg, #7b90ff, #62e7ff 55%, #d7b15a) border-box;
+    box-shadow:
+        0 18px 42px rgba(27, 42, 82, 0.22),
+        0 0 32px rgba(93, 124, 255, 0.22);
+}
+
+.keynote-card--featured .keynote-identity h3 {
+    margin-bottom: 8px;
+    font-size: clamp(1.8rem, 3vw, 2.35rem);
+}
+
+.keynote-card--featured .keynote-content p {
+    color: #2a3550;
+    font-size: 1.05rem;
+    line-height: 1.72;
 }
 
 .keynote-photo-link:hover {
@@ -1831,6 +1870,57 @@ td {
 
 .schedule-table td:first-child {
     font-weight: 650;
+    white-space: nowrap;
+}
+
+.schedule-table td:nth-child(2) {
+    font-weight: 650;
+}
+
+.schedule-table tbody tr {
+    transition: background 0.2s ease;
+}
+
+.schedule-row--oral td {
+    background: linear-gradient(90deg, rgba(93, 124, 255, 0.12), rgba(93, 124, 255, 0.03));
+}
+
+.schedule-row--oral td:first-child {
+    box-shadow: inset 3px 0 0 var(--accent);
+}
+
+.schedule-row--break td {
+    color: #6d7890;
+}
+
+.schedule-row--invited td {
+    background: linear-gradient(90deg, rgba(255, 206, 92, 0.42), rgba(255, 228, 160, 0.16));
+    color: #4a3208;
+    font-weight: 750;
+}
+
+.schedule-row--invited td:first-child {
+    box-shadow: inset 3px 0 0 #e0a21a;
+}
+
+.schedule-row--invited a {
+    color: #7a4e00;
+    font-weight: 850;
+    text-decoration-thickness: 2px;
+    text-underline-offset: 3px;
+}
+
+.schedule-row--invited a:hover,
+.schedule-row--invited a:focus-visible {
+    color: #3f2800;
+}
+
+.schedule-row--poster td {
+    background: linear-gradient(90deg, rgba(0, 212, 255, 0.12), rgba(0, 212, 255, 0.03));
+}
+
+.schedule-row--poster td:first-child {
+    box-shadow: inset 3px 0 0 var(--accent-2);
 }
 
 .organizer-grid>div {
@@ -3637,6 +3727,8 @@ details p {
     .nav-toggle-bar,
     .keynote-photo-link,
     .keynote-photo,
+    .winner-card,
+    .winner-card::before,
     .sponsor-feature-logo,
     .funder-logo-card,
     .image-lightbox-close {
@@ -3660,6 +3752,7 @@ details p {
     .nav-toggle:hover,
     .keynote-photo-link:hover,
     .keynote-photo-link:hover .keynote-photo,
+    .winner-card:hover,
     .sponsor-feature-logo:hover,
     .funder-logo-card:hover,
     .image-lightbox-close:hover,
@@ -3669,7 +3762,9 @@ details p {
     }
 
     .button.participate-cta:hover:not(:disabled):not([aria-disabled="true"])::before,
-    .button.participate-cta:focus-visible:not(:disabled):not([aria-disabled="true"])::before {
+    .button.participate-cta:focus-visible:not(:disabled):not([aria-disabled="true"])::before,
+    .winner-card,
+    .winner-card::before {
         animation: none;
     }
 
@@ -3815,6 +3910,27 @@ details p {
         width: 64px;
         height: 64px;
         flex-basis: 64px;
+    }
+
+    .keynote-card--featured {
+        grid-template-columns: 1fr;
+        justify-items: center;
+        gap: 22px;
+        padding: 28px 22px;
+    }
+
+    .keynote-card--featured .keynote-photo-link {
+        width: 196px;
+        height: 196px;
+        flex-basis: 196px;
+    }
+
+    .keynote-card--featured .keynote-content {
+        text-align: left;
+    }
+
+    .winner-grid {
+        grid-template-columns: 1fr;
     }
 
     .sponsor-feature,
@@ -4030,10 +4146,144 @@ details p {
     font-size: 0.82rem;
 }
 
+.winner-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 22px;
+}
+
+.winner-card {
+    position: relative;
+    isolation: isolate;
+    overflow: hidden;
+    min-height: 0;
+    border: 1px solid rgba(214, 158, 42, 0.72);
+    background:
+        radial-gradient(circle at 0% 0%, rgba(255, 220, 120, 0.72), transparent 42%),
+        radial-gradient(circle at 100% 110%, rgba(255, 176, 48, 0.38), transparent 46%),
+        linear-gradient(165deg, #fffdf6 0%, #fff3cc 46%, #ffe7a4 100%);
+    box-shadow:
+        0 0 0 1px rgba(255, 214, 120, 0.45),
+        0 18px 42px rgba(140, 92, 12, 0.2),
+        0 0 34px rgba(255, 188, 48, 0.42);
+    color: #4a3208;
+    animation: winner-glow 3.6s ease-in-out infinite;
+}
+
+.winner-card::before {
+    position: absolute;
+    inset: -45%;
+    z-index: 0;
+    background: linear-gradient(115deg, transparent 36%, rgba(255, 255, 255, 0.62) 48%, transparent 60%);
+    content: "";
+    pointer-events: none;
+    animation: winner-shine 5.2s ease-in-out infinite;
+}
+
+.winner-card>* {
+    position: relative;
+    z-index: 1;
+}
+
+.winner-card .track-card-badge {
+    background: linear-gradient(135deg, #a87412, #f0c14a 55%, #ffe7a3);
+    color: #fffaf0;
+    box-shadow: 0 8px 18px rgba(168, 116, 18, 0.32);
+}
+
+.winner-card h3 {
+    color: #6a4508;
+    font-size: clamp(1.45rem, 2vw, 1.8rem);
+}
+
+.winner-card p {
+    color: #5c4318;
+}
+
+.winner-card a {
+    color: #7a4e00;
+    font-weight: 750;
+    text-decoration-color: rgba(122, 78, 0, 0.4);
+    text-decoration-thickness: 2px;
+    text-underline-offset: 3px;
+}
+
+.winner-card a:hover,
+.winner-card a:focus-visible {
+    color: #3f2800;
+    text-decoration-color: #3f2800;
+}
+
+.winner-method {
+    margin-bottom: 8px;
+    font-weight: 700;
+}
+
+.winner-papers-label {
+    margin: 12px 0 6px;
+    color: #8a5a00;
+    font-size: 0.74rem;
+    font-weight: 850;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.winner-paper {
+    margin: 0 0 4px;
+    font-weight: 750;
+    line-height: 1.4;
+}
+
+.winner-authors {
+    margin: 0 0 10px;
+    color: #6d5430;
+    font-size: 0.92rem;
+}
+
 .winner-card .winner-score {
-    margin-top: 12px;
-    color: inherit;
-    font-weight: 760;
+    display: inline-block;
+    margin-top: 8px;
+    padding: 6px 12px;
+    border-radius: 999px;
+    background: linear-gradient(135deg, #b8860b, #f2c14d);
+    color: #fffaf0;
+    font-weight: 850;
+    letter-spacing: 0.01em;
+    box-shadow: 0 8px 18px rgba(168, 116, 18, 0.28);
+}
+
+@keyframes winner-glow {
+    0%,
+    100% {
+        box-shadow:
+            0 0 0 1px rgba(255, 214, 120, 0.4),
+            0 18px 42px rgba(140, 92, 12, 0.18),
+            0 0 26px rgba(255, 188, 48, 0.32);
+    }
+
+    50% {
+        box-shadow:
+            0 0 0 1px rgba(255, 226, 150, 0.85),
+            0 22px 48px rgba(140, 92, 12, 0.24),
+            0 0 52px rgba(255, 196, 64, 0.72);
+    }
+}
+
+@keyframes winner-shine {
+    0%,
+    100% {
+        opacity: 0;
+        transform: translateX(-18%);
+    }
+
+    42% {
+        opacity: 1;
+    }
+
+    72% {
+        opacity: 0;
+        transform: translateX(18%);
+    }
 }
 
 .leaderboard-refresh-status {
@@ -4748,5 +4998,74 @@ a.leaderboard-method:focus-visible {
     .leaderboard-tab:hover,
     .leaderboard-preview-card:hover {
         transform: none;
+    }
+}
+
+@media (max-width: 680px) {
+    .winner-grid {
+        grid-template-columns: 1fr;
+    }
+
+    table.schedule-table,
+    .schedule-table {
+        min-width: 0;
+    }
+
+    .schedule-table thead {
+        display: none;
+    }
+
+    .schedule-table,
+    .schedule-table tbody,
+    .schedule-table tr,
+    .schedule-table td {
+        display: block;
+        width: 100%;
+    }
+
+    .schedule-table tr {
+        padding: 12px 14px 12px 16px;
+    }
+
+    .schedule-table td {
+        padding: 2px 0;
+        border-bottom: 0;
+    }
+
+    .schedule-table td:first-child {
+        color: #273158;
+        font-size: 1rem;
+        box-shadow: none;
+    }
+
+    .schedule-row--oral {
+        box-shadow: inset 3px 0 0 var(--accent);
+    }
+
+    .schedule-row--invited {
+        box-shadow: inset 3px 0 0 #e0a21a;
+    }
+
+    .schedule-row--poster {
+        box-shadow: inset 3px 0 0 var(--accent-2);
+    }
+
+    .schedule-table td:nth-child(2)::before,
+    .schedule-table td:nth-child(3)::before {
+        display: block;
+        margin-bottom: 2px;
+        color: #6d7890;
+        font-size: 0.72rem;
+        font-weight: 850;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+    }
+
+    .schedule-table td:nth-child(2)::before {
+        content: "Duration";
+    }
+
+    .schedule-table td:nth-child(3)::before {
+        content: "Activity";
     }
 }

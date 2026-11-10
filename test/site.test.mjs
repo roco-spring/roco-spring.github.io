@@ -442,7 +442,7 @@ test("site headings and named resources use consistent capitalization", async ()
     for (const required of [
         "Four Challenge Tracks",
         "Competition Schedule",
-        "Confirmed Keynote Speakers",
+        "Invited Speaker",
         "Sponsors &amp; Acknowledgements",
         "Step-by-Step Participation",
         "Task-Specific Error Metrics",
@@ -507,6 +507,7 @@ test("homepage includes the requested sponsor and project-specific acknowledgeme
         .trim();
 
     assert.match(index, /<section class="section support-section" id="sponsors">/u);
+    assert.match(chrome, /href="index\.html#schedule">Schedule<\/a>/u);
     assert.match(chrome, /href="index\.html#sponsors">Sponsors<\/a>/u);
     assert.ok(normalized.includes(
         "This event is supported by the SFB-TRR 161 Quantitative Methods for Visual Computing."
@@ -616,32 +617,67 @@ test("Call for Papers is a dedicated tab with four concise tracks and exact subm
     assert.match(rules, /href="call-for-papers\.html">Call for Papers<\/a>/u);
 });
 
-test("keynote speaker names and portraits link to their verified homepages", async () => {
+test("the invited speaker portrait links to the verified Google Scholar profile", async () => {
     const index = await source("index.html");
+    const speaker = {
+        name: "Matteo Poggi",
+        homepage: "https://scholar.google.com/citations?user=bve0VwgAAAAJ&amp;hl=en",
+        portrait: "img/speakers/matteo-poggi.webp"
+    };
 
-    for (const speaker of [
-        {
-            name: "Jia Deng",
-            homepage: "https://www.cs.princeton.edu/~jiadeng/",
-            portrait: "img/speakers/jia-deng.webp"
-        },
-        {
-            name: "Fatih Porikli",
-            homepage: "https://www.porikli.com/",
-            portrait: "img/speakers/fatih-porikli.webp"
-        }
+    assert.match(index, /<section class="section" id="speaker"/u);
+    assert.match(index, /<h2 id="speaker-heading">Invited Speaker<\/h2>/u);
+    assert.ok(index.includes(`href="${speaker.homepage}"`), speaker.name);
+    assert.ok(index.includes(`src="${speaker.portrait}"`), speaker.name);
+    assert.match(
+        index,
+        new RegExp(
+            `<a href="${speaker.homepage.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}"[^>]*>${speaker.name}<\\/a>`,
+            "u"
+        ),
+        speaker.name
+    );
+    assert.doesNotMatch(index, /Jia Deng|Fatih Porikli/u);
+    await assert.doesNotReject(access(path.join(ROOT, speaker.portrait)), speaker.portrait);
+});
+
+test("the homepage schedule is linked from the Schedule tab", async () => {
+    const index = await source("index.html");
+    const chrome = await source("assets/site-chrome.html");
+
+    assert.match(chrome, /<a href="index\.html#schedule">Schedule<\/a>/u);
+    assert.match(index, /<section class="section" id="schedule"/u);
+    for (const item of [
+        "15:30–15:45",
+        "Opening Remarks",
+        "Oral Presentation: Team RoCo-19",
+        "Coffee Break",
+        "Oral Presentation: Team RoCo-23",
+        "Invited Talk:",
+        "Open Discussion: Town Hall + Closing Remarks",
+        "Poster Session",
+        "17:15–17:45"
     ]) {
-        assert.ok(index.includes(`href="${speaker.homepage}"`), speaker.name);
-        assert.ok(index.includes(`src="${speaker.portrait}"`), speaker.name);
-        assert.match(
-            index,
-            new RegExp(
-                `<a href="${speaker.homepage.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}"[^>]*>${speaker.name}<\\/a>`,
-                "u"
-            ),
-            speaker.name
-        );
-        await assert.doesNotReject(access(path.join(ROOT, speaker.portrait)), speaker.portrait);
+        assert.ok(index.includes(item), item);
+    }
+    assert.doesNotMatch(index, /Detailed program to be announced/u);
+});
+
+test("winner cards cite the OpenReview papers and author lists", async () => {
+    const index = await source("index.html");
+    const evaluation = await source("evaluation.html");
+
+    for (const page of [index, evaluation]) {
+        assert.match(page, /class="winner-grid"/u);
+        assert.match(page, /https:\/\/openreview\.net\/forum\?id=FMtSmCxOFk/u);
+        assert.match(page, /SPEAR: Staged Pre-training and Expert Adapter Routing for Generalizable Optical Flow Learning/u);
+        assert.match(page, /Takahiro Shindo, Taiju Watanabe/u);
+        assert.match(page, /https:\/\/openreview\.net\/forum\?id=YG4vxor9aA/u);
+        assert.match(page, /Robust Stereo Matching under Missing Correspondence Evidence/u);
+        assert.match(page, /Minji Jeon, Donggun Kim, Jeongbin You, Seungsang Oh/u);
+        assert.match(page, /https:\/\/openreview\.net\/forum\?id=2hM9uf3sw6/u);
+        assert.match(page, /Robust Scene Flow via Task-Wise Adaptation of Pretrained Stereo and Optical Flow/u);
+        assert.match(page, /Donggun Kim, Minji Jeon, Jeongbin You, Seungsang Oh/u);
     }
 });
 

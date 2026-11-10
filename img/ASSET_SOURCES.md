@@ -10,14 +10,12 @@ The website stores these public-facing assets locally so production pages do not
   [institutional profile](https://www.uni-mannheim.de/dws/people/researchers/postdoctoral-research-fellows/steffen-jung/).
   His name links to his [personal homepage](https://jung.vision/).
 
-## Keynote speakers
+## Invited speaker
 
-- `speakers/jia-deng.webp` is an optimized derivative of Jia Deng's portrait on his
-  [Princeton Computer Science profile](https://www.cs.princeton.edu/people/profile/jiadeng).
-  The image and name link to his official Princeton homepage.
-- `speakers/fatih-porikli.webp` is an optimized derivative of Fatih Porikli's headshot on the
-  [Qualcomm author page](https://www.qualcomm.com/news/onq/2025/12/qualcomm-ai-research-neurips-2025).
-  The image and name link to his personal homepage.
+- `speakers/matteo-poggi.webp` is an optimized derivative of Matteo Poggi's portrait at
+  <https://mattpoggi.github.io/assets/img/mpoggi.jpeg>.
+  The image and name link to his
+  [Google Scholar profile](https://scholar.google.com/citations?user=bve0VwgAAAAJ&hl=en).
 
 Public profile display does not itself grant a general reuse license. The event organizers should retain or
 obtain any speaker/institution approval required for promotional use.

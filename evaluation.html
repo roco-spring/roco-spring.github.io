@@ -7,7 +7,7 @@
     <title>Leaderboard — RoCo-Spring</title>
     <meta name="description"
         content="Final frozen RbS-Score leaderboard, winners, baselines, and metric definition for RoCo-Spring.">
-    <link rel="stylesheet" href="assets/style.css?v=be7d22599424">
+    <link rel="stylesheet" href="assets/style.css?v=fc900de56255">
     <script src="assets/site-layout.js" defer></script>
 </head>
 
@@ -36,33 +36,59 @@
                 </p>
             </div>
 
-            <div class="card-grid four">
+            <div class="winner-grid">
                 <article class="track-card winner-card">
                     <span class="track-card-badge">Optical Flow</span>
                     <h3>PlayStation</h3>
-                    <p>RoCo-23 · <a href="https://spring-benchmark.org/517/" target="_blank"
+                    <p class="winner-method">RoCo-23 · <a href="https://spring-benchmark.org/517/" target="_blank"
                             rel="noopener noreferrer">SPEAR-L-K1</a></p>
+                    <p class="winner-paper">
+                        <a href="https://openreview.net/forum?id=FMtSmCxOFk" target="_blank"
+                            rel="noopener noreferrer">SPEAR: Staged Pre-training and Expert Adapter Routing for Generalizable Optical Flow Learning</a>
+                    </p>
+                    <p class="winner-authors">Takahiro Shindo, Taiju Watanabe</p>
                     <p class="winner-score">RbS-Score 0.211795</p>
                 </article>
                 <article class="track-card winner-card">
                     <span class="track-card-badge">Stereo Matching</span>
                     <h3>KoreaU_DLmath</h3>
-                    <p>RoCo-19 · <a href="https://spring-benchmark.org/522/" target="_blank"
+                    <p class="winner-method">RoCo-19 · <a href="https://spring-benchmark.org/522/" target="_blank"
                             rel="noopener noreferrer">CorrDrop-Stereo</a></p>
+                    <p class="winner-paper">
+                        <a href="https://openreview.net/forum?id=YG4vxor9aA" target="_blank"
+                            rel="noopener noreferrer">Robust Stereo Matching under Missing Correspondence Evidence</a>
+                    </p>
+                    <p class="winner-authors">Minji Jeon, Donggun Kim, Jeongbin You, Seungsang Oh</p>
                     <p class="winner-score">RbS-Score 0.117581</p>
                 </article>
                 <article class="track-card winner-card">
                     <span class="track-card-badge">Scene Flow</span>
                     <h3>KoreaU_DLmath</h3>
-                    <p>RoCo-19 · <a href="https://spring-benchmark.org/518/" target="_blank"
+                    <p class="winner-method">RoCo-19 · <a href="https://spring-benchmark.org/518/" target="_blank"
                             rel="noopener noreferrer">Q4-Independent</a></p>
+                    <p class="winner-paper">
+                        <a href="https://openreview.net/forum?id=2hM9uf3sw6" target="_blank"
+                            rel="noopener noreferrer">Robust Scene Flow via Task-Wise Adaptation of Pretrained Stereo and Optical Flow</a>
+                    </p>
+                    <p class="winner-authors">Donggun Kim, Minji Jeon, Jeongbin You, Seungsang Oh</p>
                     <p class="winner-score">RbS-Score 0.241302</p>
                 </article>
                 <article class="track-card winner-card">
                     <span class="track-card-badge">Cross-Task</span>
                     <h3>KoreaU_DLmath</h3>
-                    <p>RoCo-19 · <a href="evaluation.html?track=cross-task#leaderboards">Combined quantitative
+                    <p class="winner-method">RoCo-19 · <a href="evaluation.html?track=cross-task#leaderboards">Combined quantitative
                             tracks</a></p>
+                    <p class="winner-papers-label">Workshop papers</p>
+                    <p class="winner-paper">
+                        <a href="https://openreview.net/forum?id=YG4vxor9aA" target="_blank"
+                            rel="noopener noreferrer">Robust Stereo Matching under Missing Correspondence Evidence</a>
+                    </p>
+                    <p class="winner-authors">Minji Jeon, Donggun Kim, Jeongbin You, Seungsang Oh</p>
+                    <p class="winner-paper">
+                        <a href="https://openreview.net/forum?id=2hM9uf3sw6" target="_blank"
+                            rel="noopener noreferrer">Robust Scene Flow via Task-Wise Adaptation of Pretrained Stereo and Optical Flow</a>
+                    </p>
+                    <p class="winner-authors">Donggun Kim, Minji Jeon, Jeongbin You, Seungsang Oh</p>
                     <p class="winner-score">RbS-Score 0.262759</p>
                 </article>
             </div>
@@ -480,7 +506,7 @@
     <footer id="site-footer"></footer>
 
     <script src="assets/flow.js"></script>
-    <script src="assets/leaderboard.js?v=41e98ae2f307"></script>
+    <script src="assets/leaderboard.js?v=eaae2e69eb92"></script>
 </body>
 
 </html>
