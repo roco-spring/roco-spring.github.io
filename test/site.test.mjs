@@ -645,8 +645,14 @@ test("the homepage schedule is linked from the Schedule tab", async () => {
     const index = await source("index.html");
     const chrome = await source("assets/site-chrome.html");
 
-    assert.match(chrome, /<a href="index\.html#schedule">Schedule<\/a>/u);
+    assert.match(chrome, /<a href="index\.html">Overview<\/a>\s*<a href="index\.html#schedule">Schedule<\/a>/u);
+    assert.match(index, /class="button schedule-cta" href="#schedule">Schedule<\/a>/u);
     assert.match(index, /<section class="section" id="schedule"/u);
+    const previewAt = index.indexOf('id="leaderboard-preview-heading"');
+    const speakerAt = index.indexOf('id="speaker"');
+    const scheduleAt = index.indexOf('id="schedule"');
+    const datasetsAt = index.indexOf("Spring and RobustSpring");
+    assert.ok(previewAt < speakerAt && speakerAt < scheduleAt && scheduleAt < datasetsAt);
     for (const item of [
         "15:30–15:45",
         "Opening Remarks",

@@ -4,6 +4,38 @@
     const scriptUrl = document.currentScript?.src || location.href;
     const publishedSnapshotUrl = new URL("leaderboard-data.json", scriptUrl);
     const quantitativeTrackKeys = ["optical-flow", "stereo-matching", "scene-flow"];
+    const stereoWinnerPaper = Object.freeze({
+        title: "Robust Stereo Matching under Missing Correspondence Evidence",
+        href: "https://openreview.net/forum?id=YG4vxor9aA",
+        authors: "Minji Jeon, Donggun Kim, Jeongbin You, Seungsang Oh"
+    });
+    const sceneFlowWinnerPaper = Object.freeze({
+        title: "Robust Scene Flow via Task-Wise Adaptation of Pretrained Stereo and Optical Flow",
+        href: "https://openreview.net/forum?id=2hM9uf3sw6",
+        authors: "Donggun Kim, Minji Jeon, Jeongbin You, Seungsang Oh"
+    });
+    const winnerPapers = Object.freeze({
+        "optical-flow": Object.freeze({
+            teamId: "RoCo-23",
+            papers: Object.freeze([Object.freeze({
+                title: "SPEAR: Staged Pre-training and Expert Adapter Routing for Generalizable Optical Flow Learning",
+                href: "https://openreview.net/forum?id=FMtSmCxOFk",
+                authors: "Takahiro Shindo, Taiju Watanabe"
+            })])
+        }),
+        "stereo-matching": Object.freeze({
+            teamId: "RoCo-19",
+            papers: Object.freeze([stereoWinnerPaper])
+        }),
+        "scene-flow": Object.freeze({
+            teamId: "RoCo-19",
+            papers: Object.freeze([sceneFlowWinnerPaper])
+        }),
+        "cross-task": Object.freeze({
+            teamId: "RoCo-19",
+            papers: Object.freeze([stereoWinnerPaper, sceneFlowWinnerPaper])
+        })
+    });
     const tracks = [
         {
             key: "optical-flow",
@@ -449,6 +481,26 @@
         return `${label}: d1 ${formatNumber(d1, 3)} · d2 ${formatNumber(d2, 3)} · flow ${formatNumber(flow, 3)}`;
     }
 
+    function winnerRecord(trackKey, row) {
+        const record = winnerPapers[trackKey];
+        if (!record || row.isBaseline === true || row.rank !== 1 || row.teamId !== record.teamId) {
+            return null;
+        }
+        return record;
+    }
+
+    function appendWinnerPapers(parent, record) {
+        const block = element("span", "leaderboard-winner-papers");
+        record.papers.forEach((paper) => {
+            const link = element("a", "leaderboard-paper", paper.title);
+            link.href = paper.href;
+            link.target = "_blank";
+            link.rel = "noopener noreferrer";
+            block.append(link, element("span", "leaderboard-paper-authors", paper.authors));
+        });
+        parent.append(block);
+    }
+
     function buildRankChange(change) {
         const node = element("span", "rank-change");
         if (change > 0) {
@@ -499,6 +551,8 @@
             if (!isBaseline) tableRow.dataset.teamId = row.teamId;
             if (isPending) tableRow.classList.add("leaderboard-row--pending");
             if (isBaseline) tableRow.classList.add("leaderboard-row--baseline");
+            const winner = winnerRecord(track.key, row);
+            if (winner) tableRow.classList.add("leaderboard-row--winner");
 
             const rankCell = element("td", "leaderboard-rank-cell");
             const rank = element(
@@ -563,6 +617,7 @@
                     method.setAttribute("aria-label", `${row.benchmarkMethod} benchmark result (opens in a new tab)`);
                 }
                 methodCell.append(method);
+                if (winner) appendWinnerPapers(methodCell, winner);
             } else {
                 const noMethod = element("span", "leaderboard-method-placeholder", "—");
                 noMethod.setAttribute("aria-label", "No matched method");
@@ -792,6 +847,8 @@
 
             rows.forEach((row) => {
                 const item = document.createElement("li");
+                const winner = winnerRecord(track.key, row);
+                if (winner) item.classList.add("leaderboard-preview-winner");
                 item.append(element("span", "leaderboard-preview-rank", String(row.rank)));
                 const identity = element("span", "leaderboard-preview-team");
                 identity.append(
@@ -805,6 +862,7 @@
                         row.benchmarkMethod
                     ));
                 }
+                if (winner) appendWinnerPapers(identity, winner);
                 item.append(identity);
                 item.append(
                     isFiniteNumber(row.score)
@@ -906,6 +964,18 @@
         document.querySelectorAll("[data-leaderboard-source]").forEach((node) => {
             node.textContent = visibleSourceLabel(snapshot, syncState);
         });
+        // The preview replaces a short loading note and can push the speaker
+        // and schedule down after a hash link has already scrolled.
+        keepHashTargetInView();
+    }
+
+    function keepHashTargetInView() {
+        const id = location.hash.slice(1);
+        if (id !== "schedule" && id !== "speaker") return;
+        const target = document.getElementById(id);
+        if (!target) return;
+        const top = target.getBoundingClientRect().top;
+        if (top < 70 || top > 160) target.scrollIntoView();
     }
 
     function renderUnavailable() {

@@ -7,7 +7,7 @@
     <title>RoCo-Spring: The Robust Correspondence Challenge</title>
     <meta name="description"
         content="Final results for RoCo-Spring, the concluded NeurIPS 2026 challenge on robust dense correspondence.">
-    <link rel="stylesheet" href="assets/style.css?v=fc900de56255">
+    <link rel="stylesheet" href="assets/style.css?v=d91897009d63">
     <script src="assets/site-layout.js" defer></script>
 </head>
 
@@ -82,6 +82,7 @@
                         <span>Archive</span>
                     </a>
                     <a class="button secondary" href="evaluation.html">Leaderboard</a>
+                    <a class="button schedule-cta" href="#schedule">Schedule</a>
                     <a class="button starter-kit" href="https://github.com/hmorimitsu/roco-spring-devkit"
                         target="_blank" rel="noopener noreferrer">
                         <svg class="button-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
@@ -195,6 +196,138 @@
             </p>
             <div class="leaderboard-loading" data-leaderboard-root data-mode="preview" aria-live="polite">
                 Loading published standings…
+            </div>
+        </section>
+
+        <section class="section" id="speaker" aria-labelledby="speaker-heading">
+            <div class="section-heading">
+                <div class="eyebrow">Workshop</div>
+                <h2 id="speaker-heading">Invited Speaker</h2>
+            </div>
+
+            <article class="info-card keynote-card keynote-card--featured">
+                <div class="keynote-profile">
+                    <a class="keynote-photo-link" href="https://scholar.google.com/citations?user=bve0VwgAAAAJ&amp;hl=en"
+                        target="_blank" rel="noopener noreferrer" aria-label="Visit Matteo Poggi's Google Scholar profile">
+                        <img class="keynote-photo keynote-photo--matteo" src="img/speakers/matteo-poggi.webp"
+                            alt="Matteo Poggi" loading="lazy">
+                    </a>
+                    <div class="keynote-identity">
+                        <h3>
+                            <a href="https://scholar.google.com/citations?user=bve0VwgAAAAJ&amp;hl=en" target="_blank"
+                                rel="noopener noreferrer">Matteo Poggi</a>
+                        </h3>
+                        <p class="keynote-affiliation">
+                            Associate Professor · University of Bologna · CVLab
+                        </p>
+                    </div>
+                </div>
+                <div class="keynote-content">
+                    <p>
+                        Matteo Poggi is Associate Professor at the University of Bologna, where he
+                        conducts research on dense correspondence at CVLab. His work sits at the center
+                        of RoCo-Spring: stereo matching, optical flow, and depth estimation that remain
+                        reliable when the visual domain shifts. He introduced continual adaptation for
+                        deep stereo with MADNet, a modular network that adapts online from the images
+                        observed at deployment, without requiring new ground truth<a class="citation-ref"
+                            href="#ref-poggi2021continual" aria-label="Reference 1">[1]</a>, and he has
+                        surveyed both the relationship between learning and binocular stereo<a class="citation-ref"
+                            href="#ref-poggi2021synergies" aria-label="Reference 2">[2]</a> and deep stereo
+                        matching in the 2020s<a class="citation-ref" href="#ref-tosi2025survey"
+                            aria-label="Reference 3">[3]</a>. Recent work includes FlowIt, a global-matching
+                        optical flow architecture evaluated on Spring as well as Sintel and KITTI, which
+                        recovers motion together with explicit confidence and occlusion cues<a class="citation-ref"
+                            href="#ref-safadoust2026flowit" aria-label="Reference 4">[4]</a>. His invited
+                        talk will connect this line of correspondence research with the question at the
+                        center of the workshop: how Optical Flow, Stereo Matching, and Scene Flow stay
+                        accurate under realistic corruptions such as noise, weather, blur, compression,
+                        and changes in illumination.
+                    </p>
+                </div>
+            </article>
+
+            <div class="keynote-references content-card">
+                <h3>References</h3>
+                <ol>
+                    <li id="ref-poggi2021continual">
+                        Poggi, M., Tonioni, A., Tosi, F., Mattoccia, S., &amp; Di Stefano, L. (2021).
+                        Continual Adaptation for Deep Stereo. <em>IEEE Transactions on Pattern Analysis
+                            and Machine Intelligence (TPAMI)</em>.
+                    </li>
+                    <li id="ref-poggi2021synergies">
+                        Poggi, M., Tosi, F., Batsos, K., Mordohai, P., &amp; Mattoccia, S. (2021).
+                        On the Synergies between Machine Learning and Binocular Stereo for Depth
+                        Estimation from Images: A Survey. <em>IEEE Transactions on Pattern Analysis
+                            and Machine Intelligence (TPAMI)</em>.
+                    </li>
+                    <li id="ref-tosi2025survey">
+                        Tosi, F., Bartolomei, L., &amp; Poggi, M. (2025). A Survey on Deep Stereo
+                        Matching in the Twenties. <em>International Journal of Computer Vision
+                            (IJCV)</em>, 133, 4245–4276.
+                    </li>
+                    <li id="ref-safadoust2026flowit">
+                        Safadoust, S., Tosi, F., Poggi, M., &amp; Güney, F. (2026). FlowIt: Global
+                        Matching via Hierarchical Transformers and Optimal Transport for Optical Flow.
+                        <em>Proc. British Machine Vision Conference (BMVC)</em>.
+                    </li>
+                </ol>
+            </div>
+        </section>
+
+        <section class="section" id="schedule" aria-labelledby="schedule-heading">
+            <div class="section-heading">
+                <div class="eyebrow">Schedule</div>
+                <h2 id="schedule-heading">Workshop Schedule</h2>
+                <p>December 12, 2026 · Room MR C4.3 · Sydney local time</p>
+            </div>
+
+            <div class="table-wrapper content-card">
+                <table class="schedule-table">
+                    <thead>
+                        <tr>
+                            <th>Time</th>
+                            <th>Duration</th>
+                            <th>Activity</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>15:30–15:45</td>
+                            <td>15 mins</td>
+                            <td>Opening Remarks</td>
+                        </tr>
+                        <tr class="schedule-row--oral">
+                            <td>15:45–16:05</td>
+                            <td>20 mins (15 mins talk + 5 mins discussion)</td>
+                            <td>Oral Presentation: Team RoCo-19</td>
+                        </tr>
+                        <tr class="schedule-row--break">
+                            <td>16:05–16:15</td>
+                            <td>10 mins</td>
+                            <td>Coffee Break</td>
+                        </tr>
+                        <tr class="schedule-row--oral">
+                            <td>16:15–16:30</td>
+                            <td>15 mins (10 mins talk + 5 mins discussion)</td>
+                            <td>Oral Presentation: Team RoCo-23</td>
+                        </tr>
+                        <tr class="schedule-row--invited">
+                            <td>16:30–17:00</td>
+                            <td>30 mins</td>
+                            <td>Invited Talk: <a href="#speaker">Matteo Poggi</a></td>
+                        </tr>
+                        <tr>
+                            <td>17:00–17:15</td>
+                            <td>15 mins</td>
+                            <td>Open Discussion: Town Hall + Closing Remarks</td>
+                        </tr>
+                        <tr class="schedule-row--poster">
+                            <td>17:15–17:45</td>
+                            <td>30 mins</td>
+                            <td>Poster Session</td>
+                        </tr>
+                    </tbody>
+                </table>
             </div>
         </section>
 
@@ -357,138 +490,6 @@
             <p class="tentative-note">The quantitative challenge has concluded and its leaderboard is frozen. The workshop is on December 12, 2026.</p>
         </section>
 
-        <section class="section" id="speaker" aria-labelledby="speaker-heading">
-            <div class="section-heading">
-                <div class="eyebrow">Workshop</div>
-                <h2 id="speaker-heading">Invited Speaker</h2>
-            </div>
-
-            <article class="info-card keynote-card keynote-card--featured">
-                <div class="keynote-profile">
-                    <a class="keynote-photo-link" href="https://scholar.google.com/citations?user=bve0VwgAAAAJ&amp;hl=en"
-                        target="_blank" rel="noopener noreferrer" aria-label="Visit Matteo Poggi's Google Scholar profile">
-                        <img class="keynote-photo keynote-photo--matteo" src="img/speakers/matteo-poggi.webp"
-                            alt="Matteo Poggi" loading="lazy">
-                    </a>
-                    <div class="keynote-identity">
-                        <h3>
-                            <a href="https://scholar.google.com/citations?user=bve0VwgAAAAJ&amp;hl=en" target="_blank"
-                                rel="noopener noreferrer">Matteo Poggi</a>
-                        </h3>
-                        <p class="keynote-affiliation">
-                            Associate Professor · University of Bologna · CVLab
-                        </p>
-                    </div>
-                </div>
-                <div class="keynote-content">
-                    <p>
-                        Matteo Poggi is Associate Professor at the University of Bologna, where he
-                        conducts research on dense correspondence at CVLab. His work sits at the center
-                        of RoCo-Spring: stereo matching, optical flow, and depth estimation that remain
-                        reliable when the visual domain shifts. He introduced continual adaptation for
-                        deep stereo with MADNet, a modular network that adapts online from the images
-                        observed at deployment, without requiring new ground truth<a class="citation-ref"
-                            href="#ref-poggi2021continual" aria-label="Reference 1">[1]</a>, and he has
-                        surveyed both the relationship between learning and binocular stereo<a class="citation-ref"
-                            href="#ref-poggi2021synergies" aria-label="Reference 2">[2]</a> and deep stereo
-                        matching in the 2020s<a class="citation-ref" href="#ref-tosi2025survey"
-                            aria-label="Reference 3">[3]</a>. Recent work includes FlowIt, a global-matching
-                        optical flow architecture evaluated on Spring as well as Sintel and KITTI, which
-                        recovers motion together with explicit confidence and occlusion cues<a class="citation-ref"
-                            href="#ref-safadoust2026flowit" aria-label="Reference 4">[4]</a>. His invited
-                        talk will connect this line of correspondence research with the question at the
-                        center of the workshop: how Optical Flow, Stereo Matching, and Scene Flow stay
-                        accurate under realistic corruptions such as noise, weather, blur, compression,
-                        and changes in illumination.
-                    </p>
-                </div>
-            </article>
-
-            <div class="keynote-references content-card">
-                <h3>References</h3>
-                <ol>
-                    <li id="ref-poggi2021continual">
-                        Poggi, M., Tonioni, A., Tosi, F., Mattoccia, S., &amp; Di Stefano, L. (2021).
-                        Continual Adaptation for Deep Stereo. <em>IEEE Transactions on Pattern Analysis
-                            and Machine Intelligence (TPAMI)</em>.
-                    </li>
-                    <li id="ref-poggi2021synergies">
-                        Poggi, M., Tosi, F., Batsos, K., Mordohai, P., &amp; Mattoccia, S. (2021).
-                        On the Synergies between Machine Learning and Binocular Stereo for Depth
-                        Estimation from Images: A Survey. <em>IEEE Transactions on Pattern Analysis
-                            and Machine Intelligence (TPAMI)</em>.
-                    </li>
-                    <li id="ref-tosi2025survey">
-                        Tosi, F., Bartolomei, L., &amp; Poggi, M. (2025). A Survey on Deep Stereo
-                        Matching in the Twenties. <em>International Journal of Computer Vision
-                            (IJCV)</em>, 133, 4245–4276.
-                    </li>
-                    <li id="ref-safadoust2026flowit">
-                        Safadoust, S., Tosi, F., Poggi, M., &amp; Güney, F. (2026). FlowIt: Global
-                        Matching via Hierarchical Transformers and Optimal Transport for Optical Flow.
-                        <em>Proc. British Machine Vision Conference (BMVC)</em>.
-                    </li>
-                </ol>
-            </div>
-        </section>
-
-        <section class="section" id="schedule" aria-labelledby="schedule-heading">
-            <div class="section-heading">
-                <div class="eyebrow">Schedule</div>
-                <h2 id="schedule-heading">Workshop Schedule</h2>
-                <p>December 12, 2026 · Room MR C4.3 · Sydney local time</p>
-            </div>
-
-            <div class="table-wrapper content-card">
-                <table class="schedule-table">
-                    <thead>
-                        <tr>
-                            <th>Time</th>
-                            <th>Duration</th>
-                            <th>Activity</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr>
-                            <td>15:30–15:45</td>
-                            <td>15 mins</td>
-                            <td>Opening Remarks</td>
-                        </tr>
-                        <tr class="schedule-row--oral">
-                            <td>15:45–16:05</td>
-                            <td>20 mins (15 mins talk + 5 mins discussion)</td>
-                            <td>Oral Presentation: Team RoCo-19</td>
-                        </tr>
-                        <tr class="schedule-row--break">
-                            <td>16:05–16:15</td>
-                            <td>10 mins</td>
-                            <td>Coffee Break</td>
-                        </tr>
-                        <tr class="schedule-row--oral">
-                            <td>16:15–16:30</td>
-                            <td>15 mins (10 mins talk + 5 mins discussion)</td>
-                            <td>Oral Presentation: Team RoCo-23</td>
-                        </tr>
-                        <tr class="schedule-row--invited">
-                            <td>16:30–17:00</td>
-                            <td>30 mins</td>
-                            <td>Invited Talk: <a href="#speaker">Matteo Poggi</a></td>
-                        </tr>
-                        <tr>
-                            <td>17:00–17:15</td>
-                            <td>15 mins</td>
-                            <td>Open Discussion: Town Hall + Closing Remarks</td>
-                        </tr>
-                        <tr class="schedule-row--poster">
-                            <td>17:15–17:45</td>
-                            <td>30 mins</td>
-                            <td>Poster Session</td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-        </section>
-
         <section class="section">
             <div class="section-heading">
                 <div class="eyebrow">Organizers</div>
@@ -637,7 +638,7 @@
     <script src="assets/flow.js"></script>
     <script src="assets/lightbox.js"></script>
     <script src="assets/timeline.js?v=f7339b1bec9f"></script>
-    <script src="assets/leaderboard.js?v=eaae2e69eb92"></script>
+    <script src="assets/leaderboard.js?v=49883076e854"></script>
 </body>
 
 </html>
