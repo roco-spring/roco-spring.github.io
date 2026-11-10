@@ -15,6 +15,7 @@ import {
 
 const COMMIT = "a".repeat(40);
 const REQUIRED_PUBLICATION_FILES = Object.freeze([
+    "accepted-papers.html",
     "call-for-papers.html",
     "evaluation.html",
     "index.html",

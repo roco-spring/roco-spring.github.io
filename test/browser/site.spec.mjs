@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 
 const SITE_PAGES = [
+  "accepted-papers.html",
   "call-for-papers.html",
   "index.html",
   "participate.html",

@@ -16,6 +16,7 @@ const DEFAULT_MAX_ATTEMPTS = 40;
 const DEFAULT_POLL_DELAY_MS = 15_000;
 const EXPECTED_CHECKS = Object.freeze(["verify", "deploy"]);
 const PUBLISHED_FILES = Object.freeze([
+    "accepted-papers.html",
     "call-for-papers.html",
     "evaluation.html",
     "index.html",

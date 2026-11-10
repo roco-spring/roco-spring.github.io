@@ -5,6 +5,7 @@ import test from "node:test";
 
 const ROOT = path.resolve(import.meta.dirname, "..");
 const HTML_FILES = [
+    "accepted-papers.html",
     "call-for-papers.html",
     "index.html",
     "participate.html",
@@ -594,7 +595,7 @@ test("Call for Papers is a dedicated tab with four concise tracks and exact subm
     assert.match(callForPapers, /<title>Call for Papers — RoCo-Spring<\/title>/u);
     assert.match(
         chrome,
-        /Participate<\/a> <a href="call-for-papers\.html">Call for Papers<\/a> <a href="tasks-data\.html">Tasks &amp; Data<\/a>/u
+        /Participate<\/a> <a href="call-for-papers\.html">Call for Papers<\/a> <a href="accepted-papers\.html">Accepted Papers<\/a> <a href="tasks-data\.html">Tasks &amp; Data<\/a>/u
     );
     assert.match(chrome, /<footer[\s\S]*href="call-for-papers\.html">Call for Papers<\/a>/u);
     for (const track of ["Optical Flow", "Stereo Matching", "Scene Flow", "Exploration Track"]) {
@@ -685,6 +686,40 @@ test("winner cards cite the OpenReview papers and author lists", async () => {
         assert.match(page, /Robust Scene Flow via Task-Wise Adaptation of Pretrained Stereo and Optical Flow/u);
         assert.match(page, /Donggun Kim, Minji Jeon, Jeongbin You, Seungsang Oh/u);
     }
+});
+
+test("accepted papers page lists orals first, then the remaining papers by submission number", async () => {
+    const page = await source("accepted-papers.html");
+    const chrome = (await source("assets/site-chrome.html")).replace(/\s+/gu, " ");
+    const leaderboard = await source("assets/leaderboard.js");
+
+    assert.match(page, /<title>Accepted Papers — RoCo-Spring<\/title>/u);
+    assert.match(chrome, /href="accepted-papers\.html">Accepted Papers<\/a>/u);
+    assert.match(page, /All papers accepted for Oral Presentation will also have a Poster presentation\./u);
+    assert.match(page, /id="poster-instructions"/u);
+    assert.match(page, /61 cm \(W\) × 85 cm \(H\) Portrait format/u);
+    assert.match(page, /Authors are NOT permitted to hang any posters on the walls of the venue/u);
+    assert.match(page, /https:\/\/neurips\.cc\/Conferences\/2026\/PosterInstructions/u);
+    assert.match(page, /mailto:roco-spring-org@googlegroups\.com/u);
+    assert.ok(page.indexOf('id="oral-presentations"') < page.indexOf('id="poster-presentations"'));
+    assert.match(page, /Submission 10<\/span>[\s\S]*Submission 17<\/span>[\s\S]*Submission 1<\/span>[\s\S]*Submission 7<\/span>[\s\S]*Submission 9<\/span>[\s\S]*Submission 13<\/span>[\s\S]*Submission 23<\/span>[\s\S]*Submission 24<\/span>/u);
+    for (const forum of [
+        "FMtSmCxOFk",
+        "YG4vxor9aA",
+        "zuRXHI62cn",
+        "ShsYQK3k8d",
+        "gNwQB6jE0Z",
+        "2hM9uf3sw6",
+        "tG2S5yNu2a",
+        "YDHZ5C9kc5"
+    ]) {
+        assert.match(page, new RegExp(`https://openreview\\.net/forum\\?id=${forum}`, "u"), forum);
+    }
+    assert.match(leaderboard, /gNwQB6jE0Z/u);
+    assert.match(leaderboard, /tG2S5yNu2a/u);
+    assert.match(leaderboard, /ShsYQK3k8d/u);
+    assert.match(leaderboard, /leaderboard-preview-place-2/u);
+    assert.match(leaderboard, /leaderboard-preview-place-3/u);
 });
 
 test("generic primary and secondary buttons have polished interaction states", async () => {

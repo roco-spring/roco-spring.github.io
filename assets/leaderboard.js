@@ -14,26 +14,39 @@
         href: "https://openreview.net/forum?id=2hM9uf3sw6",
         authors: "Donggun Kim, Minji Jeon, Jeongbin You, Seungsang Oh"
     });
-    const winnerPapers = Object.freeze({
+    // Team numbers come from the OpenReview abstracts. Ranks 1–3 on a track
+    // share this lookup, so second and third place show the same paper block.
+    const placementPapers = Object.freeze({
         "optical-flow": Object.freeze({
-            teamId: "RoCo-23",
-            papers: Object.freeze([Object.freeze({
+            "RoCo-23": Object.freeze([Object.freeze({
                 title: "SPEAR: Staged Pre-training and Expert Adapter Routing for Generalizable Optical Flow Learning",
                 href: "https://openreview.net/forum?id=FMtSmCxOFk",
                 authors: "Takahiro Shindo, Taiju Watanabe"
+            })]),
+            "RoCo-14": Object.freeze([Object.freeze({
+                title: "CAR-GR for RoCo-Spring: Clean-Anchored Adaptation with Error-Supervised Gated Residual Refinement",
+                href: "https://openreview.net/forum?id=gNwQB6jE0Z",
+                authors: "Zihang Shu, Xiangyu Guo, Changrui Li"
             })])
         }),
         "stereo-matching": Object.freeze({
-            teamId: "RoCo-19",
-            papers: Object.freeze([stereoWinnerPaper])
+            "RoCo-19": Object.freeze([stereoWinnerPaper]),
+            "RoCo-67": Object.freeze([Object.freeze({
+                title: "From Failure Observability to Risk-Guided Input Adaptation in Stereo Matching",
+                href: "https://openreview.net/forum?id=tG2S5yNu2a",
+                authors: "Eunsu Baek"
+            })]),
+            "RoCo-22": Object.freeze([Object.freeze({
+                title: "PairBridge: Selective Optical-Flow Adaptation with Benefit–Harm Supervision",
+                href: "https://openreview.net/forum?id=ShsYQK3k8d",
+                authors: "SHAO-KAI LIU, Yun-Tze Tsai, Chih-Chung Hsu"
+            })])
         }),
         "scene-flow": Object.freeze({
-            teamId: "RoCo-19",
-            papers: Object.freeze([sceneFlowWinnerPaper])
+            "RoCo-19": Object.freeze([sceneFlowWinnerPaper])
         }),
         "cross-task": Object.freeze({
-            teamId: "RoCo-19",
-            papers: Object.freeze([stereoWinnerPaper, sceneFlowWinnerPaper])
+            "RoCo-19": Object.freeze([stereoWinnerPaper, sceneFlowWinnerPaper])
         })
     });
     const tracks = [
@@ -482,11 +495,9 @@
     }
 
     function winnerRecord(trackKey, row) {
-        const record = winnerPapers[trackKey];
-        if (!record || row.isBaseline === true || row.rank !== 1 || row.teamId !== record.teamId) {
-            return null;
-        }
-        return record;
+        if (row.isBaseline === true || row.rank < 1 || row.rank > 3) return null;
+        const papers = placementPapers[trackKey]?.[row.teamId];
+        return papers ? { papers } : null;
     }
 
     function appendWinnerPapers(parent, record) {
@@ -552,7 +563,9 @@
             if (isPending) tableRow.classList.add("leaderboard-row--pending");
             if (isBaseline) tableRow.classList.add("leaderboard-row--baseline");
             const winner = winnerRecord(track.key, row);
-            if (winner) tableRow.classList.add("leaderboard-row--winner");
+            if (winner && row.rank === 1) tableRow.classList.add("leaderboard-row--winner");
+            if (winner && row.rank === 2) tableRow.classList.add("leaderboard-row--place-2");
+            if (winner && row.rank === 3) tableRow.classList.add("leaderboard-row--place-3");
 
             const rankCell = element("td", "leaderboard-rank-cell");
             const rank = element(
@@ -848,7 +861,9 @@
             rows.forEach((row) => {
                 const item = document.createElement("li");
                 const winner = winnerRecord(track.key, row);
-                if (winner) item.classList.add("leaderboard-preview-winner");
+                if (winner && row.rank === 1) item.classList.add("leaderboard-preview-winner");
+                if (winner && row.rank === 2) item.classList.add("leaderboard-preview-place-2");
+                if (winner && row.rank === 3) item.classList.add("leaderboard-preview-place-3");
                 item.append(element("span", "leaderboard-preview-rank", String(row.rank)));
                 const identity = element("span", "leaderboard-preview-team");
                 identity.append(
