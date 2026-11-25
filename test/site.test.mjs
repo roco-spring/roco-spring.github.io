@@ -657,12 +657,13 @@ test("the homepage schedule is linked from the Schedule tab", async () => {
     assert.match(index, /<h2>Competition Schedule<\/h2>\s*<\/div>\s*<p class="competition-closed">The competition has now concluded, and submissions are now closed\. See you at the workshop :\)<\/p>/u);
     assert.doesNotMatch(index, /September 25, 2026 <span class="new-deadline-badge">NEW<\/span>/u);
     for (const item of [
-        "14:45–15:30",
+        "14:45–15:25",
         "Poster Session",
-        "15:30–15:45",
+        "15:25–15:40",
         "Opening Remarks",
+        "15:40–16:00",
         "Oral Presentation: Team RoCo-19",
-        "16:05–16:20",
+        "16:00–16:15",
         "Oral Presentation: Team RoCo-23",
         "16:15–16:55",
         "Invited Talk:",
